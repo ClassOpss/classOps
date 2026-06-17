@@ -199,7 +199,11 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
 [x] Step 1 — Prisma schema (all models + lesson-plan template), entrypoint.sh, Dockerfile,
     docker-compose.yml, .env, seed (admin + 10 schools + 18 topics), initial migration applied.
     App builds clean. Local Postgres 17 running on localhost:5432.
-[ ] Auth working with role detection
+[x] Step 2 — Auth.js v5 (Credentials + JWT, 7-day) with edge-safe split config (auth.config.ts
+    + auth.ts), Prisma adapter, login logs an activity entry. proxy.ts (Next 16 rename of
+    middleware) + auth-guards.ts enforce roles: admin=all, teacher=admin area minus
+    pay/users/activity, assistant=/my only (admin may view /my). Verified via runtime smoke test.
+    Login page + sign-out wired. Dev test accounts: scripts/dev-users.ts.
 [ ] Batch import: student PDF upload + Claude parse + preview + insert
 [ ] — update this section as modules are completed —
 
