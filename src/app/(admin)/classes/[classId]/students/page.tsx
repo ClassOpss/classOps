@@ -2,18 +2,9 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { deactivateStudent } from "@/actions/students";
+import { uniqueCode } from "@/lib/code";
 import { ImportStudents } from "./import-students";
 import { AddStudentForm } from "./add-student-form";
-
-// Next suggested code: max numeric suffix of existing "C<n>" codes + 1.
-function nextCodeNumber(codes: string[]): number {
-  let max = 0;
-  for (const c of codes) {
-    const m = /^C(\d+)$/.exec(c.trim());
-    if (m) max = Math.max(max, parseInt(m[1], 10));
-  }
-  return max + 1;
-}
 
 export default async function StudentsPage({
   params,
@@ -40,7 +31,8 @@ export default async function StudentsPage({
     );
   }
 
-  const startNumber = nextCodeNumber(klass.students.map((s) => s.code));
+  const existingCodes = klass.students.map((s) => s.code);
+  const suggestedCode = uniqueCode(new Set(existingCodes));
 
   return (
     <div className="flex flex-col gap-8">
@@ -56,14 +48,14 @@ export default async function StudentsPage({
       {user.role === "admin" && (
         <section>
           <h2 className="mb-3 font-medium">Import students from PDF</h2>
-          <ImportStudents classId={classId} startNumber={startNumber} />
+          <ImportStudents classId={classId} existingCodes={existingCodes} />
         </section>
       )}
 
       {user.role === "admin" && (
         <section>
           <h2 className="mb-3 font-medium">Add a student manually</h2>
-          <AddStudentForm classId={classId} suggestedCode={`C${startNumber}`} />
+          <AddStudentForm classId={classId} suggestedCode={suggestedCode} />
         </section>
       )}
 

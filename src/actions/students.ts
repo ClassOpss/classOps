@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
+import { uniqueCode } from "@/lib/code";
 
 export type ImportRow = { name: string; code: string };
 export type ImportResult = { added: number; skipped: number; error?: string };
@@ -22,14 +23,20 @@ export async function addStudent(
 ): Promise<FormState> {
   const admin = await requireRole("admin");
   const name = String(formData.get("name") ?? "").trim();
-  const code = String(formData.get("code") ?? "").trim();
-  if (!name || !code) return { error: "Name and code are required." };
+  if (!name) return { error: "Name is required." };
 
-  const clash = await prisma.student.findFirst({
-    where: { classId, OR: [{ code }, { name: { equals: name, mode: "insensitive" } }] },
-    select: { id: true },
+  const existing = await prisma.student.findMany({
+    where: { classId },
+    select: { name: true, code: true },
   });
-  if (clash) return { error: "A student with that name or code already exists in this class." };
+  if (existing.some((s) => s.name.toLowerCase() === name.toLowerCase())) {
+    return { error: "A student with that name already exists in this class." };
+  }
+
+  // Code is optional — use the provided one if free, otherwise mint a random unique code.
+  const taken = new Set(existing.map((s) => s.code));
+  let code = String(formData.get("code") ?? "").trim();
+  if (!code || taken.has(code)) code = uniqueCode(taken);
 
   await prisma.student.create({ data: { classId, name, code } });
   await syncStudentCount(classId);
@@ -80,15 +87,18 @@ export async function importStudents(
 
   for (const row of rows) {
     const name = row.name.trim();
-    const code = row.code.trim();
-    if (!name || !code) {
+    if (!name) {
       skipped++;
       continue;
     }
-    if (seenNames.has(name.toLowerCase()) || seenCodes.has(code)) {
+    // Only a duplicate NAME is skipped. Codes are opaque/random, so a code
+    // clash (or a blank code) just means we mint a fresh unique one.
+    if (seenNames.has(name.toLowerCase())) {
       skipped++;
       continue;
     }
+    let code = row.code.trim();
+    if (!code || seenCodes.has(code)) code = uniqueCode(seenCodes);
     seenNames.add(name.toLowerCase());
     seenCodes.add(code);
     toInsert.push({ classId, name, code });

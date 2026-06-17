@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { importStudents, type ImportRow, type ImportResult } from "@/actions/students";
+import { uniqueCode } from "@/lib/code";
 
 export function ImportStudents({
   classId,
-  startNumber,
+  existingCodes,
 }: {
   classId: string;
-  startNumber: number;
+  existingCodes: string[];
 }) {
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [parsing, setParsing] = useState(false);
@@ -17,7 +18,12 @@ export function ImportStudents({
   const [isSaving, startSaving] = useTransition();
 
   function makeRows(names: string[]): ImportRow[] {
-    return names.map((name, i) => ({ name, code: `C${startNumber + i}` }));
+    const taken = new Set(existingCodes);
+    return names.map((name) => {
+      const code = uniqueCode(taken);
+      taken.add(code);
+      return { name, code };
+    });
   }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -52,7 +58,10 @@ export function ImportStudents({
     setRows((r) => r.filter((_, idx) => idx !== i));
   }
   function addRow() {
-    setRows((r) => [...r, { name: "", code: `C${startNumber + r.length}` }]);
+    setRows((r) => {
+      const taken = new Set([...existingCodes, ...r.map((x) => x.code)]);
+      return [...r, { name: "", code: uniqueCode(taken) }];
+    });
   }
 
   function save() {
