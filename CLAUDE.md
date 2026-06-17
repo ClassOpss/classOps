@@ -212,6 +212,13 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     • Assistant onboarding: invite (single + bulk) -> VerificationToken -> /set-password
       self-setup. No SMTP in v1 — admin copies the generated link (email send slots in later).
       Verified end-to-end: login blocked pre-setup, succeeds post-setup, token is single-use.
+[~] Step 4a — Admin CRUD: schools (create), classes (create/edit/activate with school +
+    year group + schedule{day,time} + planStartDate + notes), manual student add/deactivate
+    (active-only roster, studentCount synced). Read paths + role guards verified over HTTP
+    (admin sees create forms; teacher read-only; assistant blocked). DAYS/YEAR_GROUPS live in
+    lib/constants.ts (a "use server" file may only export async fns). Write server actions are
+    build-verified but not yet exercised in a live browser request.
+[ ] Step 4b — assistant↔class assignment + auto-divide students (alphabetical halves).
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions

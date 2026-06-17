@@ -7,6 +7,55 @@ import { logActivity } from "@/lib/activity";
 
 export type ImportRow = { name: string; code: string };
 export type ImportResult = { added: number; skipped: number; error?: string };
+export type FormState = { ok?: boolean; error?: string } | undefined;
+
+async function syncStudentCount(classId: string) {
+  const count = await prisma.student.count({ where: { classId, active: true } });
+  await prisma.class.update({ where: { id: classId }, data: { studentCount: count } });
+}
+
+// Manually add a single student to a class.
+export async function addStudent(
+  classId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const admin = await requireRole("admin");
+  const name = String(formData.get("name") ?? "").trim();
+  const code = String(formData.get("code") ?? "").trim();
+  if (!name || !code) return { error: "Name and code are required." };
+
+  const clash = await prisma.student.findFirst({
+    where: { classId, OR: [{ code }, { name: { equals: name, mode: "insensitive" } }] },
+    select: { id: true },
+  });
+  if (clash) return { error: "A student with that name or code already exists in this class." };
+
+  await prisma.student.create({ data: { classId, name, code } });
+  await syncStudentCount(classId);
+  await logActivity({
+    actorId: admin.id,
+    actorRole: admin.role,
+    action: "added_student",
+    entityType: "class",
+    entityId: classId,
+    classId,
+  });
+  revalidatePath(`/classes/${classId}/students`);
+  return { ok: true };
+}
+
+// Soft-deactivate a student (kept for historical records).
+export async function deactivateStudent(studentId: string): Promise<void> {
+  await requireRole("admin");
+  const student = await prisma.student.update({
+    where: { id: studentId },
+    data: { active: false },
+    select: { classId: true },
+  });
+  await syncStudentCount(student.classId);
+  revalidatePath(`/classes/${student.classId}/students`);
+}
 
 // Admin batch-insert of students into a class. Dedupes by name (case-insensitive)
 // and code within the class; uses createMany(skipDuplicates) for the bulk insert.
@@ -51,8 +100,7 @@ export async function importStudents(
       : { count: 0 };
 
   // Keep the denormalised studentCount in sync with the real roster.
-  const count = await prisma.student.count({ where: { classId } });
-  await prisma.class.update({ where: { id: classId }, data: { studentCount: count } });
+  await syncStudentCount(classId);
 
   await logActivity({
     actorId: admin.id,

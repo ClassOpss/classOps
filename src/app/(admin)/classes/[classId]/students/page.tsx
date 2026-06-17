@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
+import { deactivateStudent } from "@/actions/students";
 import { ImportStudents } from "./import-students";
+import { AddStudentForm } from "./add-student-form";
 
 // Next suggested code: max numeric suffix of existing "C<n>" codes + 1.
 function nextCodeNumber(codes: string[]): number {
@@ -25,7 +27,7 @@ export default async function StudentsPage({
     where: { id: classId },
     include: {
       school: { select: { name: true } },
-      students: { orderBy: { name: "asc" } },
+      students: { where: { active: true }, orderBy: { name: "asc" } },
     },
   });
 
@@ -58,16 +60,24 @@ export default async function StudentsPage({
         </section>
       )}
 
+      {user.role === "admin" && (
+        <section>
+          <h2 className="mb-3 font-medium">Add a student manually</h2>
+          <AddStudentForm classId={classId} suggestedCode={`C${startNumber}`} />
+        </section>
+      )}
+
       <section>
         <h2 className="mb-3 font-medium">Roster</h2>
         {klass.students.length === 0 ? (
           <p className="text-sm text-black/50 dark:text-white/50">No students yet.</p>
         ) : (
-          <table className="w-full max-w-md text-left text-sm">
+          <table className="w-full max-w-lg text-left text-sm">
             <thead className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
               <tr>
                 <th className="w-20 py-2">Code</th>
                 <th className="py-2">Name</th>
+                {user.role === "admin" && <th className="w-20 py-2"></th>}
               </tr>
             </thead>
             <tbody>
@@ -75,6 +85,15 @@ export default async function StudentsPage({
                 <tr key={s.id} className="border-b border-black/5 dark:border-white/5">
                   <td className="py-2">{s.code}</td>
                   <td className="py-2">{s.name}</td>
+                  {user.role === "admin" && (
+                    <td className="py-2">
+                      <form action={deactivateStudent.bind(null, s.id)}>
+                        <button type="submit" className="text-sm text-red-600 hover:underline">
+                          Remove
+                        </button>
+                      </form>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
