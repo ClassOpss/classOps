@@ -1,0 +1,583 @@
+// ClassOps — Prisma schema (single source of truth for the DB)
+// Conventions:
+//  - UUID string PKs, all timestamps Timestamptz (stored UTC, displayed Africa/Cairo)
+//  - snake_case table/column names via @@map / @map to match the spec
+//  - Auth.js v5 adapter models (User/Account/Session/VerificationToken) included;
+//    the lesson "session" domain model is named ClassSession to avoid the name clash.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// Enums
+// ----------------------------------------------------------------------------
+
+enum Role {
+  admin
+  teacher
+  assistant
+}
+
+enum YearGroup {
+  Y9
+  Y10
+  S1
+  shared
+}
+
+enum SessionStatus {
+  scheduled
+  completed
+  cancelled
+}
+
+enum HwStatus {
+  on_time
+  late
+  missing
+}
+
+enum AttendanceStatus {
+  present
+  absent
+}
+
+enum AssessmentType {
+  quiz
+  midterm
+  past_paper
+  exam
+}
+
+enum IncidentType {
+  attendance
+  parent_update
+  classroom_upload
+  hw_correction
+  grade_entry
+}
+
+enum PayPeriodStatus {
+  open
+  finalised
+  sent
+}
+
+enum PayCalcStatus {
+  pending
+  approved
+  sent
+}
+
+// ----------------------------------------------------------------------------
+// Auth.js v5 (NextAuth) adapter models
+// ----------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(uuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime? @map("email_verified") @db.Timestamptz(6)
+  image         String?
+  passwordHash  String?   @map("password_hash")
+  phone         String?
+  role          Role      @default(assistant)
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  accounts  Account[]
+  sessions  Session[]
+  assistant Assistant?
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("auth_accounts")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("auth_sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime @db.Timestamptz(6)
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ----------------------------------------------------------------------------
+// Core domain
+// ----------------------------------------------------------------------------
+
+model School {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  classes Class[]
+
+  @@map("schools")
+}
+
+model Class {
+  id           String    @id @default(uuid())
+  schoolId     String    @map("school_id")
+  yearGroup    YearGroup @map("year_group")
+  name         String
+  studentCount Int       @default(0) @map("student_count")
+  // schedule: { "day": "Sunday", "time": "16:00" } — drives late-detection deadlines
+  schedule     Json
+  // planStartDate: the date this class's lesson 1 takes place; used to generate sessions
+  planStartDate DateTime? @map("plan_start_date") @db.Date
+  active       Boolean   @default(true)
+  notes        String?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  school          School                       @relation(fields: [schoolId], references: [id])
+  students        Student[]
+  assignments     ClassAssignment[]
+  subAssignments  StudentAssistantAssignment[]
+  sessions        ClassSession[]
+  homework        HomeworkAssignment[]
+  assessments     Assessment[]
+  officeHours     OfficeHourSession[]
+  activity        ActivityLog[]
+
+  @@index([schoolId])
+  @@map("classes")
+}
+
+model Student {
+  id        String   @id @default(uuid())
+  classId   String   @map("class_id")
+  name      String
+  code      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  class          Class                        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subAssignments StudentAssistantAssignment[]
+  hwSubmissions  HomeworkSubmission[]
+  attendance     Attendance[]
+  grades         AssessmentGrade[]
+  officeHours    OfficeHourSession[]
+
+  @@unique([classId, code])
+  @@index([classId])
+  @@map("students")
+}
+
+model Assistant {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  name      String
+  email     String
+  phone     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  classAssignments ClassAssignment[]            @relation("AssignmentAssistant")
+  substituteFor    ClassAssignment[]            @relation("AssignmentSubstitute")
+  subAssignments   StudentAssistantAssignment[]
+  hwSubmissions    HomeworkSubmission[]
+  attendanceLogs   Attendance[]
+  gradesLogged     AssessmentGrade[]
+  parentUpdates    ParentUpdateLog[]
+  classroomUploads ClassroomUploadLog[]
+  officeHours      OfficeHourSession[]
+  incidents        LateIncident[]
+  payCalcs         PayCalculation[]
+
+  @@map("assistants")
+}
+
+model ClassAssignment {
+  id              String    @id @default(uuid())
+  classId         String    @map("class_id")
+  assistantId     String    @map("assistant_id")
+  startDate       DateTime  @map("start_date") @db.Date
+  endDate         DateTime? @map("end_date") @db.Date
+  isSubstitute    Boolean   @default(false) @map("is_substitute")
+  substitutingFor String?   @map("substituting_for")
+  notes           String?
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  class            Class      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  assistant        Assistant  @relation("AssignmentAssistant", fields: [assistantId], references: [id])
+  substitutingForA Assistant? @relation("AssignmentSubstitute", fields: [substitutingFor], references: [id])
+
+  @@index([classId])
+  @@index([assistantId])
+  @@map("class_assignments")
+}
+
+model StudentAssistantAssignment {
+  id          String    @id @default(uuid())
+  classId     String    @map("class_id")
+  studentId   String    @map("student_id")
+  assistantId String    @map("assistant_id")
+  startDate   DateTime  @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  class     Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assistant Assistant @relation(fields: [assistantId], references: [id])
+
+  @@index([classId])
+  @@index([studentId])
+  @@index([assistantId])
+  @@map("student_assistant_assignments")
+}
+
+model Topic {
+  id        String    @id @default(uuid())
+  title     String
+  yearGroup YearGroup @map("year_group")
+  chapter   String?
+  sortOrder Int       @default(0) @map("sort_order")
+
+  sessions    ClassSession[]
+  planItems   LessonPlanItem[]
+  assessments Assessment[]
+  officeHours OfficeHourSession[]
+
+  @@map("topics")
+}
+
+// ----------------------------------------------------------------------------
+// Lesson plan: shared template per year group -> generated per-class sessions
+// ----------------------------------------------------------------------------
+
+model LessonPlan {
+  id        String    @id @default(uuid())
+  yearGroup YearGroup @unique @map("year_group")
+  title     String?
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  items LessonPlanItem[]
+
+  @@map("lesson_plans")
+}
+
+model LessonPlanItem {
+  id        String  @id @default(uuid())
+  planId    String  @map("plan_id")
+  sequence  Int // 1-based position in the year-group plan
+  topicId   String? @map("topic_id")
+  notes     String?
+
+  plan     LessonPlan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  topic    Topic?         @relation(fields: [topicId], references: [id])
+  sessions ClassSession[]
+
+  @@unique([planId, sequence])
+  @@index([planId])
+  @@map("lesson_plan_items")
+}
+
+model ClassSession {
+  id                 String        @id @default(uuid())
+  classId            String        @map("class_id")
+  // planItemId links a generated session back to its template row; null = ad-hoc/override-added
+  planItemId         String?       @map("plan_item_id")
+  lessonNumber       Int           @map("lesson_number") // stored sequence position; display number computed (excludes day-offs)
+  scheduledDate      DateTime      @map("scheduled_date") @db.Date
+  topicId            String?       @map("topic_id")
+  status             SessionStatus @default(scheduled)
+  dayOff             Boolean       @default(false) @map("day_off")
+  cancellationReason String?       @map("cancellation_reason")
+  // free-text notes injected into the class-update WhatsApp message
+  messageNotes       String?       @map("message_notes")
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  class           Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
+  planItem        LessonPlanItem?     @relation(fields: [planItemId], references: [id])
+  topic           Topic?              @relation(fields: [topicId], references: [id])
+  homework        HomeworkAssignment?
+  attendance      Attendance[]
+  parentUpdate    ParentUpdateLog?
+  classroomUpload ClassroomUploadLog?
+  incidents       LateIncident[]
+
+  @@index([classId])
+  @@index([scheduledDate])
+  @@map("sessions")
+}
+
+// ----------------------------------------------------------------------------
+// Homework
+// ----------------------------------------------------------------------------
+
+model HomeworkAssignment {
+  id          String   @id @default(uuid())
+  sessionId   String   @unique @map("session_id")
+  classId     String   @map("class_id")
+  description String?
+  deadline    DateTime @db.Date
+  noHomework  Boolean  @default(false) @map("no_homework")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  session     ClassSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  class       Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
+  submissions HomeworkSubmission[]
+
+  @@index([classId])
+  @@map("homework_assignments")
+}
+
+model HomeworkSubmission {
+  id             String    @id @default(uuid())
+  homeworkId     String    @map("homework_id")
+  studentId      String    @map("student_id")
+  submissionDate DateTime? @map("submission_date") @db.Date
+  status         HwStatus
+  weakPoints     String?   @map("weak_points")
+  loggedById     String    @map("logged_by")
+  loggedAt       DateTime  @default(now()) @map("logged_at") @db.Timestamptz(6)
+
+  homework HomeworkAssignment @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  student  Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  loggedBy Assistant          @relation(fields: [loggedById], references: [id])
+
+  @@unique([homeworkId, studentId])
+  @@index([homeworkId])
+  @@index([studentId])
+  @@map("homework_submissions")
+}
+
+// ----------------------------------------------------------------------------
+// Daily session tasks: attendance / parent update / classroom upload
+// ----------------------------------------------------------------------------
+
+model Attendance {
+  id         String           @id @default(uuid())
+  sessionId  String           @map("session_id")
+  studentId  String           @map("student_id")
+  status     AttendanceStatus
+  loggedById String           @map("logged_by")
+  loggedAt   DateTime         @default(now()) @map("logged_at") @db.Timestamptz(6)
+  notes      String?
+
+  session  ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student  Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  loggedBy Assistant    @relation(fields: [loggedById], references: [id])
+
+  @@unique([sessionId, studentId])
+  @@index([sessionId])
+  @@map("attendance")
+}
+
+model ParentUpdateLog {
+  id          String   @id @default(uuid())
+  sessionId   String   @unique @map("session_id")
+  assistantId String   @map("assistant_id")
+  sentAt      DateTime @default(now()) @map("sent_at") @db.Timestamptz(6)
+  autoSent    Boolean  @default(false) @map("auto_sent")
+
+  session   ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  assistant Assistant    @relation(fields: [assistantId], references: [id])
+
+  @@map("parent_update_logs")
+}
+
+model ClassroomUploadLog {
+  id          String   @id @default(uuid())
+  sessionId   String   @unique @map("session_id")
+  assistantId String   @map("assistant_id")
+  uploadedAt  DateTime @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+  notes       String?
+
+  session   ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  assistant Assistant    @relation(fields: [assistantId], references: [id])
+
+  @@map("classroom_upload_logs")
+}
+
+// ----------------------------------------------------------------------------
+// Assessments
+// ----------------------------------------------------------------------------
+
+model Assessment {
+  id           String         @id @default(uuid())
+  classId      String         @map("class_id")
+  type         AssessmentType
+  label        String
+  topicId      String?        @map("topic_id")
+  topicNotes   String?        @map("topic_notes")
+  date         DateTime       @db.Date
+  time         String? // "HH:mm" — needed for quiz announcement
+  maxMark      Int            @map("max_mark")
+  isDiagnostic Boolean        @default(false) @map("is_diagnostic")
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  class  Class             @relation(fields: [classId], references: [id], onDelete: Cascade)
+  topic  Topic?            @relation(fields: [topicId], references: [id])
+  grades AssessmentGrade[]
+
+  @@index([classId])
+  @@map("assessments")
+}
+
+model AssessmentGrade {
+  id           String   @id @default(uuid())
+  assessmentId String   @map("assessment_id")
+  studentId    String   @map("student_id")
+  rawMark      Decimal  @map("raw_mark") @db.Decimal(10, 2)
+  percentage   Decimal  @db.Decimal(5, 2)
+  loggedById   String   @map("logged_by")
+  loggedAt     DateTime @default(now()) @map("logged_at") @db.Timestamptz(6)
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  loggedBy   Assistant  @relation(fields: [loggedById], references: [id])
+
+  @@unique([assessmentId, studentId])
+  @@index([assessmentId])
+  @@index([studentId])
+  @@map("assessment_grades")
+}
+
+// ----------------------------------------------------------------------------
+// Office hours
+// ----------------------------------------------------------------------------
+
+model OfficeHourSession {
+  id          String   @id @default(uuid())
+  classId     String   @map("class_id")
+  assistantId String   @map("assistant_id")
+  studentId   String   @map("student_id")
+  date        DateTime @db.Date
+  topicId     String?  @map("topic_id")
+  topicNotes  String?  @map("topic_notes")
+  durationMin Int?     @map("duration_min")
+  loggedAt    DateTime @default(now()) @map("logged_at") @db.Timestamptz(6)
+
+  class     Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  assistant Assistant @relation(fields: [assistantId], references: [id])
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  topic     Topic?    @relation(fields: [topicId], references: [id])
+
+  @@index([classId])
+  @@index([assistantId])
+  @@map("office_hour_sessions")
+}
+
+// ----------------------------------------------------------------------------
+// Late incidents + pay
+// ----------------------------------------------------------------------------
+
+model LateIncident {
+  id              String       @id @default(uuid())
+  assistantId     String       @map("assistant_id")
+  sessionId       String?      @map("session_id")
+  type            IncidentType
+  deadline        DateTime     @db.Timestamptz(6)
+  actualTime      DateTime?    @map("actual_time") @db.Timestamptz(6)
+  deductionAmount Decimal      @default(100) @map("deduction_amount") @db.Decimal(10, 2)
+  waived          Boolean      @default(false)
+  waiveReason     String?      @map("waive_reason")
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  assistant Assistant     @relation(fields: [assistantId], references: [id])
+  session   ClassSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([assistantId])
+  @@index([sessionId])
+  @@map("late_incidents")
+}
+
+model PayPeriod {
+  id        String          @id @default(uuid())
+  month     Int
+  year      Int
+  status    PayPeriodStatus @default(open)
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  calculations PayCalculation[]
+
+  @@unique([month, year])
+  @@map("pay_periods")
+}
+
+model PayCalculation {
+  id               String        @id @default(uuid())
+  payPeriodId      String        @map("pay_period_id")
+  assistantId      String        @map("assistant_id")
+  classesCovered   Int           @map("classes_covered")
+  baseSalary       Decimal       @map("base_salary") @db.Decimal(10, 2)
+  lateDeductions   Decimal       @map("late_deductions") @db.Decimal(10, 2)
+  officeHoursBonus Decimal       @map("office_hours_bonus") @db.Decimal(10, 2)
+  manualAdjustment Decimal       @default(0) @map("manual_adjustment") @db.Decimal(10, 2)
+  adjustmentNote   String?       @map("adjustment_note")
+  total            Decimal       @db.Decimal(10, 2)
+  status           PayCalcStatus @default(pending)
+  sentAt           DateTime?     @map("sent_at") @db.Timestamptz(6)
+
+  payPeriod PayPeriod @relation(fields: [payPeriodId], references: [id], onDelete: Cascade)
+  assistant Assistant @relation(fields: [assistantId], references: [id])
+
+  @@unique([payPeriodId, assistantId])
+  @@index([assistantId])
+  @@map("pay_calculations")
+}
+
+// ----------------------------------------------------------------------------
+// Activity log (append-only)
+// ----------------------------------------------------------------------------
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  actorId    String   @map("actor_id")
+  actorRole  String   @map("actor_role")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  classId    String?  @map("class_id")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  class Class? @relation(fields: [classId], references: [id], onDelete: SetNull)
+
+  @@index([classId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("activity_log")
+}

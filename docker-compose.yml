@@ -1,0 +1,42 @@
+# Local development stack: Postgres + the ClassOps app.
+#
+# Common usage:
+#   docker compose up db          -> just Postgres (run `npm run dev` on the host)
+#   docker compose up --build     -> full production-image app + Postgres
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: classops
+      POSTGRES_PASSWORD: classops
+      POSTGRES_DB: classops
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U classops -d classops"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://classops:classops@db:5432/classops
+      AUTH_SECRET: ${AUTH_SECRET:-dev-insecure-secret-change-me}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      CRON_SECRET: ${CRON_SECRET:-dev-cron-secret}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
