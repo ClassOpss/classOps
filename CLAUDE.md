@@ -204,7 +204,14 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     middleware) + auth-guards.ts enforce roles: admin=all, teacher=admin area minus
     pay/users/activity, assistant=/my only (admin may view /my). Verified via runtime smoke test.
     Login page + sign-out wired. Dev test accounts: scripts/dev-users.ts.
-[ ] Batch import: student PDF upload + Claude parse + preview + insert
+[x] Step 3 — Batch import + onboarding.
+    • Student PDF import: /api/import/parse-pdf (admin-only; pdf-parse v2 -> claude-sonnet-4-6
+      name extraction, PDF discarded) + editable preview table + importStudents() (createMany,
+      skipDuplicates, name/code dedupe, syncs studentCount). Route guards verified; live
+      PDF→names parse NOT yet tested (needs ANTHROPIC_API_KEY + a real class-list PDF).
+    • Assistant onboarding: invite (single + bulk) -> VerificationToken -> /set-password
+      self-setup. No SMTP in v1 — admin copies the generated link (email send slots in later).
+      Verified end-to-end: login blocked pre-setup, succeeds post-setup, token is single-use.
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions
