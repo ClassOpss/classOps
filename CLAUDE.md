@@ -225,6 +225,16 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     end-to-end in browser (3/2 split; new student → smaller group). Added placeholder
     pages for lesson-plan/insights/activity/settings so the admin sidebar has no dead links.
     Also dropped next/font/google (Geist) -> system fonts so builds need no network.
+[~] Step 5a — Teacher topics + lesson-plan authoring. Topic CRUD per year group
+    (actions/topics.ts) and the shared per-year-group plan (LessonPlan + ordered
+    LessonPlanItem) via actions/lesson-plan.ts (add/remove/reorder; reorder renumbers
+    1..n in a transaction with an offset pass to dodge @@unique([planId,sequence])).
+    /lesson-plan UI with Y9/Y10/S1 tabs. Verified in-browser (add lessons + reorder).
+    Codes: number now uses crypto.getRandomValues (was Math.random); report-order
+    anonymity deferred to the reporting step.
+[ ] Step 5b — generate per-class ClassSessions from plan + schedule + planStartDate;
+    day-off cascade + dynamic lesson numbering (lib/lesson-number.ts).
+[ ] Step 5c — cross-class lesson-plan progress view (+ behind/ahead flag).
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions
