@@ -232,8 +232,11 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     /lesson-plan UI with Y9/Y10/S1 tabs. Verified in-browser (add lessons + reorder).
     Codes: number now uses crypto.getRandomValues (was Math.random); report-order
     anonymity deferred to the reporting step.
-[ ] Step 5b — generate per-class ClassSessions from plan + schedule + planStartDate;
-    day-off cascade + dynamic lesson numbering (lib/lesson-number.ts).
+[x] Step 5b — generateSessions(classId): materializes per-class ClassSessions from the
+    year-group plan + schedule weekday + planStartDate (lib/sessions.ts dates; one per plan
+    item, weekly). Regenerate blocked once attendance exists. Day-off mark/clear (admin-only)
+    + dynamic lesson numbering (lib/lesson-number.ts) — both unit-tested. /classes/[id]/sessions
+    UI. Verified in-browser: 4 weekly Sundays generated; day-off on #2 -> numbers [1,—,2,3].
 [ ] Step 5c — cross-class lesson-plan progress view (+ behind/ahead flag).
 [ ] — update this section as modules are completed —
 
