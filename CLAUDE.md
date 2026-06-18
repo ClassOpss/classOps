@@ -218,7 +218,13 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     (admin sees create forms; teacher read-only; assistant blocked). DAYS/YEAR_GROUPS live in
     lib/constants.ts (a "use server" file may only export async fns). Write server actions are
     build-verified but not yet exercised in a live browser request.
-[ ] Step 4b — assistant↔class assignment + auto-divide students (alphabetical halves).
+[x] Step 4b — assistant↔class assignment (max 2 active/class) + auto-divide students
+    (lib/divide.ts: alphabetical halves, first assistant gets the extra; unit-tested).
+    Late-imported students auto-assign to the smaller sub-group (hooked into add/import).
+    /classes/[id]/assistants UI: assign, end, auto-divide, sub-group view. Verified
+    end-to-end in browser (3/2 split; new student → smaller group). Added placeholder
+    pages for lesson-plan/insights/activity/settings so the admin sidebar has no dead links.
+    Also dropped next/font/google (Geist) -> system fonts so builds need no network.
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions

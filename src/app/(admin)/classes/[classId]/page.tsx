@@ -63,7 +63,9 @@ export default async function ClassOverviewPage({
         <Link href={`/classes/${classId}/students`} className="text-blue-600 hover:underline">
           Manage students →
         </Link>
-        {/* Assistant assignment + auto-divide land here in Step 4b. */}
+        <Link href={`/classes/${classId}/assistants`} className="text-blue-600 hover:underline">
+          Assistants &amp; sub-groups →
+        </Link>
       </div>
 
       {isAdmin && (

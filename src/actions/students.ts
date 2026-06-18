@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { schoolPrefix, uniqueStudentCode } from "@/lib/code";
+import { autoAssignNewStudents } from "@/actions/assignments";
 
 export type ImportRow = { name: string; code: string };
 export type ImportResult = { added: number; skipped: number; error?: string };
@@ -44,8 +45,12 @@ export async function addStudent(
   let code = String(formData.get("code") ?? "").trim();
   if (!code || taken.has(code)) code = uniqueStudentCode(schoolPrefix(klass.school.name), taken);
 
-  await prisma.student.create({ data: { classId, name, code } });
+  const created = await prisma.student.create({
+    data: { classId, name, code },
+    select: { id: true },
+  });
   await syncStudentCount(classId);
+  await autoAssignNewStudents(classId, [created.id]);
   await logActivity({
     actorId: admin.id,
     actorRole: admin.role,
@@ -121,6 +126,17 @@ export async function importStudents(
 
   // Keep the denormalised studentCount in sync with the real roster.
   await syncStudentCount(classId);
+
+  // If the class is already divided between 2 assistants, slot the new students
+  // into the smaller sub-group.
+  if (toInsert.length > 0) {
+    const insertedCodes = toInsert.map((t) => t.code);
+    const created = await prisma.student.findMany({
+      where: { classId, code: { in: insertedCodes } },
+      select: { id: true },
+    });
+    await autoAssignNewStudents(classId, created.map((c) => c.id));
+  }
 
   await logActivity({
     actorId: admin.id,
