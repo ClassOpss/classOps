@@ -237,7 +237,11 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     item, weekly). Regenerate blocked once attendance exists. Day-off mark/clear (admin-only)
     + dynamic lesson numbering (lib/lesson-number.ts) — both unit-tested. /classes/[id]/sessions
     UI. Verified in-browser: 4 weekly Sundays generated; day-off on #2 -> numbers [1,—,2,3].
-[ ] Step 5c — cross-class lesson-plan progress view (+ behind/ahead flag).
+[x] Step 5c — /progress: cross-class lesson-plan progress (admin+teacher, sidebar link).
+    Per class: lessons delivered (non-day-off sessions dated <= today) of total, grouped by
+    year group; "Behind by N" relative to the furthest-along class in the cohort, else
+    "On track". Verified in-browser (Citadel 6/6 On track; Noon 5/5 Behind by 1 via a day-off).
+    Step 5 (Teacher area) complete.
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions
