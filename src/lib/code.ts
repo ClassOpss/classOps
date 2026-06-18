@@ -9,8 +9,18 @@ export function schoolPrefix(schoolName: string): string {
   return (letters[0] ?? "S").toUpperCase();
 }
 
+// Cryptographically secure, unbiased integer in [1, max] (Web Crypto; works
+// server + client). Secure RNG so a code can't be predicted/reproduced, and the
+// values carry no relation to roster order.
 function randomNumber(max: number): number {
-  return 1 + Math.floor(Math.random() * max);
+  const limit = Math.floor(0x100000000 / max) * max; // reject values that would bias the modulo
+  const buf = new Uint32Array(1);
+  let x: number;
+  do {
+    globalThis.crypto.getRandomValues(buf);
+    x = buf[0];
+  } while (x >= limit);
+  return 1 + (x % max);
 }
 
 export function studentCode(prefix: string, max = 9999): string {
