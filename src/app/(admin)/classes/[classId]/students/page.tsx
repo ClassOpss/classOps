@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { deactivateStudent } from "@/actions/students";
-import { uniqueCode } from "@/lib/code";
+import { schoolPrefix, uniqueStudentCode } from "@/lib/code";
 import { ImportStudents } from "./import-students";
 import { AddStudentForm } from "./add-student-form";
 
@@ -32,7 +32,8 @@ export default async function StudentsPage({
   }
 
   const existingCodes = klass.students.map((s) => s.code);
-  const suggestedCode = uniqueCode(new Set(existingCodes));
+  const prefix = schoolPrefix(klass.school.name);
+  const suggestedCode = uniqueStudentCode(prefix, new Set(existingCodes));
 
   return (
     <div className="flex flex-col gap-8">
@@ -48,7 +49,7 @@ export default async function StudentsPage({
       {user.role === "admin" && (
         <section>
           <h2 className="mb-3 font-medium">Import students from PDF</h2>
-          <ImportStudents classId={classId} existingCodes={existingCodes} />
+          <ImportStudents classId={classId} prefix={prefix} existingCodes={existingCodes} />
         </section>
       )}
 

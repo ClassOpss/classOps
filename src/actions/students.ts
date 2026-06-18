@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
-import { uniqueCode } from "@/lib/code";
+import { schoolPrefix, uniqueStudentCode } from "@/lib/code";
 
 export type ImportRow = { name: string; code: string };
 export type ImportResult = { added: number; skipped: number; error?: string };
@@ -25,6 +25,12 @@ export async function addStudent(
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Name is required." };
 
+  const klass = await prisma.class.findUnique({
+    where: { id: classId },
+    select: { school: { select: { name: true } } },
+  });
+  if (!klass) return { error: "Class not found." };
+
   const existing = await prisma.student.findMany({
     where: { classId },
     select: { name: true, code: true },
@@ -36,7 +42,7 @@ export async function addStudent(
   // Code is optional — use the provided one if free, otherwise mint a random unique code.
   const taken = new Set(existing.map((s) => s.code));
   let code = String(formData.get("code") ?? "").trim();
-  if (!code || taken.has(code)) code = uniqueCode(taken);
+  if (!code || taken.has(code)) code = uniqueStudentCode(schoolPrefix(klass.school.name), taken);
 
   await prisma.student.create({ data: { classId, name, code } });
   await syncStudentCount(classId);
@@ -72,8 +78,12 @@ export async function importStudents(
 ): Promise<ImportResult> {
   const admin = await requireRole("admin");
 
-  const klass = await prisma.class.findUnique({ where: { id: classId }, select: { id: true } });
+  const klass = await prisma.class.findUnique({
+    where: { id: classId },
+    select: { id: true, school: { select: { name: true } } },
+  });
   if (!klass) return { added: 0, skipped: 0, error: "Class not found." };
+  const prefix = schoolPrefix(klass.school.name);
 
   const existing = await prisma.student.findMany({
     where: { classId },
@@ -98,7 +108,7 @@ export async function importStudents(
       continue;
     }
     let code = row.code.trim();
-    if (!code || seenCodes.has(code)) code = uniqueCode(seenCodes);
+    if (!code || seenCodes.has(code)) code = uniqueStudentCode(prefix, seenCodes);
     seenNames.add(name.toLowerCase());
     seenCodes.add(code);
     toInsert.push({ classId, name, code });

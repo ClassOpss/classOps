@@ -2,13 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { importStudents, type ImportRow, type ImportResult } from "@/actions/students";
-import { uniqueCode } from "@/lib/code";
+import { uniqueStudentCode } from "@/lib/code";
 
 export function ImportStudents({
   classId,
+  prefix,
   existingCodes,
 }: {
   classId: string;
+  prefix: string;
   existingCodes: string[];
 }) {
   const [rows, setRows] = useState<ImportRow[]>([]);
@@ -20,7 +22,7 @@ export function ImportStudents({
   function makeRows(names: string[]): ImportRow[] {
     const taken = new Set(existingCodes);
     return names.map((name) => {
-      const code = uniqueCode(taken);
+      const code = uniqueStudentCode(prefix, taken);
       taken.add(code);
       return { name, code };
     });
@@ -60,7 +62,7 @@ export function ImportStudents({
   function addRow() {
     setRows((r) => {
       const taken = new Set([...existingCodes, ...r.map((x) => x.code)]);
-      return [...r, { name: "", code: uniqueCode(taken) }];
+      return [...r, { name: "", code: uniqueStudentCode(prefix, taken) }];
     });
   }
 
