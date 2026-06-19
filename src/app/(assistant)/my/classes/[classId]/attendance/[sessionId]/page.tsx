@@ -1,0 +1,114 @@
+import Link from "next/link";
+import { requireClassAccess } from "@/lib/auth-guards";
+import { prisma } from "@/lib/db";
+import { submitAttendance } from "@/actions/attendance";
+import { sessionDeadline, isLate, formatCairo } from "@/lib/datetime";
+
+const dateFmt = new Intl.DateTimeFormat("en-GB", {
+  weekday: "long",
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+export default async function AttendancePage({
+  params,
+}: {
+  params: Promise<{ classId: string; sessionId: string }>;
+}) {
+  const { classId, sessionId } = await params;
+  await requireClassAccess(classId);
+
+  const session = await prisma.classSession.findUnique({
+    where: { id: sessionId },
+    select: { id: true, classId: true, scheduledDate: true, dayOff: true, topic: { select: { title: true } } },
+  });
+  if (!session || session.classId !== classId) {
+    return (
+      <div>
+        <h1 className="text-lg font-semibold">Session not found</h1>
+        <Link href={`/my/classes/${classId}`} className="text-sm text-blue-600 hover:underline">← Back</Link>
+      </div>
+    );
+  }
+
+  const [students, existing] = await Promise.all([
+    prisma.student.findMany({
+      where: { classId, active: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, code: true },
+    }),
+    prisma.attendance.findMany({
+      where: { sessionId },
+      select: { studentId: true, status: true, loggedAt: true },
+    }),
+  ]);
+
+  const statusByStudent = new Map(existing.map((a) => [a.studentId, a.status]));
+  const loggedAt = existing[0]?.loggedAt ?? null;
+  const deadline = sessionDeadline(session.scheduledDate);
+  const late = loggedAt ? isLate(loggedAt, deadline) : false;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <Link href={`/my/classes/${classId}`} className="text-sm text-blue-600 hover:underline">← Back</Link>
+        <h1 className="mt-1 text-lg font-semibold">Attendance</h1>
+        <p className="text-sm text-black/50 dark:text-white/50">
+          {dateFmt.format(session.scheduledDate)} · {session.topic?.title ?? "—"}
+        </p>
+        <p className="text-xs text-black/40 dark:text-white/40">
+          Deadline: {formatCairo(deadline, "d MMM, h:mm a")}
+        </p>
+      </div>
+
+      {loggedAt && (
+        <div
+          className={`rounded-md p-3 text-sm ${
+            late
+              ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30"
+              : "bg-green-50 text-green-700 dark:bg-green-950/30"
+          }`}
+        >
+          Logged at {formatCairo(loggedAt)} — {late ? "Late (after the 9pm deadline)" : "On time"}
+        </div>
+      )}
+
+      <form action={submitAttendance.bind(null, sessionId)} className="flex flex-col gap-2">
+        <p className="text-xs text-black/50 dark:text-white/50">
+          Checked = present. Uncheck absent students, then submit.
+        </p>
+        {students.length === 0 ? (
+          <p className="text-sm text-black/60 dark:text-white/60">No students in this class yet.</p>
+        ) : (
+          <ul className="flex flex-col">
+            {students.map((s) => (
+              <li key={s.id} className="border-b border-black/5 dark:border-white/5">
+                <label className="flex items-center gap-3 py-3">
+                  <input
+                    type="checkbox"
+                    name="present"
+                    value={s.id}
+                    defaultChecked={statusByStudent.get(s.id) !== "absent"}
+                    className="h-5 w-5"
+                  />
+                  <span className="flex-1">{s.name}</span>
+                  <span className="text-xs text-black/40">{s.code}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
+        {students.length > 0 && (
+          <button
+            type="submit"
+            className="mt-2 rounded-md bg-foreground px-4 py-3 text-sm font-medium text-background hover:opacity-90"
+          >
+            {loggedAt ? "Update attendance" : "Submit attendance"}
+          </button>
+        )}
+      </form>
+    </div>
+  );
+}

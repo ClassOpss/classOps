@@ -242,6 +242,14 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     year group; "Behind by N" relative to the furthest-along class in the cohort, else
     "On track". Verified in-browser (Citadel 6/6 On track; Noon 5/5 Behind by 1 via a day-off).
     Step 5 (Teacher area) complete.
+[x] Step 6 — Assistant attendance logging (first assistant-facing flow). /my (assigned
+    classes) -> /my/classes/[id] (sessions) -> /my/classes/[id]/attendance/[sessionId]:
+    full-class roster, default-present checkboxes, submit (upsert), "Logged at <Cairo>" +
+    on-time/late banner. lib/datetime.ts (date-fns-tz): sessionDeadline = 9pm Africa/Cairo on
+    the session day; isLate; formatCairo. Assistants only (admin view read-only). NOTE:
+    late_incident *records* are deferred to Step 11 (cron) — Step 6 only records + displays
+    lateness. Verified in-browser as the assistant: past session -> Late, future -> On time,
+    statuses persisted.
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions
