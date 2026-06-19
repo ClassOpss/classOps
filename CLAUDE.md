@@ -264,6 +264,11 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     due date, default deadline = next session date; or "no homework" -> HomeworkAssignment),
     and a quiz/announcement note (session.messageNotes). These feed the message and are omitted
     when blank. Verified: message showed name + topic + HW + Due + quiz note.
+[x] Step 8 — Google Classroom upload logging. actions/classroom-upload.ts
+    markClassroomUploaded -> ClassroomUploadLog.uploadedAt (+ optional notes), gated like the
+    other session tasks (after start, not day-off, assistant). "Google Classroom" section on the
+    attendance page shows mark button + on-time/late vs 9pm. Build-verified; flow is identical to
+    the browser-verified parent-update mark-sent.
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions

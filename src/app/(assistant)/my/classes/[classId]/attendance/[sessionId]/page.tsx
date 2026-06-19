@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireClassAccess } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { submitAttendance } from "@/actions/attendance";
+import { markClassroomUploaded } from "@/actions/classroom-upload";
 import { sessionStart, sessionDeadline, isLate, formatCairo } from "@/lib/datetime";
 import { LessonDetailsForm } from "./lesson-details-form";
 
@@ -32,6 +33,7 @@ export default async function AttendancePage({
       messageNotes: true,
       topic: { select: { title: true } },
       homework: { select: { description: true, deadline: true, noHomework: true } },
+      classroomUpload: { select: { uploadedAt: true, notes: true } },
       class: { select: { schedule: true, yearGroup: true } },
     },
   });
@@ -73,6 +75,8 @@ export default async function AttendancePage({
   const loggedAt = existing[0]?.loggedAt ?? null;
   const deadline = sessionDeadline(session.scheduledDate);
   const late = loggedAt ? isLate(loggedAt, deadline) : false;
+  const uploadedAt = session.classroomUpload?.uploadedAt ?? null;
+  const uploadLate = uploadedAt ? isLate(uploadedAt, deadline) : false;
   const sched = (session.class.schedule ?? {}) as { time?: string };
   const start = sessionStart(session.scheduledDate, sched.time);
   const notStarted = !session.dayOff && new Date() < start;
@@ -173,6 +177,38 @@ export default async function AttendancePage({
           left out of the message when blank.
         </p>
         <LessonDetailsForm sessionId={sessionId} topics={topics} current={lessonDetails} />
+      </section>
+
+      <section className="border-t border-black/10 pt-4 dark:border-white/10">
+        <h2 className="mb-1 font-medium">Google Classroom</h2>
+        {uploadedAt && (
+          <div
+            className={`mb-2 rounded-md p-3 text-sm ${
+              uploadLate
+                ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30"
+                : "bg-green-50 text-green-700 dark:bg-green-950/30"
+            }`}
+          >
+            Marked uploaded at {formatCairo(uploadedAt)} — {uploadLate ? "Late (after the 9pm deadline)" : "On time"}
+            {session.classroomUpload?.notes ? ` · ${session.classroomUpload.notes}` : ""}
+          </div>
+        )}
+        <form
+          action={markClassroomUploaded.bind(null, sessionId)}
+          className="flex flex-wrap items-end gap-2"
+        >
+          <input
+            name="notes"
+            placeholder="what you uploaded (optional)"
+            className="flex-1 rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none focus:border-black/40 dark:border-white/20 dark:bg-transparent"
+          />
+          <button
+            type="submit"
+            className="rounded-md border border-black/15 px-4 py-2 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+          >
+            {uploadedAt ? "Update" : "Mark uploaded ✓"}
+          </button>
+        </form>
       </section>
     </div>
   );
