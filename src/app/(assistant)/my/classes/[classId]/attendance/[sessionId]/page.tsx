@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireClassAccess } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { submitAttendance } from "@/actions/attendance";
-import { sessionDeadline, isLate, formatCairo } from "@/lib/datetime";
+import { sessionStart, sessionDeadline, isLate, formatCairo } from "@/lib/datetime";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   weekday: "long",
@@ -22,7 +22,14 @@ export default async function AttendancePage({
 
   const session = await prisma.classSession.findUnique({
     where: { id: sessionId },
-    select: { id: true, classId: true, scheduledDate: true, dayOff: true, topic: { select: { title: true } } },
+    select: {
+      id: true,
+      classId: true,
+      scheduledDate: true,
+      dayOff: true,
+      topic: { select: { title: true } },
+      class: { select: { schedule: true } },
+    },
   });
   if (!session || session.classId !== classId) {
     return (
@@ -49,6 +56,29 @@ export default async function AttendancePage({
   const loggedAt = existing[0]?.loggedAt ?? null;
   const deadline = sessionDeadline(session.scheduledDate);
   const late = loggedAt ? isLate(loggedAt, deadline) : false;
+  const sched = (session.class.schedule ?? {}) as { time?: string };
+  const start = sessionStart(session.scheduledDate, sched.time);
+  const notStarted = !session.dayOff && new Date() < start;
+
+  // Can't log a day off, or a class that hasn't started yet.
+  if (session.dayOff || notStarted) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div>
+          <Link href={`/my/classes/${classId}`} className="text-sm text-blue-600 hover:underline">← Back</Link>
+          <h1 className="mt-1 text-lg font-semibold">Attendance</h1>
+          <p className="text-sm text-black/50 dark:text-white/50">
+            {dateFmt.format(session.scheduledDate)} · {session.topic?.title ?? "—"}
+          </p>
+        </div>
+        <p className="text-sm text-black/60 dark:text-white/60">
+          {session.dayOff
+            ? "This is a day off — there's no attendance to log."
+            : `This class hasn't started yet. You can log attendance from ${formatCairo(start)}.`}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">

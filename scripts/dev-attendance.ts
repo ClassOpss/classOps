@@ -22,7 +22,7 @@ async function main() {
         schoolId: school.id,
         yearGroup: "Y9",
         name: "Y9-Citadel",
-        schedule: { day: "Sunday", time: "16:00" },
+        schedule: { day: "Sunday", time: "08:00" },
         planStartDate: daysFromNowUTC(-7),
       },
     });
@@ -48,7 +48,8 @@ async function main() {
   await prisma.classSession.createMany({
     data: [
       { classId: klass.id, lessonNumber: 1, scheduledDate: daysFromNowUTC(-7) },
-      { classId: klass.id, lessonNumber: 2, scheduledDate: daysFromNowUTC(7) },
+      { classId: klass.id, lessonNumber: 2, scheduledDate: daysFromNowUTC(0) },
+      { classId: klass.id, lessonNumber: 3, scheduledDate: daysFromNowUTC(7) },
     ],
   });
 

@@ -4,18 +4,30 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireClassAccess } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
+import { sessionStart } from "@/lib/datetime";
 
 // Attendance is taken for the WHOLE class (spec 4.6) by whichever assistant logs first.
 // Checkboxes named "present" carry the present student ids; everyone else is absent.
 export async function submitAttendance(sessionId: string, formData: FormData): Promise<void> {
   const session = await prisma.classSession.findUnique({
     where: { id: sessionId },
-    select: { id: true, classId: true },
+    select: {
+      id: true,
+      classId: true,
+      dayOff: true,
+      scheduledDate: true,
+      class: { select: { schedule: true } },
+    },
   });
   if (!session) return;
 
   const user = await requireClassAccess(session.classId);
   if (!user.assistantId) return; // only assistants log attendance (admin view is read-only)
+  if (session.dayOff) return; // no attendance on a day off
+
+  // Can't take attendance before the class has started.
+  const sched = (session.class.schedule ?? {}) as { time?: string };
+  if (new Date() < sessionStart(session.scheduledDate, sched.time)) return;
 
   const students = await prisma.student.findMany({
     where: { classId: session.classId, active: true },

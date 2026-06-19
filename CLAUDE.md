@@ -248,8 +248,10 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     on-time/late banner. lib/datetime.ts (date-fns-tz): sessionDeadline = 9pm Africa/Cairo on
     the session day; isLate; formatCairo. Assistants only (admin view read-only). NOTE:
     late_incident *records* are deferred to Step 11 (cron) — Step 6 only records + displays
-    lateness. Verified in-browser as the assistant: past session -> Late, future -> On time,
-    statuses persisted.
+    lateness. Attendance is only loggable once the class has STARTED: sessionStart =
+    schedule.time on the session day (Cairo); future sessions show "Upcoming" (no link) and
+    the page/action refuse early submits. Verified in-browser: future -> Upcoming/gated,
+    today (after start) -> On time, past -> Late; statuses persisted.
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions
