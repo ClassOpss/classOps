@@ -105,6 +105,15 @@ export default async function AttendancePage({
         </div>
       )}
 
+      {loggedAt && (
+        <Link
+          href={`/my/classes/${classId}/parent-update/${sessionId}`}
+          className="text-sm text-blue-600 hover:underline"
+        >
+          Send parent update →
+        </Link>
+      )}
+
       <form action={submitAttendance.bind(null, sessionId)} className="flex flex-col gap-2">
         <p className="text-xs text-black/50 dark:text-white/50">
           Checked = present. Uncheck absent students, then submit.

@@ -252,6 +252,12 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     schedule.time on the session day (Cairo); future sessions show "Upcoming" (no link) and
     the page/action refuse early submits. Verified in-browser: future -> Upcoming/gated,
     today (after start) -> On time, past -> Late; statuses persisted.
+[x] Step 7 — Assistant parent-update message. lib/whatsapp/class-update.ts builds Message A
+    (date/class/school/topic + absentees BY CODE for privacy; HW/quiz sections omitted until
+    Steps 9/10 add that data). /my/classes/[id]/parent-update/[sessionId]: styled preview,
+    Copy-to-clipboard (Copied! 2s), Mark-as-sent -> ParentUpdateLog.sentAt with on-time/late vs
+    9pm. Gated like attendance (after start, not day-off). Linked from the attendance page.
+    Verified in-browser end-to-end (absent C11 in message, copy flip, sent=Late after 9pm).
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions
