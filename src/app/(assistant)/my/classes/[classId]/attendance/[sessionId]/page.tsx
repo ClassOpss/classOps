@@ -3,6 +3,7 @@ import { requireClassAccess } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { submitAttendance } from "@/actions/attendance";
 import { sessionStart, sessionDeadline, isLate, formatCairo } from "@/lib/datetime";
+import { LessonDetailsForm } from "./lesson-details-form";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   weekday: "long",
@@ -27,8 +28,11 @@ export default async function AttendancePage({
       classId: true,
       scheduledDate: true,
       dayOff: true,
+      topicId: true,
+      messageNotes: true,
       topic: { select: { title: true } },
-      class: { select: { schedule: true } },
+      homework: { select: { description: true, deadline: true, noHomework: true } },
+      class: { select: { schedule: true, yearGroup: true } },
     },
   });
   if (!session || session.classId !== classId) {
@@ -40,7 +44,7 @@ export default async function AttendancePage({
     );
   }
 
-  const [students, existing] = await Promise.all([
+  const [students, existing, topics] = await Promise.all([
     prisma.student.findMany({
       where: { classId, active: true },
       orderBy: { name: "asc" },
@@ -50,7 +54,20 @@ export default async function AttendancePage({
       where: { sessionId },
       select: { studentId: true, status: true, loggedAt: true },
     }),
+    prisma.topic.findMany({
+      where: { yearGroup: session.class.yearGroup },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true, title: true },
+    }),
   ]);
+
+  const lessonDetails = {
+    topicId: session.topicId ?? "",
+    homework: session.homework?.description ?? "",
+    deadline: session.homework?.deadline ? session.homework.deadline.toISOString().slice(0, 10) : "",
+    noHomework: session.homework?.noHomework ?? false,
+    notes: session.messageNotes ?? "",
+  };
 
   const statusByStudent = new Map(existing.map((a) => [a.studentId, a.status]));
   const loggedAt = existing[0]?.loggedAt ?? null;
@@ -148,6 +165,15 @@ export default async function AttendancePage({
           </button>
         )}
       </form>
+
+      <section className="border-t border-black/10 pt-4 dark:border-white/10">
+        <h2 className="mb-1 font-medium">Lesson details</h2>
+        <p className="mb-3 text-xs text-black/50 dark:text-white/50">
+          Topic, homework, and any quiz/announcement — these fill the parent update and are
+          left out of the message when blank.
+        </p>
+        <LessonDetailsForm sessionId={sessionId} topics={topics} current={lessonDetails} />
+      </section>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 // Message A — Class Update (spec 5.13). Sent to the class WhatsApp group after a session.
-// Students are referenced by CODE (not name) to keep the group message private — each
-// parent recognises only their own child's code (see student-code-privacy).
+// Students are referenced by NAME here (codes are reserved for the grade reports —
+// see student-code-privacy).
 
 export type ClassUpdateData = {
   dateLabel: string;
@@ -8,9 +8,9 @@ export type ClassUpdateData = {
   schoolName: string;
   topic?: string | null;
   attendanceLogged: boolean;
-  absentCodes: string[];
-  // Optional sections — populated once homework (Step 9) / assessments (Step 10) exist.
-  hwMissingCodes?: string[];
+  absentNames: string[];
+  // Optional sections — included only when present.
+  hwMissingNames?: string[];
   newHomework?: string | null;
   homeworkDueLabel?: string | null;
   quizLine?: string | null;
@@ -29,13 +29,13 @@ export function buildClassUpdateMessage(d: ClassUpdateData): string {
   if (!d.attendanceLogged) {
     lines.push("Absent students: (attendance not logged yet)");
   } else {
-    lines.push(`Absent students: ${d.absentCodes.length ? d.absentCodes.join(", ") : "None"}`);
+    lines.push(`Absent students: ${d.absentNames.length ? d.absentNames.join(", ") : "None"}`);
   }
 
   // Homework block — only when there's something to say.
   const hwLines: string[] = [];
-  if (d.hwMissingCodes && d.hwMissingCodes.length > 0) {
-    hwLines.push(`Students who did not submit previous homework: ${d.hwMissingCodes.join(", ")}`);
+  if (d.hwMissingNames && d.hwMissingNames.length > 0) {
+    hwLines.push(`Students who did not submit previous homework: ${d.hwMissingNames.join(", ")}`);
   }
   if (d.newHomework) {
     hwLines.push(`New homework assigned: ${d.newHomework}`);

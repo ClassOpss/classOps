@@ -30,6 +30,7 @@ export default async function ParentUpdatePage({
       dayOff: true,
       messageNotes: true,
       topic: { select: { title: true } },
+      homework: { select: { description: true, deadline: true, noHomework: true } },
       class: { select: { name: true, schedule: true, school: { select: { name: true } } } },
       parentUpdate: { select: { sentAt: true } },
     },
@@ -62,20 +63,23 @@ export default async function ParentUpdatePage({
 
   const attendance = await prisma.attendance.findMany({
     where: { sessionId },
-    select: { status: true, student: { select: { code: true } } },
+    select: { status: true, student: { select: { name: true } } },
   });
-  const absentCodes = attendance
+  const absentNames = attendance
     .filter((a) => a.status === "absent")
-    .map((a) => a.student.code)
+    .map((a) => a.student.name)
     .sort();
 
+  const hw = session.homework;
   const message = buildClassUpdateMessage({
     dateLabel: longDate.format(session.scheduledDate),
     className: session.class.name,
     schoolName: session.class.school.name,
     topic: session.topic?.title,
     attendanceLogged: attendance.length > 0,
-    absentCodes,
+    absentNames,
+    newHomework: hw && !hw.noHomework ? hw.description : null,
+    homeworkDueLabel: hw && !hw.noHomework && hw.deadline ? longDate.format(hw.deadline) : null,
     notes: session.messageNotes,
   });
 

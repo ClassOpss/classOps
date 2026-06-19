@@ -258,6 +258,12 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     Copy-to-clipboard (Copied! 2s), Mark-as-sent -> ParentUpdateLog.sentAt with on-time/late vs
     9pm. Gated like attendance (after start, not day-off). Linked from the attendance page.
     Verified in-browser end-to-end (absent C11 in message, copy flip, sent=Late after 9pm).
+[x] Step 7b — Class-update message now lists absentees BY NAME (codes are for grade reports
+    only; see student-code-privacy). Attendance page gained a "Lesson details" form
+    (actions/lesson-details.ts): topic covered (sets session.topicId), homework (description +
+    due date, default deadline = next session date; or "no homework" -> HomeworkAssignment),
+    and a quiz/announcement note (session.messageNotes). These feed the message and are omitted
+    when blank. Verified: message showed name + topic + HW + Due + quiz note.
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions
