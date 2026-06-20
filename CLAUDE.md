@@ -286,6 +286,14 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     "Incomplete — N of total reviewed" (never on-time/done). On-time is judged by completion time
     (max first-entry loggedAt, edit-stable). List page shows reviewed/total or "Complete".
     Verified: 1-of-3 entry still Incomplete; 3-of-3 -> "All 3 reviewed … On time".
+[x] Step 10 — Assessments + grade entry. actions/assessments.ts create/delete (admin/teacher;
+    type/label/date/time/maxMark/topicNotes/isDiagnostic; past_paper auto-diagnostic) +
+    /classes/[id]/assessments admin page. actions/assessment-grades.submitGrades: per sub-group,
+    rawMark -> percentage, blank=unreviewed, loggedAt create-only. Assistant
+    /my/classes/[id]/assessments list + /[assessmentId] entry: client GradeEntryForm with LIVE
+    %/colour (green>classAvg, red<, vs server-snapshot avg across ALL students) + live reviewed
+    counter; completeness gate + on-time/late vs Saturday deadline. Verified in-browser
+    (90/50/70% -> green/red/neutral vs 70% avg; 0/3 Incomplete -> 3/3 On time).
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions

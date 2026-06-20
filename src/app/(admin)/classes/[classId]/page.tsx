@@ -69,6 +69,9 @@ export default async function ClassOverviewPage({
         <Link href={`/classes/${classId}/sessions`} className="text-blue-600 hover:underline">
           Sessions &amp; day-offs →
         </Link>
+        <Link href={`/classes/${classId}/assessments`} className="text-blue-600 hover:underline">
+          Assessments →
+        </Link>
       </div>
 
       {isAdmin && (

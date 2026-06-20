@@ -51,12 +51,14 @@ export default async function AssistantClassPage({
         <p className="text-sm text-black/50 dark:text-white/50">{klass.school.name}</p>
       </div>
 
-      <Link
-        href={`/my/classes/${classId}/homework`}
-        className="text-sm text-blue-600 hover:underline"
-      >
-        Homework →
-      </Link>
+      <div className="flex gap-4">
+        <Link href={`/my/classes/${classId}/homework`} className="text-sm text-blue-600 hover:underline">
+          Homework →
+        </Link>
+        <Link href={`/my/classes/${classId}/assessments`} className="text-sm text-blue-600 hover:underline">
+          Assessments →
+        </Link>
+      </div>
 
       <h2 className="font-medium">Attendance</h2>
       {sessions.length === 0 ? (
