@@ -51,6 +51,13 @@ export default async function AssistantClassPage({
         <p className="text-sm text-black/50 dark:text-white/50">{klass.school.name}</p>
       </div>
 
+      <Link
+        href={`/my/classes/${classId}/homework`}
+        className="text-sm text-blue-600 hover:underline"
+      >
+        Homework →
+      </Link>
+
       <h2 className="font-medium">Attendance</h2>
       {sessions.length === 0 ? (
         <p className="text-sm text-black/60 dark:text-white/60">No sessions scheduled yet.</p>

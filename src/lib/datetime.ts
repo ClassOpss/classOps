@@ -26,6 +26,14 @@ export function sessionDeadline(scheduledDate: Date): Date {
   return cairoInstant(scheduledDate, "21:00:00");
 }
 
+// Weekly-task deadline (HW correction / grade entry, spec 5.10): 9pm Cairo on the Saturday
+// of the week (Sunday–Saturday) containing `date`. On a Saturday it's that same day.
+export function saturdayDeadline(date: Date): Date {
+  const base = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  base.setUTCDate(base.getUTCDate() + (6 - base.getUTCDay())); // 0=Sun..6=Sat -> advance to Sat
+  return cairoInstant(base, "21:00:00");
+}
+
 export function isLate(loggedAt: Date, deadline: Date): boolean {
   return loggedAt.getTime() > deadline.getTime();
 }

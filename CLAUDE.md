@@ -269,6 +269,14 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     other session tasks (after start, not day-off, assistant). "Google Classroom" section on the
     attendance page shows mark button + on-time/late vs 9pm. Build-verified; flow is identical to
     the browser-verified parent-update mark-sent.
+[x] Step 9 — Homework submission entry. lib/datetime.saturdayDeadline (9pm Cairo on the
+    Sun–Sat week's Saturday) + lib/homework.hwStatus (on_time/late/missing/pending(null)) —
+    both unit-tested. actions/homework.submitHomeworkSubmissions: per the assistant's SUB-GROUP
+    (getVisibleStudentIds), upsert HomeworkSubmission (submission date + weak points), auto
+    status, pending rows skipped. /my/classes/[id]/homework list + /[homeworkId] entry page
+    with status badges + on-time/late vs the Saturday deadline. Verified in-browser
+    (on_time/late/missing + "Last saved … On time"). HW assignments come from session lesson
+    details (Step 7b).
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions
