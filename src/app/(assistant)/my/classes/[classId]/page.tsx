@@ -58,6 +58,9 @@ export default async function AssistantClassPage({
         <Link href={`/my/classes/${classId}/assessments`} className="text-sm text-blue-600 hover:underline">
           Assessments →
         </Link>
+        <Link href={`/my/classes/${classId}/office-hours`} className="text-sm text-blue-600 hover:underline">
+          Office hours →
+        </Link>
       </div>
 
       <h2 className="font-medium">Attendance</h2>

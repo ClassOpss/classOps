@@ -312,6 +312,10 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     sendCalc. /pay (list + open period) and /pay/[periodId] (calc table: base/-deductions/+bonus/
     adjustment/total, approve->send per assistant). Build-verified; browser verification pending in
     the rigorous test pass.
+[~] Step 13 — Office hours logging. actions/office-hours.logOfficeHour (assistant, sub-group
+    student + date + optional topic/notes/duration -> OfficeHourSession) + deleteOfficeHour.
+    /my/classes/[id]/office-hours form + list. +100 EGP bonus already read by lib/pay.
+    Build-verified; browser verification in the rigorous test pass.
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions
