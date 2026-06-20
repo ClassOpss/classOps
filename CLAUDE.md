@@ -280,6 +280,12 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     bumped on update; correction lateness = the assistant's FIRST entry. So editing after
     Saturday to record a student's own late submission keeps the assistant on-time (verified:
     edited a missing->late student post-Saturday, banner stayed "On time", student became Late).
+[x] Step 9b — Completeness gate (accountability). HW entry now requires an EXPLICIT per-student
+    choice: "Submitted" (date defaults to due date) or "Not submitted" — no ambiguous blanks.
+    A correction is "done" only when ALL sub-group students have a row; until then the page shows
+    "Incomplete — N of total reviewed" (never on-time/done). On-time is judged by completion time
+    (max first-entry loggedAt, edit-stable). List page shows reviewed/total or "Complete".
+    Verified: 1-of-3 entry still Incomplete; 3-of-3 -> "All 3 reviewed … On time".
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions

@@ -27,25 +27,31 @@ export async function submitHomeworkSubmissions(
 
   const ops = [];
   for (const studentId of visibleIds) {
-    const dateStr = String(formData.get(`date_${studentId}`) ?? "").trim();
+    const state = String(formData.get(`state_${studentId}`) ?? ""); // submitted | not_submitted | ""
     const weak = String(formData.get(`weak_${studentId}`) ?? "").trim() || null;
-    const submissionDate = dateStr ? new Date(dateStr) : null;
-    const status = hwStatus(submissionDate, homework.deadline, now);
 
-    if (status === null) {
-      // Pending: clear any stale row, otherwise nothing to store.
-      ops.push(
-        prisma.homeworkSubmission.deleteMany({ where: { homeworkId, studentId } }),
-      );
+    if (state !== "submitted" && state !== "not_submitted") {
+      // Unreviewed: no row exists -> the correction stays incomplete.
+      ops.push(prisma.homeworkSubmission.deleteMany({ where: { homeworkId, studentId } }));
       continue;
+    }
+
+    let submissionDate: Date | null = null;
+    let status: "on_time" | "late" | "missing";
+    if (state === "submitted") {
+      const dateStr = String(formData.get(`date_${studentId}`) ?? "").trim();
+      submissionDate = dateStr ? new Date(dateStr) : homework.deadline; // default to the due date
+      // date is always set here, so hwStatus resolves to on_time | late
+      status = hwStatus(submissionDate, homework.deadline, now) ?? "on_time";
+    } else {
+      status = "missing"; // explicitly reviewed as not submitted
     }
 
     ops.push(
       prisma.homeworkSubmission.upsert({
         where: { homeworkId_studentId: { homeworkId, studentId } },
-        // loggedAt is set once (on create) and never bumped on edit — so re-opening
-        // later to record a student's OWN late submission doesn't make the assistant
-        // look late. The assistant's correction timeliness is their first entry.
+        // loggedAt is set once (on create) and never bumped on edit — editing later to
+        // record a student's OWN late submission doesn't make the assistant look late.
         update: { submissionDate, status, weakPoints: weak, loggedById },
         create: { homeworkId, studentId, submissionDate, status, weakPoints: weak, loggedById, loggedAt: now },
       }),
