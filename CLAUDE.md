@@ -316,6 +316,11 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     student + date + optional topic/notes/duration -> OfficeHourSession) + deleteOfficeHour.
     /my/classes/[id]/office-hours form + list. +100 EGP bonus already read by lib/pay.
     Build-verified; browser verification in the rigorous test pass.
+[~] Step 14 — Insights (admin+teacher). /insights: topic performance bar chart (Recharts,
+    client topic-chart.tsx; avg % per topic excl. diagnostics, green>overall avg/red<, ref line),
+    attendance rate per class + students with >3 absences flagged, common weak-point keywords
+    (tokenised from homework_submissions.weakPoints), assistant activity (incidents, office hours).
+    Filters (year group/school/date) deferred. Build-verified; chart runtime check in test pass.
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions
