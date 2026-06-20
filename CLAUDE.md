@@ -329,7 +329,11 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     ?month=&year= (auth admin/teacher; renderToBuffer -> application/pdf). Download form on the admin
     class overview. Verified: 403 unauth, 200 valid %PDF; extracted text correct (avg 70%, by-code
     rows, 50% attendance/submission). Logo is per-teacher -> becomes the Operation's logo in multi-tenancy.
-[ ] Step 16 — WhatsApp quiz-announcement template (Message B).
+[x] Step 16 — WhatsApp quiz-announcement (Message B). lib/whatsapp/quiz-announcement.ts:
+    buildQuizAnnouncement + friendlyTime (16:00 -> 4:00 PM) + topicsFromNotes (split topicNotes on
+    , ; newline into bullets, else topic.title). Per-assessment QuizAnnouncement client (toggle
+    preview + copy-to-clipboard) on the /classes/[id]/assessments admin page. Verified builder
+    output. NOTE: "Team MO" signature hardcoded -> becomes per-Operation branding in multi-tenancy.
 [ ] FINAL — Multi-tenancy (logical: Operation table + operationId scoping; per-teacher
     personalization incl. logo) + rigorous test pass, then Railway deploy. See multi-tenancy-decision memory.
 [ ] — update this section as modules are completed —

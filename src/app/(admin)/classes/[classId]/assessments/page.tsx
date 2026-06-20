@@ -2,7 +2,9 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { deleteAssessment } from "@/actions/assessments";
+import { buildQuizAnnouncement, friendlyTime, topicsFromNotes } from "@/lib/whatsapp/quiz-announcement";
 import { AssessmentForm } from "./assessment-form";
+import { QuizAnnouncement } from "./quiz-announcement";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -33,7 +35,7 @@ export default async function AssessmentsAdminPage({
   const assessments = await prisma.assessment.findMany({
     where: { classId },
     orderBy: { date: "desc" },
-    include: { _count: { select: { grades: true } } },
+    include: { _count: { select: { grades: true } }, topic: { select: { title: true } } },
   });
 
   return (
@@ -76,11 +78,20 @@ export default async function AssessmentsAdminPage({
                   <td className="py-2">{a.maxMark}</td>
                   <td className="py-2">{a._count.grades}</td>
                   <td className="py-2">
-                    {user.role === "admin" && a._count.grades === 0 && (
-                      <form action={deleteAssessment.bind(null, a.id)}>
-                        <button type="submit" className="text-red-600 hover:underline">Delete</button>
-                      </form>
-                    )}
+                    <div className="flex flex-col gap-1">
+                      <QuizAnnouncement
+                        message={buildQuizAnnouncement({
+                          dateLabel: dateFmt.format(a.date),
+                          timeLabel: friendlyTime(a.time),
+                          topics: topicsFromNotes(a.topicNotes, a.topic?.title),
+                        })}
+                      />
+                      {user.role === "admin" && a._count.grades === 0 && (
+                        <form action={deleteAssessment.bind(null, a.id)}>
+                          <button type="submit" className="text-red-600 hover:underline">Delete</button>
+                        </form>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
