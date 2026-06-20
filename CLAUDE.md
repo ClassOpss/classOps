@@ -304,6 +304,14 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     (active classes/assistants, sessions this month delivered/planned, open incidents), incidents
     list with waive (reason) + EGP totals, recent activity feed. Verified in-browser + cron curls:
     401 unauth, daily=3, idempotent re-run=0, weekly=2; waive dropped 5/500 -> 4/400 EGP.
+[~] Step 12 — Pay periods + calculation. lib/pay.computePayComponents (classesCovered = distinct
+    classes with an assignment overlapping the month; base = classes*1000; lateDeductions = sum of
+    non-waived incident deductionAmount with deadline in month; officeHoursBonus = office-hour count
+    *100). actions/pay: createPayPeriod (generates a PayCalculation per active assistant),
+    recalcPayPeriod (refresh after waiving; keeps manual adjustment), setAdjustment, approveCalc,
+    sendCalc. /pay (list + open period) and /pay/[periodId] (calc table: base/-deductions/+bonus/
+    adjustment/total, approve->send per assistant). Build-verified; browser verification pending in
+    the rigorous test pass.
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions
