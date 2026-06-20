@@ -294,6 +294,16 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     %/colour (green>classAvg, red<, vs server-snapshot avg across ALL students) + live reviewed
     counter; completeness gate + on-time/late vs Saturday deadline. Verified in-browser
     (90/50/70% -> green/red/neutral vs 70% avg; 0/3 Incomplete -> 3/3 On time).
+[x] Step 11 — Late-incident detection (cron) + admin dashboard. lib/late-incidents.detectLateIncidents
+    (idempotent): daily run -> one incident per active assistant per missed session task
+    (attendance/parent_update/classroom_upload, dedupe by assistant+session+type); weekly (Sat)
+    run -> hw_correction (per HW due this Sun–Sat week with incomplete sub-group, sessionId set)
+    and grade_entry (per assessment this week, sessionId null). /api/cron/check-late-incidents
+    (Bearer CRON_SECRET; body {weekly?, date?} — date overrides "now" for testing). lib/roster.ts
+    subGroupStudentIds/activeAt. actions/incidents waive/unwaive (admin). Dashboard: stat cards
+    (active classes/assistants, sessions this month delivered/planned, open incidents), incidents
+    list with waive (reason) + EGP totals, recent activity feed. Verified in-browser + cron curls:
+    401 unauth, daily=3, idempotent re-run=0, weekly=2; waive dropped 5/500 -> 4/400 EGP.
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions
