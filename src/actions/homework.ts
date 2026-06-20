@@ -43,7 +43,10 @@ export async function submitHomeworkSubmissions(
     ops.push(
       prisma.homeworkSubmission.upsert({
         where: { homeworkId_studentId: { homeworkId, studentId } },
-        update: { submissionDate, status, weakPoints: weak, loggedById, loggedAt: now },
+        // loggedAt is set once (on create) and never bumped on edit — so re-opening
+        // later to record a student's OWN late submission doesn't make the assistant
+        // look late. The assistant's correction timeliness is their first entry.
+        update: { submissionDate, status, weakPoints: weak, loggedById },
         create: { homeworkId, studentId, submissionDate, status, weakPoints: weak, loggedById, loggedAt: now },
       }),
     );

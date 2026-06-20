@@ -64,8 +64,14 @@ export default async function HomeworkEntryPage({
   const byStudent = new Map(submissions.map((s) => [s.studentId, s]));
 
   const correctionDeadline = saturdayDeadline(homework.deadline);
-  const loggedAt = submissions.map((s) => s.loggedAt).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
-  const late = loggedAt ? isLate(loggedAt, correctionDeadline) : false;
+  // Earliest entry = when the assistant first did the correction. Judging lateness on this
+  // (not the latest edit) means recording a student's late submission afterwards never
+  // makes the assistant late.
+  const firstLoggedAt =
+    submissions.length > 0
+      ? submissions.map((s) => s.loggedAt).sort((a, b) => a.getTime() - b.getTime())[0]
+      : null;
+  const late = firstLoggedAt ? isLate(firstLoggedAt, correctionDeadline) : false;
 
   return (
     <div className="flex flex-col gap-4">
@@ -77,7 +83,7 @@ export default async function HomeworkEntryPage({
         </p>
       </div>
 
-      {loggedAt && (
+      {firstLoggedAt && (
         <div
           className={`rounded-md p-3 text-sm ${
             late
@@ -85,7 +91,7 @@ export default async function HomeworkEntryPage({
               : "bg-green-50 text-green-700 dark:bg-green-950/30"
           }`}
         >
-          Last saved {formatCairo(loggedAt)} — {late ? "Late (after 9pm Saturday)" : "On time"}
+          Correction logged {formatCairo(firstLoggedAt)} — {late ? "Late (after 9pm Saturday)" : "On time"}
         </div>
       )}
 

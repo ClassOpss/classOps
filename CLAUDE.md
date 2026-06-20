@@ -275,8 +275,11 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     (getVisibleStudentIds), upsert HomeworkSubmission (submission date + weak points), auto
     status, pending rows skipped. /my/classes/[id]/homework list + /[homeworkId] entry page
     with status badges + on-time/late vs the Saturday deadline. Verified in-browser
-    (on_time/late/missing + "Last saved … On time"). HW assignments come from session lesson
-    details (Step 7b).
+    (on_time/late/missing + "Correction logged … On time"). HW assignments come from session
+    lesson details (Step 7b). EDIT-AFTER-DEADLINE: loggedAt is set once (create) and never
+    bumped on update; correction lateness = the assistant's FIRST entry. So editing after
+    Saturday to record a student's own late submission keeps the assistant on-time (verified:
+    edited a missing->late student post-Saturday, banner stayed "On time", student became Late).
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions
