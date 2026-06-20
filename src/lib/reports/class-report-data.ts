@@ -115,8 +115,9 @@ export async function buildClassReportData(
     });
 
   const assessments = monthAssessments.map((a) => {
-    const avg = a.grades.length
-      ? a.grades.reduce((sum, g) => sum + Number(g.percentage), 0) / a.grades.length
+    const graded = a.grades.filter((g) => g.percentage != null);
+    const avg = graded.length
+      ? graded.reduce((sum, g) => sum + Number(g.percentage), 0) / graded.length
       : null;
     return {
       label: a.label,
@@ -128,8 +129,9 @@ export async function buildClassReportData(
 
   const studentRows = students
     .map((s) => {
-      const avg = s.grades.length
-        ? s.grades.reduce((sum, g) => sum + Number(g.percentage), 0) / s.grades.length
+      const graded = s.grades.filter((g) => g.percentage != null);
+      const avg = graded.length
+        ? graded.reduce((sum, g) => sum + Number(g.percentage), 0) / graded.length
         : null;
       return {
         code: s.code,

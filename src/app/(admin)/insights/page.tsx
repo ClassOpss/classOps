@@ -29,7 +29,7 @@ export default async function InsightsPage() {
 
   const [grades, attendance, classes, weakSubs, assistants, absenceGroups] = await Promise.all([
     prisma.assessmentGrade.findMany({
-      where: { assessment: { isDiagnostic: false, topicId: { not: null } } },
+      where: { assessment: { isDiagnostic: false, topicId: { not: null } }, percentage: { not: null } },
       select: { percentage: true, assessment: { select: { topic: { select: { title: true } } } } },
     }),
     prisma.attendance.findMany({ select: { status: true, session: { select: { classId: true } } } }),

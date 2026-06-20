@@ -41,7 +41,7 @@ export default async function GradeEntryPage({
     }),
     prisma.assessmentGrade.findMany({
       where: { assessmentId, studentId: { in: visibleIds } },
-      select: { studentId: true, rawMark: true, loggedAt: true },
+      select: { studentId: true, rawMark: true, absent: true, loggedAt: true },
     }),
     // Class average across ALL students (both sub-groups), for the colour coding.
     prisma.assessmentGrade.aggregate({ where: { assessmentId }, _avg: { percentage: true } }),
@@ -49,11 +49,15 @@ export default async function GradeEntryPage({
   const byStudent = new Map(grades.map((g) => [g.studentId, g]));
   const classAverage = avg._avg.percentage !== null ? Number(avg._avg.percentage) : null;
 
-  const rows: GradeRow[] = students.map((s) => ({
-    id: s.id,
-    name: s.name,
-    mark: byStudent.has(s.id) ? String(Number(byStudent.get(s.id)!.rawMark)) : "",
-  }));
+  const rows: GradeRow[] = students.map((s) => {
+    const g = byStudent.get(s.id);
+    return {
+      id: s.id,
+      name: s.name,
+      mark: g && g.rawMark != null ? String(Number(g.rawMark)) : "",
+      absent: g?.absent ?? false,
+    };
+  });
 
   const total = students.length;
   const reviewed = grades.length;

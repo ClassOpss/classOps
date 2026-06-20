@@ -460,8 +460,10 @@ model AssessmentGrade {
   id           String   @id @default(uuid())
   assessmentId String   @map("assessment_id")
   studentId    String   @map("student_id")
-  rawMark      Decimal  @map("raw_mark") @db.Decimal(10, 2)
-  percentage   Decimal  @db.Decimal(5, 2)
+  // null mark + absent=true: student sat out the assessment (reviewed, excluded from averages).
+  rawMark      Decimal? @map("raw_mark") @db.Decimal(10, 2)
+  percentage   Decimal? @db.Decimal(5, 2)
+  absent       Boolean  @default(false)
   loggedById   String   @map("logged_by")
   loggedAt     DateTime @default(now()) @map("logged_at") @db.Timestamptz(6)
 

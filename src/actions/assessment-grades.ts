@@ -24,25 +24,34 @@ export async function submitGrades(assessmentId: string, formData: FormData): Pr
 
   const ops = [];
   for (const studentId of visibleIds) {
+    const absent = formData.get(`absent_${studentId}`) === "on";
     const raw = String(formData.get(`mark_${studentId}`) ?? "").trim();
-    if (raw === "") {
-      ops.push(prisma.assessmentGrade.deleteMany({ where: { assessmentId, studentId } }));
-      continue;
-    }
-    let mark = Number(raw);
-    if (Number.isNaN(mark)) {
-      ops.push(prisma.assessmentGrade.deleteMany({ where: { assessmentId, studentId } }));
-      continue;
-    }
-    mark = Math.min(max, Math.max(0, mark));
-    const percentage = Math.round((mark / max) * 10000) / 100;
 
+    // Absent: reviewed, no mark, excluded from averages.
+    if (absent) {
+      ops.push(
+        prisma.assessmentGrade.upsert({
+          where: { assessmentId_studentId: { assessmentId, studentId } },
+          update: { absent: true, rawMark: null, percentage: null, loggedById },
+          create: { assessmentId, studentId, absent: true, rawMark: null, percentage: null, loggedById, loggedAt: now },
+        }),
+      );
+      continue;
+    }
+
+    if (raw === "" || Number.isNaN(Number(raw))) {
+      ops.push(prisma.assessmentGrade.deleteMany({ where: { assessmentId, studentId } })); // unreviewed
+      continue;
+    }
+
+    const mark = Math.min(max, Math.max(0, Number(raw)));
+    const percentage = Math.round((mark / max) * 10000) / 100;
     ops.push(
       prisma.assessmentGrade.upsert({
         where: { assessmentId_studentId: { assessmentId, studentId } },
         // loggedAt set once on create (edit-stable, like homework).
-        update: { rawMark: mark, percentage, loggedById },
-        create: { assessmentId, studentId, rawMark: mark, percentage, loggedById, loggedAt: now },
+        update: { absent: false, rawMark: mark, percentage, loggedById },
+        create: { assessmentId, studentId, absent: false, rawMark: mark, percentage, loggedById, loggedAt: now },
       }),
     );
   }
