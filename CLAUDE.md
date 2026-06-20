@@ -321,6 +321,17 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     attendance rate per class + students with >3 absences flagged, common weak-point keywords
     (tokenised from homework_submissions.weakPoints), assistant activity (incidents, office hours).
     Filters (year group/school/date) deferred. Build-verified; chart runtime check in test pass.
+[x] Step 15 — Monthly PDF report. @react-pdf/renderer (serverExternalPackages). lib/reports/
+    class-report-data.ts gathers per class+month (sessions w/ display lesson# + attendance rate,
+    assessments w/ class avg, student summary BY CODE ordered by code (privacy), homework submission
+    rates) + loads public/logos/teacher1.png as a data URI. lib/reports/class-report-doc.tsx
+    (Document/Page/Table; logo watermark top-right opacity .5). GET /api/reports/class/[classId]
+    ?month=&year= (auth admin/teacher; renderToBuffer -> application/pdf). Download form on the admin
+    class overview. Verified: 403 unauth, 200 valid %PDF; extracted text correct (avg 70%, by-code
+    rows, 50% attendance/submission). Logo is per-teacher -> becomes the Operation's logo in multi-tenancy.
+[ ] Step 16 — WhatsApp quiz-announcement template (Message B).
+[ ] FINAL — Multi-tenancy (logical: Operation table + operationId scoping; per-teacher
+    personalization incl. logo) + rigorous test pass, then Railway deploy. See multi-tenancy-decision memory.
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions

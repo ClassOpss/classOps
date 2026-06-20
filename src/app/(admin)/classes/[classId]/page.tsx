@@ -6,6 +6,11 @@ import { EditClassForm, type ClassDefaults } from "./edit-class-form";
 
 type Schedule = { day?: string; time?: string };
 
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
 function toDateInput(d: Date | null): string {
   if (!d) return "";
   return d.toISOString().slice(0, 10);
@@ -73,6 +78,38 @@ export default async function ClassOverviewPage({
           Assessments →
         </Link>
       </div>
+
+      <section>
+        <h2 className="mb-2 font-medium">Monthly report (PDF)</h2>
+        <form
+          action={`/api/reports/class/${classId}`}
+          method="get"
+          target="_blank"
+          className="flex flex-wrap items-end gap-2"
+        >
+          <select
+            name="month"
+            defaultValue={new Date().getUTCMonth() + 1}
+            className="rounded-md border border-black/15 bg-white px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
+          >
+            {MONTHS.map((m, i) => (
+              <option key={m} value={i + 1}>{m}</option>
+            ))}
+          </select>
+          <input
+            name="year"
+            type="number"
+            defaultValue={new Date().getUTCFullYear()}
+            className="w-24 rounded-md border border-black/15 bg-white px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
+          />
+          <button
+            type="submit"
+            className="rounded-md border border-black/15 px-3 py-2 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+          >
+            Download PDF
+          </button>
+        </form>
+      </section>
 
       {isAdmin && (
         <>
