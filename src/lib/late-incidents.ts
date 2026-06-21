@@ -3,6 +3,7 @@ import type { IncidentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { CAIRO_TZ, sessionDeadline, saturdayDeadline } from "@/lib/datetime";
 import { subGroupStudentIds, activeAt } from "@/lib/roster";
+import { getConfig } from "@/lib/config";
 
 type Queued = {
   assistantId: string;
@@ -129,12 +130,14 @@ export async function detectLateIncidents(now: Date, weekly: boolean): Promise<D
   }
 
   if (fresh.length > 0) {
+    const deductionAmount = getConfig().lateDeduction;
     await prisma.lateIncident.createMany({
       data: fresh.map((q) => ({
         assistantId: q.assistantId,
         sessionId: q.sessionId,
         type: q.type,
         deadline: q.deadline,
+        deductionAmount,
       })),
     });
   }

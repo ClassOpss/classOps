@@ -4,6 +4,7 @@ import path from "path";
 import { prisma } from "@/lib/db";
 import { monthWindow } from "@/lib/pay";
 import { displayedLessonNumbers } from "@/lib/lesson-number";
+import { getConfig } from "@/lib/config";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -29,7 +30,7 @@ export type ClassReportData = {
 
 async function loadLogo(): Promise<string | null> {
   try {
-    const file = path.join(process.cwd(), "public", "logos", "teacher1.png");
+    const file = path.join(process.cwd(), "public", getConfig().logoPath.replace(/^\//, ""));
     const buf = await fs.readFile(file);
     return `data:image/png;base64,${buf.toString("base64")}`;
   } catch {

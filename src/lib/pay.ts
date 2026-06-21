@@ -1,7 +1,5 @@
 import { prisma } from "@/lib/db";
-
-export const PER_CLASS = 1000; // EGP per class covered (spec 5.9)
-export const PER_OFFICE_HOUR = 100; // EGP bonus per office-hour session
+import { getConfig } from "@/lib/config";
 
 export type PayComponents = {
   classesCovered: number;
@@ -45,14 +43,15 @@ export async function computePayComponents(
     }),
   ]);
 
+  const cfg = getConfig();
   const classesCovered = new Set(assignments.map((a) => a.classId)).size;
   const lateDeductions = Number(incidents._sum.deductionAmount ?? 0);
 
   return {
     classesCovered,
-    baseSalary: classesCovered * PER_CLASS,
+    baseSalary: classesCovered * cfg.perClassSalary * cfg.payMultiplier,
     lateDeductions,
-    officeHoursBonus: officeHours * PER_OFFICE_HOUR,
+    officeHoursBonus: officeHours * cfg.officeHourBonus,
   };
 }
 

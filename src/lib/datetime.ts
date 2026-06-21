@@ -1,37 +1,41 @@
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
+import { getConfig } from "@/lib/config";
 
-// All timestamps are stored UTC; the operation runs in Cairo time.
-export const CAIRO_TZ = "Africa/Cairo";
+// All timestamps are stored UTC; the operation runs in its configured time zone.
+export const CAIRO_TZ = getConfig().timeZone;
+
+const pad = (n: number) => String(n).padStart(2, "0");
 
 export function formatCairo(date: Date, fmt = "d MMM yyyy, h:mm a"): string {
-  return formatInTimeZone(date, CAIRO_TZ, fmt);
+  return formatInTimeZone(date, getConfig().timeZone, fmt);
 }
 
-function cairoInstant(scheduledDate: Date, hms: string): Date {
+function zonedInstant(scheduledDate: Date, hms: string): Date {
   const y = scheduledDate.getUTCFullYear();
-  const m = String(scheduledDate.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(scheduledDate.getUTCDate()).padStart(2, "0");
-  return fromZonedTime(`${y}-${m}-${d}T${hms}`, CAIRO_TZ);
+  const m = pad(scheduledDate.getUTCMonth() + 1);
+  const d = pad(scheduledDate.getUTCDate());
+  return fromZonedTime(`${y}-${m}-${d}T${hms}`, getConfig().timeZone);
 }
 
 // When the class actually starts (its scheduled time on the session day, Cairo).
 // Attendance can't be logged before this — the class hasn't happened yet.
 export function sessionStart(scheduledDate: Date, time?: string): Date {
   const hms = time && /^\d{2}:\d{2}$/.test(time) ? `${time}:00` : "00:00:00";
-  return cairoInstant(scheduledDate, hms);
+  return zonedInstant(scheduledDate, hms);
 }
 
-// The 9pm-Cairo deadline on a session's scheduled calendar day, as a UTC instant (spec 5.10).
+// Daily-task deadline on a session's scheduled calendar day (default 9pm, spec 5.10).
 export function sessionDeadline(scheduledDate: Date): Date {
-  return cairoInstant(scheduledDate, "21:00:00");
+  return zonedInstant(scheduledDate, `${pad(getConfig().dailyDeadlineHour)}:00:00`);
 }
 
-// Weekly-task deadline (HW correction / grade entry, spec 5.10): 9pm Cairo on the Saturday
-// of the week (Sunday–Saturday) containing `date`. On a Saturday it's that same day.
+// Weekly-task deadline (HW correction / grade entry, spec 5.10): the configured weekday
+// (default Saturday) + hour, in the week containing `date`. On that weekday it's the same day.
 export function saturdayDeadline(date: Date): Date {
+  const { weeklyDeadlineWeekday, weeklyDeadlineHour } = getConfig();
   const base = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  base.setUTCDate(base.getUTCDate() + (6 - base.getUTCDay())); // 0=Sun..6=Sat -> advance to Sat
-  return cairoInstant(base, "21:00:00");
+  base.setUTCDate(base.getUTCDate() + ((weeklyDeadlineWeekday - base.getUTCDay() + 7) % 7));
+  return zonedInstant(base, `${pad(weeklyDeadlineHour)}:00:00`);
 }
 
 export function isLate(loggedAt: Date, deadline: Date): boolean {

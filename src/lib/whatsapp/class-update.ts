@@ -1,6 +1,7 @@
 // Message A — Class Update (spec 5.13). Sent to the class WhatsApp group after a session.
 // Students are referenced by NAME here (codes are reserved for the grade reports —
 // see student-code-privacy).
+import { getConfig } from "@/lib/config";
 
 export type ClassUpdateData = {
   dateLabel: string;
@@ -17,7 +18,10 @@ export type ClassUpdateData = {
   notes?: string | null;
 };
 
-export function buildClassUpdateMessage(d: ClassUpdateData): string {
+export function buildClassUpdateMessage(
+  d: ClassUpdateData,
+  signature: string = getConfig().brandSignature,
+): string {
   const lines: string[] = [];
   lines.push(`*Class Update – ${d.dateLabel}*`);
   lines.push("Dear Parents,");
@@ -60,7 +64,7 @@ export function buildClassUpdateMessage(d: ClassUpdateData): string {
   lines.push("");
   lines.push("Thank you for your continued support.");
   lines.push("Best regards,");
-  lines.push("*Team MO*");
+  lines.push(`*${signature}*`);
 
   return lines.join("\n");
 }

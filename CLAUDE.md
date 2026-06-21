@@ -334,6 +334,13 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     , ; newline into bullets, else topic.title). Per-assessment QuizAnnouncement client (toggle
     preview + copy-to-clipboard) on the /classes/[id]/assessments admin page. Verified builder
     output. NOTE: "Team MO" signature hardcoded -> becomes per-Operation branding in multi-tenancy.
+[~] Pre-deploy rework — (1) "Absent" option on assessment grades (committed), (2) multi-slot
+    weekly date generator (committed), (3) config centralization: src/lib/config.ts OPERATION_DEFAULTS
+    + getConfig() now holds EVERY per-operation tunable (brandName, brandSignature, logoPath,
+    currency, timeZone, daily/weekly deadline hour+weekday, perClassSalary, officeHourBonus,
+    lateDeduction, payMultiplier). lib/datetime (deadlines/tz), lib/pay (salary/bonus), lib/late-incidents
+    (deduction), lib/whatsapp/* (signature), lib/reports (logo path) all read from it. Multi-tenancy
+    just makes getConfig() resolve per Operation; the new-teacher form sets these (defaults pre-filled).
 [ ] FINAL — Multi-tenancy (logical: Operation table + operationId scoping; per-teacher
     personalization incl. logo) + rigorous test pass, then Railway deploy. See multi-tenancy-decision memory.
 [ ] — update this section as modules are completed —

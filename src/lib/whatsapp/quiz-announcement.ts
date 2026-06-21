@@ -1,4 +1,5 @@
 // Message B — Quiz Announcement (spec 5.13). Triggered by teacher/admin from an assessment.
+import { getConfig } from "@/lib/config";
 
 export type QuizAnnouncementData = {
   dateLabel: string;
@@ -26,7 +27,10 @@ export function topicsFromNotes(topicNotes?: string | null, topicTitle?: string 
   return topicTitle ? [topicTitle] : [];
 }
 
-export function buildQuizAnnouncement(d: QuizAnnouncementData): string {
+export function buildQuizAnnouncement(
+  d: QuizAnnouncementData,
+  signature: string = getConfig().brandSignature,
+): string {
   const lines: string[] = [];
   lines.push("*Quiz Announcement*");
   lines.push("Good Afternoon Parents & Students,");
@@ -44,6 +48,6 @@ export function buildQuizAnnouncement(d: QuizAnnouncementData): string {
   lines.push("Always feel free to share any questions or concerns, we're always here!");
   lines.push("We'll also share results in the monthly report so you can track progress.");
   lines.push("Best of luck to everyone!");
-  lines.push("*Team MO*");
+  lines.push(`*${signature}*`);
   return lines.join("\n");
 }
