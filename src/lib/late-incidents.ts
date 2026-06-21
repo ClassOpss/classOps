@@ -32,23 +32,22 @@ async function detectDaily(now: Date): Promise<Queued[]> {
     where: { scheduledDate: today, dayOff: false },
     select: {
       id: true,
+      responsibleAssistantId: true,
+      coveredById: true,
       attendance: { select: { id: true }, take: 1 },
       parentUpdate: { select: { id: true } },
       classroomUpload: { select: { id: true } },
-      class: { select: { assignments: { where: activeAt(now), select: { assistantId: true } } } },
     },
   });
 
   const queued: Queued[] = [];
   for (const s of sessions) {
-    const hasAttendance = s.attendance.length > 0;
-    const hasParent = !!s.parentUpdate;
-    const hasClassroom = !!s.classroomUpload;
-    for (const { assistantId } of s.class.assignments) {
-      if (!hasAttendance) queued.push({ assistantId, sessionId: s.id, type: "attendance", deadline });
-      if (!hasParent) queued.push({ assistantId, sessionId: s.id, type: "parent_update", deadline });
-      if (!hasClassroom) queued.push({ assistantId, sessionId: s.id, type: "classroom_upload", deadline });
-    }
+    // Daily tasks belong to ONE assistant: the coverer if covered, else the session owner.
+    const assistantId = s.coveredById ?? s.responsibleAssistantId;
+    if (!assistantId) continue; // unassigned day -> nobody to charge
+    if (s.attendance.length === 0) queued.push({ assistantId, sessionId: s.id, type: "attendance", deadline });
+    if (!s.parentUpdate) queued.push({ assistantId, sessionId: s.id, type: "parent_update", deadline });
+    if (!s.classroomUpload) queued.push({ assistantId, sessionId: s.id, type: "classroom_upload", deadline });
   }
   return queued;
 }
