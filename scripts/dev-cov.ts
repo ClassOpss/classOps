@@ -8,6 +8,8 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+const DEFAULT_OPERATION_ID = "00000000-0000-0000-0000-000000000001";
+
 function dayUTC(y: number, m: number, d: number): Date {
   return new Date(Date.UTC(y, m - 1, d));
 }
@@ -19,10 +21,11 @@ async function ensureAssistant(email: string, name: string) {
     update: { passwordHash, active: true, role: "assistant" },
     create: { email, name, role: "assistant", active: true, emailVerified: new Date(), passwordHash },
   });
+  await prisma.user.update({ where: { id: user.id }, data: { operationId: DEFAULT_OPERATION_ID } });
   return prisma.assistant.upsert({
     where: { userId: user.id },
     update: { active: true },
-    create: { userId: user.id, name, email },
+    create: { userId: user.id, name, email, operationId: DEFAULT_OPERATION_ID },
   });
 }
 
@@ -32,11 +35,12 @@ async function main() {
 
   const school =
     (await prisma.school.findFirst({ where: { name: "ZZ-Cov-School" } })) ??
-    (await prisma.school.create({ data: { name: "ZZ-Cov-School" } }));
+    (await prisma.school.create({ data: { name: "ZZ-Cov-School", operationId: DEFAULT_OPERATION_ID } }));
 
   await prisma.class.deleteMany({ where: { name: "ZZ-Cov" } });
   const klass = await prisma.class.create({
     data: {
+      operationId: DEFAULT_OPERATION_ID,
       schoolId: school.id,
       yearGroup: "Y9",
       name: "ZZ-Cov",

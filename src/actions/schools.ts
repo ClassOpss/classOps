@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
+import { currentOperationId } from "@/lib/operation";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
@@ -16,10 +17,11 @@ export async function createSchool(_prev: FormState, formData: FormData): Promis
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const name = parsed.data;
-  const existing = await prisma.school.findFirst({ where: { name } });
+  const operationId = await currentOperationId();
+  const existing = await prisma.school.findFirst({ where: { name, operationId } });
   if (existing) return { error: "A school with that name already exists." };
 
-  const school = await prisma.school.create({ data: { name } });
+  const school = await prisma.school.create({ data: { name, operationId } });
   await logActivity({
     actorId: admin.id,
     actorRole: admin.role,

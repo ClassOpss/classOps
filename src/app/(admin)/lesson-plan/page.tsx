@@ -3,6 +3,7 @@ import type { YearGroup } from "@prisma/client";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { YEAR_GROUPS } from "@/lib/constants";
+import { currentOperationId } from "@/lib/operation";
 import { movePlanItem, removePlanItem } from "@/actions/lesson-plan";
 import { deleteTopic } from "@/actions/topics";
 import { AddTopicForm, AddPlanItemForm } from "./lesson-plan-forms";
@@ -18,14 +19,15 @@ export default async function LessonPlanPage({
     ? (yg as YearGroup)
     : "Y9";
 
+  const operationId = await currentOperationId();
   const [topics, plan] = await Promise.all([
     prisma.topic.findMany({
-      where: { yearGroup },
+      where: { operationId, yearGroup },
       orderBy: { sortOrder: "asc" },
       select: { id: true, title: true, chapter: true },
     }),
     prisma.lessonPlan.findUnique({
-      where: { yearGroup },
+      where: { operationId_yearGroup: { operationId, yearGroup } },
       include: {
         items: { orderBy: { sequence: "asc" }, include: { topic: { select: { title: true } } } },
       },

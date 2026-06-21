@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { createSetupToken, setupUrl } from "@/lib/tokens";
 import { logActivity } from "@/lib/activity";
+import { currentOperationId } from "@/lib/operation";
 
 const emailSchema = z.string().email();
 
@@ -18,7 +19,7 @@ export type InviteState =
 // Create (or top up) an assistant account and return a setup link.
 // In v1 there's no SMTP, so the admin copies the link to the assistant (email send
 // can be slotted in later without changing this flow).
-async function inviteOne(name: string, rawEmail: string): Promise<InviteLink> {
+async function inviteOne(name: string, rawEmail: string, operationId: string): Promise<InviteLink> {
   const email = rawEmail.toLowerCase().trim();
   const existing = await prisma.user.findUnique({
     where: { email },
@@ -29,7 +30,7 @@ async function inviteOne(name: string, rawEmail: string): Promise<InviteLink> {
   if (existing) {
     userId = existing.id;
     if (!existing.assistant) {
-      await prisma.assistant.create({ data: { userId, name, email } });
+      await prisma.assistant.create({ data: { userId, name, email, operationId } });
     }
   } else {
     const user = await prisma.user.create({
@@ -38,7 +39,8 @@ async function inviteOne(name: string, rawEmail: string): Promise<InviteLink> {
         name,
         role: "assistant",
         active: true,
-        assistant: { create: { name, email } },
+        operationId,
+        assistant: { create: { name, email, operationId } },
       },
     });
     userId = user.id;
@@ -59,7 +61,7 @@ export async function inviteAssistantAction(
   if (!name) return { ok: false, error: "Name is required." };
   if (!emailSchema.safeParse(email).success) return { ok: false, error: "Enter a valid email." };
 
-  const link = await inviteOne(name, email);
+  const link = await inviteOne(name, email, await currentOperationId());
   await logActivity({
     actorId: admin.id,
     actorRole: admin.role,
@@ -90,11 +92,12 @@ export async function bulkInviteAction(
   const invalid = emails.filter((e) => !emailSchema.safeParse(e).success);
   if (invalid.length) return { ok: false, error: `Invalid email(s): ${invalid.join(", ")}` };
 
+  const operationId = await currentOperationId();
   const links: InviteLink[] = [];
   for (const email of emails) {
     // No name provided in bulk — derive a placeholder from the local part.
     const placeholder = email.split("@")[0];
-    links.push(await inviteOne(placeholder, email));
+    links.push(await inviteOne(placeholder, email, operationId));
   }
 
   await logActivity({

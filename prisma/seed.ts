@@ -1,7 +1,12 @@
 import { PrismaClient, YearGroup } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { OPERATION_DEFAULTS } from "../src/lib/config";
 
 const prisma = new PrismaClient();
+
+// The first operation — home of all v1 single-tenant data. Must match the id the
+// add_operations migration seeds, so a fresh `db seed` and a migrated DB agree.
+const DEFAULT_OPERATION_ID = "00000000-0000-0000-0000-000000000001";
 
 // Schools from spec section 4.1
 const SCHOOLS = [
@@ -41,7 +46,31 @@ const TOPICS: Array<[string, YearGroup, string | null]> = [
 ];
 
 async function main() {
-  // --- Default admin (Jana) ---
+  // --- Default operation ("Math by Mo") — all v1 data lives here ---
+  await prisma.operation.upsert({
+    where: { id: DEFAULT_OPERATION_ID },
+    update: {},
+    create: {
+      id: DEFAULT_OPERATION_ID,
+      name: OPERATION_DEFAULTS.brandName,
+      slug: "math-by-mo",
+      brandName: OPERATION_DEFAULTS.brandName,
+      brandSignature: OPERATION_DEFAULTS.brandSignature,
+      logoPath: OPERATION_DEFAULTS.logoPath,
+      currency: OPERATION_DEFAULTS.currency,
+      dailyDeadlineHour: OPERATION_DEFAULTS.dailyDeadlineHour,
+      weeklyDeadlineWeekday: OPERATION_DEFAULTS.weeklyDeadlineWeekday,
+      weeklyDeadlineHour: OPERATION_DEFAULTS.weeklyDeadlineHour,
+      perClassSalary: OPERATION_DEFAULTS.perClassSalary,
+      officeHourBonus: OPERATION_DEFAULTS.officeHourBonus,
+      lateDeduction: OPERATION_DEFAULTS.lateDeduction,
+      coverageAdjustment: OPERATION_DEFAULTS.coverageAdjustment,
+      payMultiplier: OPERATION_DEFAULTS.payMultiplier,
+    },
+  });
+  console.log("Operation ready: Math by Mo");
+
+  // --- Default admin (Jana) — super-admin, not scoped to any operation ---
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "jana.meriden05@eng-st.cu.edu.eg";
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "ChangeMe123!";
   const passwordHash = await bcrypt.hash(adminPassword, 10);
@@ -61,20 +90,22 @@ async function main() {
   });
   console.log(`Admin ready: ${adminEmail}`);
 
-  // --- Schools ---
+  // --- Schools (scoped to the default operation) ---
   for (const name of SCHOOLS) {
-    const existing = await prisma.school.findFirst({ where: { name } });
-    if (!existing) await prisma.school.create({ data: { name } });
+    const existing = await prisma.school.findFirst({ where: { name, operationId: DEFAULT_OPERATION_ID } });
+    if (!existing) await prisma.school.create({ data: { name, operationId: DEFAULT_OPERATION_ID } });
   }
   console.log(`Schools seeded: ${SCHOOLS.length}`);
 
-  // --- Topics ---
+  // --- Topics (scoped to the default operation) ---
   let sort = 0;
   for (const [title, yearGroup, chapter] of TOPICS) {
-    const existing = await prisma.topic.findFirst({ where: { title, yearGroup } });
+    const existing = await prisma.topic.findFirst({
+      where: { title, yearGroup, operationId: DEFAULT_OPERATION_ID },
+    });
     if (!existing) {
       await prisma.topic.create({
-        data: { title, yearGroup, chapter, sortOrder: sort++ },
+        data: { title, yearGroup, chapter, sortOrder: sort++, operationId: DEFAULT_OPERATION_ID },
       });
     }
   }

@@ -49,7 +49,7 @@ export async function generateSessions(
 
   const klass = await prisma.class.findUnique({
     where: { id: classId },
-    select: { id: true, yearGroup: true, schedule: true, planStartDate: true },
+    select: { id: true, operationId: true, yearGroup: true, schedule: true, planStartDate: true },
   });
   if (!klass) return { error: "Class not found." };
   if (!klass.planStartDate) return { error: "Set a plan start date on the class first." };
@@ -58,7 +58,7 @@ export async function generateSessions(
   if (days.length === 0) return { error: "This class has no scheduled day(s)." };
 
   const plan = await prisma.lessonPlan.findUnique({
-    where: { yearGroup: klass.yearGroup },
+    where: { operationId_yearGroup: { operationId: klass.operationId, yearGroup: klass.yearGroup } },
     include: { items: { orderBy: { sequence: "asc" }, select: { id: true, topicId: true } } },
   });
   const items = plan?.items ?? [];

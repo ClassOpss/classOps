@@ -5,17 +5,22 @@ import type { YearGroup } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
+import { currentOperationId } from "@/lib/operation";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
-// One LessonPlan per year group; create on first use.
+// One LessonPlan per (operation, year group); create on first use.
 async function getOrCreatePlan(yearGroup: YearGroup): Promise<string> {
+  const operationId = await currentOperationId();
   const existing = await prisma.lessonPlan.findUnique({
-    where: { yearGroup },
+    where: { operationId_yearGroup: { operationId, yearGroup } },
     select: { id: true },
   });
   if (existing) return existing.id;
-  const created = await prisma.lessonPlan.create({ data: { yearGroup }, select: { id: true } });
+  const created = await prisma.lessonPlan.create({
+    data: { operationId, yearGroup },
+    select: { id: true },
+  });
   return created.id;
 }
 

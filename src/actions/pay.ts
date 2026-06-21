@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { computePayComponents, payTotal } from "@/lib/pay";
+import { currentOperationId } from "@/lib/operation";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
@@ -16,11 +17,14 @@ export async function createPayPeriod(_prev: FormState, formData: FormData): Pro
   if (!Number.isInteger(month) || month < 1 || month > 12) return { error: "Pick a month." };
   if (!Number.isInteger(year) || year < 2024 || year > 2100) return { error: "Enter a valid year." };
 
-  const existing = await prisma.payPeriod.findUnique({ where: { month_year: { month, year } } });
+  const operationId = await currentOperationId();
+  const existing = await prisma.payPeriod.findUnique({
+    where: { operationId_month_year: { operationId, month, year } },
+  });
   if (existing) return { error: "That pay period already exists." };
 
-  const period = await prisma.payPeriod.create({ data: { month, year } });
-  await generateCalculations(period.id, month, year);
+  const period = await prisma.payPeriod.create({ data: { operationId, month, year } });
+  await generateCalculations(period.id, month, year, operationId);
 
   await logActivity({
     actorId: admin.id,
@@ -34,9 +38,9 @@ export async function createPayPeriod(_prev: FormState, formData: FormData): Pro
   return { ok: true };
 }
 
-async function generateCalculations(periodId: string, month: number, year: number) {
+async function generateCalculations(periodId: string, month: number, year: number, operationId: string) {
   const assistants = await prisma.assistant.findMany({
-    where: { active: true, user: { active: true } },
+    where: { operationId, active: true, user: { active: true } },
     select: { id: true },
   });
   for (const a of assistants) {
@@ -76,7 +80,7 @@ export async function recalcPayPeriod(periodId: string): Promise<void> {
   await requireRole("admin");
   const period = await prisma.payPeriod.findUnique({ where: { id: periodId } });
   if (!period || period.status === "sent") return;
-  await generateCalculations(periodId, period.month, period.year);
+  await generateCalculations(periodId, period.month, period.year, period.operationId);
   revalidatePath(`/pay/${periodId}`);
 }
 

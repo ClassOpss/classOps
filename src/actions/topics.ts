@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
+import { currentOperationId } from "@/lib/operation";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
@@ -28,20 +29,22 @@ export async function createTopic(
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const d = parsed.data;
+  const operationId = await currentOperationId();
 
   const dup = await prisma.topic.findFirst({
-    where: { yearGroup: d.yearGroup, title: { equals: d.title, mode: "insensitive" } },
+    where: { operationId, yearGroup: d.yearGroup, title: { equals: d.title, mode: "insensitive" } },
     select: { id: true },
   });
   if (dup) return { error: "That topic already exists for this year group." };
 
   const last = await prisma.topic.findFirst({
-    where: { yearGroup: d.yearGroup },
+    where: { operationId, yearGroup: d.yearGroup },
     orderBy: { sortOrder: "desc" },
     select: { sortOrder: true },
   });
   const topic = await prisma.topic.create({
     data: {
+      operationId,
       title: d.title,
       yearGroup: d.yearGroup,
       chapter: d.chapter,

@@ -77,6 +77,51 @@ enum PayCalcStatus {
 }
 
 // ----------------------------------------------------------------------------
+// Operation (tenant) — one per teacher/tutoring operation. Logical isolation:
+// every domain row is scoped to an operation; the super-admin manages all of them.
+// Holds all per-operation config (branding, deadlines, pay). Timezone is a shared
+// app default, not stored here (decided: only timezone stays global).
+// ----------------------------------------------------------------------------
+
+model Operation {
+  id     String  @id @default(uuid())
+  name   String // teacher / operation display name, e.g. "Math by Mo"
+  slug   String  @unique
+  active Boolean @default(true)
+
+  // Branding / personalization
+  brandName      String  @map("brand_name")
+  brandSignature String  @map("brand_signature") // signs WhatsApp messages
+  logoPath       String  @map("logo_path")
+  currency       String  @default("EGP")
+
+  // Deadlines (Cairo time; the timezone itself is a shared app default)
+  dailyDeadlineHour     Int @default(21) @map("daily_deadline_hour")
+  weeklyDeadlineWeekday Int @default(6) @map("weekly_deadline_weekday")
+  weeklyDeadlineHour    Int @default(21) @map("weekly_deadline_hour")
+
+  // Pay
+  perClassSalary     Decimal @default(1000) @map("per_class_salary") @db.Decimal(10, 2)
+  officeHourBonus    Decimal @default(100) @map("office_hour_bonus") @db.Decimal(10, 2)
+  lateDeduction      Decimal @default(100) @map("late_deduction") @db.Decimal(10, 2)
+  coverageAdjustment Decimal @default(50) @map("coverage_adjustment") @db.Decimal(10, 2)
+  payMultiplier      Decimal @default(1) @map("pay_multiplier") @db.Decimal(6, 3)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  users       User[]
+  schools     School[]
+  classes     Class[]
+  topics      Topic[]
+  lessonPlans LessonPlan[]
+  assistants  Assistant[]
+  payPeriods  PayPeriod[]
+  activity    ActivityLog[]
+
+  @@map("operations")
+}
+
+// ----------------------------------------------------------------------------
 // Auth.js v5 (NextAuth) adapter models
 // ----------------------------------------------------------------------------
 
@@ -90,12 +135,16 @@ model User {
   phone         String?
   role          Role      @default(assistant)
   active        Boolean   @default(true)
+  // null = super-admin (cross-operation); teachers + assistants belong to one operation
+  operationId   String?   @map("operation_id")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  operation Operation? @relation(fields: [operationId], references: [id])
   accounts  Account[]
   sessions  Session[]
   assistant Assistant?
 
+  @@index([operationId])
   @@map("users")
 }
 
@@ -144,17 +193,21 @@ model VerificationToken {
 // ----------------------------------------------------------------------------
 
 model School {
-  id        String   @id @default(uuid())
-  name      String
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id          String   @id @default(uuid())
+  operationId String   @map("operation_id")
+  name        String
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  classes Class[]
+  operation Operation @relation(fields: [operationId], references: [id])
+  classes   Class[]
 
+  @@index([operationId])
   @@map("schools")
 }
 
 model Class {
   id           String    @id @default(uuid())
+  operationId  String    @map("operation_id")
   schoolId     String    @map("school_id")
   yearGroup    YearGroup @map("year_group")
   name         String
@@ -167,6 +220,7 @@ model Class {
   notes        String?
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  operation       Operation                    @relation(fields: [operationId], references: [id])
   school          School                       @relation(fields: [schoolId], references: [id])
   students        Student[]
   assignments     ClassAssignment[]
@@ -177,6 +231,7 @@ model Class {
   officeHours     OfficeHourSession[]
   activity        ActivityLog[]
 
+  @@index([operationId])
   @@index([schoolId])
   @@map("classes")
 }
@@ -202,15 +257,17 @@ model Student {
 }
 
 model Assistant {
-  id        String   @id @default(uuid())
-  userId    String   @unique @map("user_id")
-  name      String
-  email     String
-  phone     String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id          String   @id @default(uuid())
+  operationId String   @map("operation_id")
+  userId      String   @unique @map("user_id")
+  name        String
+  email       String
+  phone       String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  operation Operation @relation(fields: [operationId], references: [id])
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   classAssignments ClassAssignment[]            @relation("AssignmentAssistant")
   substituteFor    ClassAssignment[]            @relation("AssignmentSubstitute")
@@ -226,6 +283,7 @@ model Assistant {
   responsibleSessions ClassSession[]        @relation("SessionResponsible")
   coveredSessions     ClassSession[]        @relation("SessionCoveredBy")
 
+  @@index([operationId])
   @@map("assistants")
 }
 
@@ -269,17 +327,20 @@ model StudentAssistantAssignment {
 }
 
 model Topic {
-  id        String    @id @default(uuid())
-  title     String
-  yearGroup YearGroup @map("year_group")
-  chapter   String?
-  sortOrder Int       @default(0) @map("sort_order")
+  id          String    @id @default(uuid())
+  operationId String    @map("operation_id")
+  title       String
+  yearGroup   YearGroup @map("year_group")
+  chapter     String?
+  sortOrder   Int       @default(0) @map("sort_order")
 
+  operation   Operation           @relation(fields: [operationId], references: [id])
   sessions    ClassSession[]
   planItems   LessonPlanItem[]
   assessments Assessment[]
   officeHours OfficeHourSession[]
 
+  @@index([operationId])
   @@map("topics")
 }
 
@@ -288,14 +349,17 @@ model Topic {
 // ----------------------------------------------------------------------------
 
 model LessonPlan {
-  id        String    @id @default(uuid())
-  yearGroup YearGroup @unique @map("year_group")
-  title     String?
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id          String    @id @default(uuid())
+  operationId String    @map("operation_id")
+  yearGroup   YearGroup @map("year_group")
+  title       String?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  items LessonPlanItem[]
+  operation Operation        @relation(fields: [operationId], references: [id])
+  items     LessonPlanItem[]
 
+  @@unique([operationId, yearGroup])
   @@map("lesson_plans")
 }
 
@@ -536,15 +600,18 @@ model LateIncident {
 }
 
 model PayPeriod {
-  id        String          @id @default(uuid())
-  month     Int
-  year      Int
-  status    PayPeriodStatus @default(open)
-  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  id          String          @id @default(uuid())
+  operationId String          @map("operation_id")
+  month       Int
+  year        Int
+  status      PayPeriodStatus @default(open)
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  operation    Operation        @relation(fields: [operationId], references: [id])
   calculations PayCalculation[]
 
-  @@unique([month, year])
+  @@unique([operationId, month, year])
+  @@index([operationId])
   @@map("pay_periods")
 }
 
@@ -576,18 +643,21 @@ model PayCalculation {
 // ----------------------------------------------------------------------------
 
 model ActivityLog {
-  id         String   @id @default(uuid())
-  actorId    String   @map("actor_id")
-  actorRole  String   @map("actor_role")
-  action     String
-  entityType String   @map("entity_type")
-  entityId   String?  @map("entity_id")
-  classId    String?  @map("class_id")
-  metadata   Json?
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id          String   @id @default(uuid())
+  operationId String?  @map("operation_id")
+  actorId     String   @map("actor_id")
+  actorRole   String   @map("actor_role")
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  classId     String?  @map("class_id")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  class Class? @relation(fields: [classId], references: [id], onDelete: SetNull)
+  operation Operation? @relation(fields: [operationId], references: [id])
+  class     Class?     @relation(fields: [classId], references: [id], onDelete: SetNull)
 
+  @@index([operationId])
   @@index([classId])
   @@index([actorId])
   @@index([createdAt])

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { DAYS } from "@/lib/constants";
+import { currentOperationId } from "@/lib/operation";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
@@ -39,6 +40,7 @@ export async function createClass(_prev: FormState, formData: FormData): Promise
 
   const klass = await prisma.class.create({
     data: {
+      operationId: await currentOperationId(),
       schoolId: d.schoolId,
       yearGroup: d.yearGroup,
       name: d.name,
