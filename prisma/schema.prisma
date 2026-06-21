@@ -223,6 +223,8 @@ model Assistant {
   officeHours      OfficeHourSession[]
   incidents        LateIncident[]
   payCalcs         PayCalculation[]
+  responsibleSessions ClassSession[]        @relation("SessionResponsible")
+  coveredSessions     ClassSession[]        @relation("SessionCoveredBy")
 
   @@map("assistants")
 }
@@ -326,19 +328,26 @@ model ClassSession {
   cancellationReason String?       @map("cancellation_reason")
   // free-text notes injected into the class-update WhatsApp message
   messageNotes       String?       @map("message_notes")
+  // Daily-task ownership (spec: tasks split by schedule day). Stamped at generation.
+  responsibleAssistantId String?   @map("responsible_assistant_id")
+  // Set (admin-confirmed) when another assistant covered this session -> drives ±50 pay.
+  coveredById            String?   @map("covered_by_id")
   createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  class           Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
-  planItem        LessonPlanItem?     @relation(fields: [planItemId], references: [id])
-  topic           Topic?              @relation(fields: [topicId], references: [id])
-  homework        HomeworkAssignment?
-  attendance      Attendance[]
-  parentUpdate    ParentUpdateLog?
-  classroomUpload ClassroomUploadLog?
-  incidents       LateIncident[]
+  class                Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
+  planItem             LessonPlanItem?     @relation(fields: [planItemId], references: [id])
+  topic                Topic?              @relation(fields: [topicId], references: [id])
+  responsibleAssistant Assistant?          @relation("SessionResponsible", fields: [responsibleAssistantId], references: [id])
+  coveredBy            Assistant?          @relation("SessionCoveredBy", fields: [coveredById], references: [id])
+  homework             HomeworkAssignment?
+  attendance           Attendance[]
+  parentUpdate         ParentUpdateLog?
+  classroomUpload      ClassroomUploadLog?
+  incidents            LateIncident[]
 
   @@index([classId])
   @@index([scheduledDate])
+  @@index([responsibleAssistantId])
   @@map("sessions")
 }
 
