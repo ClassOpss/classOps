@@ -57,12 +57,17 @@ export function NewClassForm({ schools }: { schools: { id: string; name: string 
         Class name
         <input name="name" placeholder="e.g. Y9-Citadel" required className={inputCls} />
       </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Day
-        <select name="day" required className={inputCls} defaultValue="Sunday">
-          {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
-      </label>
+      <fieldset className="flex flex-col gap-1 text-sm sm:col-span-2">
+        <legend>Days</legend>
+        <div className="flex flex-wrap gap-3">
+          {DAYS.map((d) => (
+            <label key={d} className="flex items-center gap-1">
+              <input type="checkbox" name="days" value={d} defaultChecked={d === "Sunday"} />
+              {d.slice(0, 3)}
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <label className="flex flex-col gap-1 text-sm">
         Start time
         <input name="time" type="time" required className={inputCls} defaultValue="16:00" />

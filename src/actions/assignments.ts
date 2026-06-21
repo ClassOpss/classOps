@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { divideAlphabetically, assignToSmallerGroup } from "@/lib/divide";
+import { reassignResponsibilities } from "@/actions/sessions";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
@@ -36,6 +37,7 @@ export async function assignAssistant(
   await prisma.classAssignment.create({
     data: { classId, assistantId, startDate: new Date() },
   });
+  await reassignResponsibilities(classId); // re-split day ownership across the new roster
   await logActivity({
     actorId: admin.id,
     actorRole: admin.role,
@@ -62,6 +64,7 @@ export async function endAssignment(assignmentId: string): Promise<void> {
     where: { classId: assignment.classId, assistantId: assignment.assistantId, endDate: null },
     data: { endDate: now },
   });
+  await reassignResponsibilities(assignment.classId); // remaining assistant takes over the days
   await logActivity({
     actorId: admin.id,
     actorRole: admin.role,

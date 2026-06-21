@@ -2,9 +2,8 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { setClassActive } from "@/actions/classes";
+import { scheduleDays, scheduleTime, scheduleLabel } from "@/lib/schedule";
 import { EditClassForm, type ClassDefaults } from "./edit-class-form";
-
-type Schedule = { day?: string; time?: string };
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -41,13 +40,13 @@ export default async function ClassOverviewPage({
     );
   }
 
-  const sched = (klass.schedule ?? {}) as Schedule;
+  const days = scheduleDays(klass.schedule as object);
   const defaults: ClassDefaults = {
     schoolId: klass.schoolId,
     yearGroup: klass.yearGroup,
     name: klass.name,
-    day: sched.day ?? "Sunday",
-    time: sched.time ?? "16:00",
+    days: days.length ? days : ["Sunday"],
+    time: scheduleTime(klass.schedule as object) ?? "16:00",
     planStartDate: toDateInput(klass.planStartDate),
     notes: klass.notes ?? "",
   };
@@ -59,7 +58,7 @@ export default async function ClassOverviewPage({
         <Link href="/classes" className="text-sm text-blue-600 hover:underline">← Classes</Link>
         <h1 className="mt-1 text-xl font-semibold">{klass.name}</h1>
         <p className="mt-1 text-sm text-black/50 dark:text-white/50">
-          {klass.school.name} · {klass.yearGroup} · {sched.day} {sched.time} ·{" "}
+          {klass.school.name} · {klass.yearGroup} · {scheduleLabel(klass.schedule as object)} ·{" "}
           {klass._count.students} students · {klass.active ? "Active" : "Inactive"}
         </p>
       </div>

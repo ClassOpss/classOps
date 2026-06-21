@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
+import { scheduleLabel } from "@/lib/schedule";
 import { NewSchoolForm, NewClassForm } from "./class-forms";
-
-type Schedule = { day?: string; time?: string };
 
 export default async function ClassesPage() {
   const user = await requireRole("admin", "teacher");
@@ -49,7 +48,6 @@ export default async function ClassesPage() {
             </thead>
             <tbody>
               {classes.map((c) => {
-                const sched = (c.schedule ?? {}) as Schedule;
                 return (
                   <tr key={c.id} className="border-b border-black/5 dark:border-white/5">
                     <td className="py-2">
@@ -59,7 +57,7 @@ export default async function ClassesPage() {
                     </td>
                     <td className="py-2">{c.school.name}</td>
                     <td className="py-2">{c.yearGroup}</td>
-                    <td className="py-2">{sched.day ? `${sched.day} ${sched.time ?? ""}` : "—"}</td>
+                    <td className="py-2">{scheduleLabel(c.schedule as object)}</td>
                     <td className="py-2">{c._count.students}</td>
                     <td className="py-2">
                       {c.active ? (

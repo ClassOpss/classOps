@@ -11,7 +11,7 @@ export type ClassDefaults = {
   schoolId: string;
   yearGroup: string;
   name: string;
-  day: string;
+  days: string[];
   time: string;
   planStartDate: string; // yyyy-mm-dd or ""
   notes: string;
@@ -49,12 +49,17 @@ export function EditClassForm({
         Class name
         <input name="name" required className={inputCls} defaultValue={defaults.name} />
       </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Day
-        <select name="day" required className={inputCls} defaultValue={defaults.day || "Sunday"}>
-          {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
-      </label>
+      <fieldset className="flex flex-col gap-1 text-sm sm:col-span-2 lg:col-span-3">
+        <legend>Days</legend>
+        <div className="flex flex-wrap gap-3">
+          {DAYS.map((d) => (
+            <label key={d} className="flex items-center gap-1">
+              <input type="checkbox" name="days" value={d} defaultChecked={defaults.days.includes(d)} />
+              {d.slice(0, 3)}
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <label className="flex flex-col gap-1 text-sm">
         Start time
         <input name="time" type="time" required className={inputCls} defaultValue={defaults.time || "16:00"} />

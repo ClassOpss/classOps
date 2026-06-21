@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
-
-type Schedule = { day?: string; time?: string };
+import { scheduleLabel } from "@/lib/schedule";
 
 export default async function MyClassesPage() {
   const user = await requireRole("assistant", "admin");
@@ -48,7 +47,6 @@ export default async function MyClassesPage() {
       ) : (
         <ul className="flex flex-col gap-3">
           {classes.map((c) => {
-            const sched = (c.schedule ?? {}) as Schedule;
             return (
               <li key={c.id}>
                 <Link
@@ -57,7 +55,7 @@ export default async function MyClassesPage() {
                 >
                   <p className="font-medium">{c.name}</p>
                   <p className="text-sm text-black/50 dark:text-white/50">
-                    {c.school.name} · {sched.day} {sched.time} · {c._count.students} students
+                    {c.school.name} · {scheduleLabel(c.schedule as object)} · {c._count.students} students
                   </p>
                 </Link>
               </li>

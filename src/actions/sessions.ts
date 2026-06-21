@@ -4,11 +4,38 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
-import { generateSessionDates } from "@/lib/sessions";
+import { weeklySlotDates } from "@/lib/sessions";
+import { scheduleDays } from "@/lib/schedule";
+import { assignResponsibilities } from "@/lib/responsibility";
+import { activeAt } from "@/lib/roster";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
-type Schedule = { day?: string; time?: string };
+// Active assistants assigned to a class, in a stable order (so day-ownership is deterministic).
+async function classAssistantIds(classId: string, now: Date): Promise<string[]> {
+  const assigns = await prisma.classAssignment.findMany({
+    where: { classId, ...activeAt(now) },
+    orderBy: [{ startDate: "asc" }, { assistant: { name: "asc" } }],
+    select: { assistantId: true },
+  });
+  return [...new Set(assigns.map((a) => a.assistantId))];
+}
+
+// Recompute responsibleAssistantId for a class's sessions (e.g. after assistants change).
+export async function reassignResponsibilities(classId: string): Promise<void> {
+  const sessions = await prisma.classSession.findMany({
+    where: { classId },
+    orderBy: { scheduledDate: "asc" },
+    select: { id: true, scheduledDate: true, dayOff: true },
+  });
+  const assistantIds = await classAssistantIds(classId, new Date());
+  const owners = assignResponsibilities(sessions, assistantIds);
+  await prisma.$transaction(
+    sessions.map((s, i) =>
+      prisma.classSession.update({ where: { id: s.id }, data: { responsibleAssistantId: owners[i] } }),
+    ),
+  );
+}
 
 // Materialize per-class ClassSessions from the year-group plan + the class schedule.
 // Regenerates from scratch — refused once any attendance has been logged (so we never
@@ -27,8 +54,8 @@ export async function generateSessions(
   if (!klass) return { error: "Class not found." };
   if (!klass.planStartDate) return { error: "Set a plan start date on the class first." };
 
-  const sched = (klass.schedule ?? {}) as Schedule;
-  if (!sched.day) return { error: "This class has no scheduled day." };
+  const days = scheduleDays(klass.schedule as object);
+  if (days.length === 0) return { error: "This class has no scheduled day(s)." };
 
   const plan = await prisma.lessonPlan.findUnique({
     where: { yearGroup: klass.yearGroup },
@@ -42,7 +69,13 @@ export async function generateSessions(
     return { error: "Attendance has already been logged — sessions can no longer be regenerated." };
   }
 
-  const dates = generateSessionDates(klass.planStartDate, sched.day, items.length);
+  const dates = weeklySlotDates(klass.planStartDate, days, items.length);
+  // Stamp who owns each session's daily tasks (by weekday for multi-day, else alternating).
+  const assistantIds = await classAssistantIds(classId, new Date());
+  const owners = assignResponsibilities(
+    dates.map((d) => ({ scheduledDate: d, dayOff: false })),
+    assistantIds,
+  );
 
   await prisma.classSession.deleteMany({ where: { classId } });
   await prisma.classSession.createMany({
@@ -52,6 +85,7 @@ export async function generateSessions(
       lessonNumber: i + 1,
       scheduledDate: dates[i],
       topicId: item.topicId,
+      responsibleAssistantId: owners[i],
     })),
   });
 
