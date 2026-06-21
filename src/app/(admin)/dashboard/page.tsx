@@ -3,6 +3,8 @@ import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { formatCairo } from "@/lib/datetime";
 import { waiveIncident, unwaiveIncident } from "@/actions/incidents";
+import { detectCoverageCandidates } from "@/lib/coverage";
+import { confirmCoverage } from "@/actions/coverage";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -66,6 +68,7 @@ export default async function DashboardPage() {
     : [];
   const outstanding = incidents.filter((i) => !i.waived);
   const dueTotal = outstanding.reduce((sum, i) => sum + Number(i.deductionAmount), 0);
+  const coverages = isAdmin ? await detectCoverageCandidates() : [];
 
   return (
     <div className="flex flex-col gap-8">
@@ -77,6 +80,37 @@ export default async function DashboardPage() {
         <StatCard label="Sessions this month (delivered / planned)" value={`${delivered} / ${planned}`} />
         {isAdmin && <StatCard label="Open late incidents" value={openIncidentCount} />}
       </div>
+
+      {isAdmin && coverages.length > 0 && (
+        <section>
+          <h2 className="mb-1 font-medium">Coverage to confirm</h2>
+          <p className="mb-3 text-sm text-black/50 dark:text-white/50">
+            Someone logged a session that wasn&apos;t theirs — confirm to move ±50 EGP.
+          </p>
+          <ul className="flex flex-col gap-1">
+            {coverages.map((c) => (
+              <li
+                key={c.sessionId}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-black/5 py-2 text-sm dark:border-white/5"
+              >
+                <span>
+                  <span className="font-medium">{c.covererName}</span> covered{" "}
+                  <span className="font-medium">{c.ownerName}</span>
+                </span>
+                <Link href={`/classes/${c.classId}`} className="text-blue-600 hover:underline">
+                  {c.className}
+                </Link>
+                <span className="text-black/40">{formatCairo(c.date, "d MMM")}</span>
+                <form action={confirmCoverage.bind(null, c.sessionId, c.covererId)} className="ml-auto">
+                  <button type="submit" className="text-blue-600 hover:underline">
+                    Confirm (+50 / −50)
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {isAdmin && (
         <section>

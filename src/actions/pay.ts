@@ -53,6 +53,7 @@ async function generateCalculations(periodId: string, month: number, year: numbe
         baseSalary: c.baseSalary,
         lateDeductions: c.lateDeductions,
         officeHoursBonus: c.officeHoursBonus,
+        coverageAdjustment: c.coverageAdjustment,
         total: payTotal(c, manual),
       },
       create: {
@@ -62,6 +63,7 @@ async function generateCalculations(periodId: string, month: number, year: numbe
         baseSalary: c.baseSalary,
         lateDeductions: c.lateDeductions,
         officeHoursBonus: c.officeHoursBonus,
+        coverageAdjustment: c.coverageAdjustment,
         manualAdjustment: 0,
         total: payTotal(c, 0),
       },
@@ -86,11 +88,21 @@ export async function setAdjustment(calcId: string, formData: FormData): Promise
 
   const calc = await prisma.payCalculation.findUnique({
     where: { id: calcId },
-    select: { baseSalary: true, lateDeductions: true, officeHoursBonus: true, payPeriodId: true },
+    select: {
+      baseSalary: true,
+      lateDeductions: true,
+      officeHoursBonus: true,
+      coverageAdjustment: true,
+      payPeriodId: true,
+    },
   });
   if (!calc) return;
   const total =
-    Number(calc.baseSalary) - Number(calc.lateDeductions) + Number(calc.officeHoursBonus) + amount;
+    Number(calc.baseSalary) -
+    Number(calc.lateDeductions) +
+    Number(calc.officeHoursBonus) +
+    Number(calc.coverageAdjustment) +
+    amount;
   await prisma.payCalculation.update({
     where: { id: calcId },
     data: { manualAdjustment: amount, adjustmentNote: note, total },

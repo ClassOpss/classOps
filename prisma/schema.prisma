@@ -556,6 +556,7 @@ model PayCalculation {
   baseSalary       Decimal       @map("base_salary") @db.Decimal(10, 2)
   lateDeductions   Decimal       @map("late_deductions") @db.Decimal(10, 2)
   officeHoursBonus Decimal       @map("office_hours_bonus") @db.Decimal(10, 2)
+  coverageAdjustment Decimal     @default(0) @map("coverage_adjustment") @db.Decimal(10, 2)
   manualAdjustment Decimal       @default(0) @map("manual_adjustment") @db.Decimal(10, 2)
   adjustmentNote   String?       @map("adjustment_note")
   total            Decimal       @db.Decimal(10, 2)

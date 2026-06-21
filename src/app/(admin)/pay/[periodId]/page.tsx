@@ -73,6 +73,7 @@ export default async function PayPeriodPage({
                 <th className="py-2 pr-3">Base</th>
                 <th className="py-2 pr-3">Deductions</th>
                 <th className="py-2 pr-3">Office hrs</th>
+                <th className="py-2 pr-3">Coverage</th>
                 <th className="py-2 pr-3">Adjustment</th>
                 <th className="py-2 pr-3">Total</th>
                 <th className="py-2 pr-3">Status</th>
@@ -87,6 +88,9 @@ export default async function PayPeriodPage({
                   <td className="py-2 pr-3">{egp(c.baseSalary)}</td>
                   <td className="py-2 pr-3 text-red-600">-{egp(c.lateDeductions)}</td>
                   <td className="py-2 pr-3 text-green-600">+{egp(c.officeHoursBonus)}</td>
+                  <td className={`py-2 pr-3 ${Number(c.coverageAdjustment) < 0 ? "text-red-600" : "text-green-600"}`}>
+                    {Number(c.coverageAdjustment) >= 0 ? "+" : "−"}{egp(Math.abs(Number(c.coverageAdjustment)))}
+                  </td>
                   <td className="py-2 pr-3">
                     {c.status === "sent" ? (
                       <span>{egp(c.manualAdjustment)}</span>

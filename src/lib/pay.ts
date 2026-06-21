@@ -6,6 +6,8 @@ export type PayComponents = {
   baseSalary: number;
   lateDeductions: number;
   officeHoursBonus: number;
+  // Net coverage: +X per session I covered for a colleague, −X per session of mine a colleague covered.
+  coverageAdjustment: number;
 };
 
 export function monthWindow(month: number, year: number): { start: Date; end: Date } {
@@ -24,7 +26,8 @@ export async function computePayComponents(
 ): Promise<PayComponents> {
   const { start, end } = monthWindow(month, year);
 
-  const [assignments, incidents, officeHours] = await Promise.all([
+  const inMonth = { gte: start, lt: end };
+  const [assignments, incidents, officeHours, covered, ownedCovered] = await Promise.all([
     // Distinct classes the assistant had an active assignment overlapping this month.
     prisma.classAssignment.findMany({
       where: {
@@ -35,11 +38,19 @@ export async function computePayComponents(
       select: { classId: true },
     }),
     prisma.lateIncident.aggregate({
-      where: { assistantId, waived: false, deadline: { gte: start, lt: end } },
+      where: { assistantId, waived: false, deadline: inMonth },
       _sum: { deductionAmount: true },
     }),
-    prisma.officeHourSession.count({
-      where: { assistantId, date: { gte: start, lt: end } },
+    prisma.officeHourSession.count({ where: { assistantId, date: inMonth } }),
+    // Sessions I covered for a colleague (+).
+    prisma.classSession.count({ where: { coveredById: assistantId, scheduledDate: inMonth } }),
+    // My sessions a colleague covered (−).
+    prisma.classSession.count({
+      where: {
+        responsibleAssistantId: assistantId,
+        coveredById: { not: null, notIn: [assistantId] },
+        scheduledDate: inMonth,
+      },
     }),
   ]);
 
@@ -52,9 +63,12 @@ export async function computePayComponents(
     baseSalary: classesCovered * cfg.perClassSalary * cfg.payMultiplier,
     lateDeductions,
     officeHoursBonus: officeHours * cfg.officeHourBonus,
+    coverageAdjustment: (covered - ownedCovered) * cfg.coverageAdjustment,
   };
 }
 
 export function payTotal(c: PayComponents, manualAdjustment: number): number {
-  return c.baseSalary - c.lateDeductions + c.officeHoursBonus + manualAdjustment;
+  return (
+    c.baseSalary - c.lateDeductions + c.officeHoursBonus + c.coverageAdjustment + manualAdjustment
+  );
 }
