@@ -341,6 +341,20 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     lateDeduction, payMultiplier). lib/datetime (deadlines/tz), lib/pay (salary/bonus), lib/late-incidents
     (deduction), lib/whatsapp/* (signature), lib/reports (logo path) all read from it. Multi-tenancy
     just makes getConfig() resolve per Operation; the new-teacher form sets these (defaults pre-filled).
+[x] Per-day task ownership rework (4 chunks, all committed + browser-verified). DAILY tasks are
+    owned per schedule day: lib/responsibility.assignResponsibilities (unit-tested) — 2 assistants
+    over multiple weekdays => each weekday owned by one (Tue->A, Thu->B); single weekday => alternate
+    by week; day-offs => null. ClassSession gains responsibleAssistantId (stamped at generateSessions,
+    re-stamped by reassignResponsibilities on assign/end) + coveredById. lib/schedule (reads new
+    {days[]} + legacy {day}); class create/edit now multi-day checkboxes. (1) late-incidents attribute
+    a missed daily task to the session OWNER (coveredById ?? responsibleAssistantId), not every
+    assistant. (2) assistant /my class view filters sessions into "mine" (owner or unowned) + a
+    collapsed "cover a colleague" <details>. (3) COVERAGE: lib/coverage.detectCoverageCandidates flags
+    sessions whose daily tasks were logged by a non-owner; admin confirms on the dashboard
+    (actions/coverage.confirmCoverage -> coveredById); pay moves +/-coverageAdjustment (config, default
+    50) between coverer and owner (lib/pay + PayCalculation.coverageAdjustment column, Coverage column
+    on the pay table). Verified end-to-end in-browser: dashboard "Assistant Bee covered Test Assistant"
+    -> confirm -> Bee +50/Total 1050, owner -50/Total 950. Seeder: scripts/dev-cov.ts.
 [ ] FINAL — Multi-tenancy (logical: Operation table + operationId scoping; per-teacher
     personalization incl. logo) + rigorous test pass, then Railway deploy. See multi-tenancy-decision memory.
 [ ] — update this section as modules are completed —
