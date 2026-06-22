@@ -367,20 +367,24 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
       OperationConfig + operationConfig(row). lib/operation.resolveConfig()/resolveConfigFor(id).
       datetime deadline helpers take cfg (tz stays sync); pay/late-incidents/whatsapp/reports read
       per-op config (defaults back-stop). Single-tenant behavior unchanged.
-    • Chunk 3 (WRITTEN; build+commit PENDING — blocked by a transient tooling-classifier outage that
-      gates bash/PowerShell) — auth+scoping. operationId in JWT/session/SessionUser; currentOperationId()
-      resolves from session (teacher/assistant) or super-admin active-operation cookie
-      (ACTIVE_OPERATION_COOKIE). requireClassAccess enforces class.operationId==current. Scoped all
-      admin/teacher list reads (classes/dashboard/users/pay/progress/insights + coverage detection),
+    • Chunk 3 (committed b2cf2a1) — auth+scoping. operationId in JWT/session/SessionUser;
+      currentOperationId() resolves from session (teacher/assistant) or super-admin active-operation
+      cookie (ACTIVE_OPERATION_COOKIE). requireClassAccess enforces class.operationId==current. Scoped
+      all admin/teacher list reads (classes/dashboard/users/pay/progress/insights + coverage detection),
       class-detail pages (op-scoped findFirst), reports route. logActivity stamps operationId. Teacher-
       write actions guarded (assessments/sessions/topics/lesson-plan items via assertClassInOperation
       + op checks); assignAssistant requires same-op class+assistant.
-    • Chunk 4 (WRITTEN; build+commit PENDING) — actions/operations.ts (setActiveOperation cookie +
+    • Chunk 4 (committed b2cf2a1, with chunk 3) — actions/operations.ts (setActiveOperation cookie +
       createOperation = new Operation w/ ALL config + teacher invite link + optional schools).
       /operations super-admin page (list + switch + onboarding form). Nav "Operations" (admin-only) +
-      active-op shown in sidebar. routes ADMIN_ONLY_PREFIXES += /operations.
-    • REMAINING: build-verify chunks 3+4, browser-verify (switch op, onboard a 2nd teacher, confirm
-      isolation), rigorous test pass, then Railway deploy.
+      active-op shown in sidebar. routes ADMIN_ONLY_PREFIXES += /operations. Build clean.
+    • BROWSER-VERIFIED end-to-end: super-admin sees "Viewing: Math by Mo" + Operations page;
+      onboarded a 2nd teacher (Physics by Sara, schools Alpha/Beta) -> Operation+teacher created;
+      switched to it -> sidebar "Viewing: Physics by Sara", /classes school dropdown shows ONLY
+      Alpha/Beta + 0 classes, /users 0 assistants (Math by Mo data hidden); switched back ->
+      Math by Mo's 10 schools + 2 assistants return. Isolation confirmed across schools/classes/users.
+      (Dev DB now has a 2nd test operation "Physics by Sara"; harmless — prod seeds only Math by Mo.)
+    • REMAINING: rigorous full test pass, then Railway deploy.
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions
