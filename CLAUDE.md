@@ -384,7 +384,14 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
       Alpha/Beta + 0 classes, /users 0 assistants (Math by Mo data hidden); switched back ->
       Math by Mo's 10 schools + 2 assistants return. Isolation confirmed across schools/classes/users.
       (Dev DB now has a 2nd test operation "Physics by Sara"; harmless — prod seeds only Math by Mo.)
-    • REMAINING: rigorous full test pass, then Railway deploy.
+    • TEST PASS DONE: unit suites (responsibility/divide/homework/sessions) all pass; DB checks
+      confirmed per-op config persistence + Decimal mapping + cross-entity isolation + default-op
+      independence; and the MONEY PATH verified live in-browser — a class+assistant seeded into
+      Physics by Sara (perClassSalary 1200) produced a pay base of 1,200 (not the default 1,000),
+      proving computePayComponents -> resolveConfigFor(operationId) resolves per-operation config.
+    • REMAINING: Railway deploy (user-side: account, Postgres plugin, env vars, cron, one-time seed).
+      Full step-by-step in DEPLOY.md (audited Docker/entrypoint/migration/cron; note: prod image has
+      no tsx, so seed runs from the dev machine against the Railway DB URL).
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions
