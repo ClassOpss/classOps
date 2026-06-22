@@ -4,7 +4,7 @@ import path from "path";
 import { prisma } from "@/lib/db";
 import { monthWindow } from "@/lib/pay";
 import { displayedLessonNumbers } from "@/lib/lesson-number";
-import { getConfig } from "@/lib/config";
+import { resolveConfigFor } from "@/lib/operation";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -28,9 +28,9 @@ export type ClassReportData = {
   homeworks: { description: string; due: string; submissionRate: string }[];
 };
 
-async function loadLogo(): Promise<string | null> {
+async function loadLogo(logoPath: string): Promise<string | null> {
   try {
-    const file = path.join(process.cwd(), "public", getConfig().logoPath.replace(/^\//, ""));
+    const file = path.join(process.cwd(), "public", logoPath.replace(/^\//, ""));
     const buf = await fs.readFile(file);
     return `data:image/png;base64,${buf.toString("base64")}`;
   } catch {
@@ -49,6 +49,7 @@ export async function buildClassReportData(
     where: { id: classId },
     select: {
       name: true,
+      operationId: true,
       yearGroup: true,
       school: { select: { name: true } },
       assignments: {
@@ -58,6 +59,8 @@ export async function buildClassReportData(
     },
   });
   if (!klass) return null;
+
+  const cfg = await resolveConfigFor(klass.operationId);
 
   const [allSessions, monthAssessments, students, monthHomeworks, logoDataUri] = await Promise.all([
     prisma.classSession.findMany({
@@ -95,7 +98,7 @@ export async function buildClassReportData(
         submissions: { where: { status: { in: ["on_time", "late"] } }, select: { id: true } },
       },
     }),
-    loadLogo(),
+    loadLogo(cfg.logoPath),
   ]);
 
   const activeStudentCount = students.length;

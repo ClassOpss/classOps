@@ -1,7 +1,21 @@
-// Single source of truth for every per-operation tunable. Nothing operation-specific
-// should be hardcoded elsewhere — read it from here. Multi-tenancy will make getConfig()
-// resolve these per Operation (the new-teacher form sets them, pre-filled with these defaults).
+// Per-operation configuration. Every operation-specific tunable lives on the
+// Operation row; this module defines the shape + defaults and maps a DB row to it.
+// Resolve the *current* operation's config via lib/operation.resolveConfig().
+//
+// Timezone is the one exception: it stays a shared app default (decided), so it is
+// NOT part of OperationConfig — it lives in APP_LOCALE and date/display helpers read
+// it synchronously.
 
+import type { Operation } from "@prisma/client";
+
+// Shared locale — same for every operation (all operations run in Egypt for now).
+export const APP_LOCALE = {
+  timeZone: "Africa/Cairo",
+} as const;
+
+// Defaults pre-fill the new-teacher onboarding form and back-stop any code path
+// that runs before an operation is resolved. Must mirror the Operation column
+// defaults in the schema/migration.
 export const OPERATION_DEFAULTS = {
   // Branding / personalization
   brandName: "Math by Mo",
@@ -9,10 +23,7 @@ export const OPERATION_DEFAULTS = {
   logoPath: "/logos/teacher1.png",
   currency: "EGP",
 
-  // Locale
-  timeZone: "Africa/Cairo",
-
-  // Deadlines (Cairo time)
+  // Deadlines (Cairo time; the timezone itself is APP_LOCALE, shared)
   dailyDeadlineHour: 21, // 9pm on the session day — attendance / parent update / classroom upload
   weeklyDeadlineWeekday: 6, // Saturday (0=Sun … 6=Sat) — HW correction / grade entry
   weeklyDeadlineHour: 21, // 9pm
@@ -25,10 +36,35 @@ export const OPERATION_DEFAULTS = {
   payMultiplier: 1, // global multiplier (spec: all multipliers 1× for now)
 } as const;
 
-export type OperationConfig = typeof OPERATION_DEFAULTS;
+export type OperationConfig = {
+  brandName: string;
+  brandSignature: string;
+  logoPath: string;
+  currency: string;
+  dailyDeadlineHour: number;
+  weeklyDeadlineWeekday: number;
+  weeklyDeadlineHour: number;
+  perClassSalary: number;
+  officeHourBonus: number;
+  lateDeduction: number;
+  coverageAdjustment: number;
+  payMultiplier: number;
+};
 
-// For now there is one operation. Multi-tenancy will resolve this from the request's
-// operation; keep all reads going through this function so that swap is a one-liner.
-export function getConfig(): OperationConfig {
-  return OPERATION_DEFAULTS;
+// Map an Operation DB row -> the plain-number config the app reads (Decimals -> numbers).
+export function operationConfig(op: Operation): OperationConfig {
+  return {
+    brandName: op.brandName,
+    brandSignature: op.brandSignature,
+    logoPath: op.logoPath,
+    currency: op.currency,
+    dailyDeadlineHour: op.dailyDeadlineHour,
+    weeklyDeadlineWeekday: op.weeklyDeadlineWeekday,
+    weeklyDeadlineHour: op.weeklyDeadlineHour,
+    perClassSalary: Number(op.perClassSalary),
+    officeHourBonus: Number(op.officeHourBonus),
+    lateDeduction: Number(op.lateDeduction),
+    coverageAdjustment: Number(op.coverageAdjustment),
+    payMultiplier: Number(op.payMultiplier),
+  };
 }

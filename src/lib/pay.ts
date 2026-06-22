@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { getConfig } from "@/lib/config";
+import { resolveConfigFor } from "@/lib/operation";
 
 export type PayComponents = {
   classesCovered: number;
@@ -27,6 +27,11 @@ export async function computePayComponents(
   const { start, end } = monthWindow(month, year);
 
   const inMonth = { gte: start, lt: end };
+  const assistant = await prisma.assistant.findUnique({
+    where: { id: assistantId },
+    select: { operationId: true },
+  });
+  const cfg = await resolveConfigFor(assistant?.operationId ?? "");
   const [assignments, incidents, officeHours, covered, ownedCovered] = await Promise.all([
     // Distinct classes the assistant had an active assignment overlapping this month.
     prisma.classAssignment.findMany({
@@ -54,7 +59,6 @@ export async function computePayComponents(
     }),
   ]);
 
-  const cfg = getConfig();
   const classesCovered = new Set(assignments.map((a) => a.classId)).size;
   const lateDeductions = Number(incidents._sum.deductionAmount ?? 0);
 

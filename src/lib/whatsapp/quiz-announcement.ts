@@ -1,5 +1,5 @@
 // Message B — Quiz Announcement (spec 5.13). Triggered by teacher/admin from an assessment.
-import { getConfig } from "@/lib/config";
+import { OPERATION_DEFAULTS } from "@/lib/config";
 
 export type QuizAnnouncementData = {
   dateLabel: string;
@@ -29,7 +29,7 @@ export function topicsFromNotes(topicNotes?: string | null, topicTitle?: string 
 
 export function buildQuizAnnouncement(
   d: QuizAnnouncementData,
-  signature: string = getConfig().brandSignature,
+  signature: string = OPERATION_DEFAULTS.brandSignature,
 ): string {
   const lines: string[] = [];
   lines.push("*Quiz Announcement*");
