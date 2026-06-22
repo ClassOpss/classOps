@@ -34,6 +34,11 @@ export async function addPlanItem(
   const topicId = String(formData.get("topicId") ?? "");
   if (!topicId) return { error: "Pick a topic." };
 
+  // The topic must belong to this operation (blocks cross-operation plan items).
+  const operationId = await currentOperationId();
+  const topic = await prisma.topic.findUnique({ where: { id: topicId }, select: { operationId: true } });
+  if (!topic || topic.operationId !== operationId) return { error: "Pick a topic." };
+
   const planId = await getOrCreatePlan(yearGroup as YearGroup);
   const last = await prisma.lessonPlanItem.findFirst({
     where: { planId },
@@ -57,6 +62,12 @@ export async function addPlanItem(
 
 export async function removePlanItem(itemId: string): Promise<void> {
   await requireRole("admin", "teacher");
+  const operationId = await currentOperationId();
+  const item = await prisma.lessonPlanItem.findUnique({
+    where: { id: itemId },
+    select: { plan: { select: { operationId: true } } },
+  });
+  if (!item || item.plan.operationId !== operationId) return;
   await prisma.lessonPlanItem.delete({ where: { id: itemId } });
   revalidatePath("/lesson-plan");
 }
@@ -64,12 +75,13 @@ export async function removePlanItem(itemId: string): Promise<void> {
 // Move an item up or down, then renumber the whole plan 1..n.
 export async function movePlanItem(itemId: string, direction: "up" | "down"): Promise<void> {
   await requireRole("admin", "teacher");
+  const operationId = await currentOperationId();
 
   const item = await prisma.lessonPlanItem.findUnique({
     where: { id: itemId },
-    select: { id: true, planId: true },
+    select: { id: true, planId: true, plan: { select: { operationId: true } } },
   });
-  if (!item) return;
+  if (!item || item.plan.operationId !== operationId) return;
 
   const items = await prisma.lessonPlanItem.findMany({
     where: { planId: item.planId },

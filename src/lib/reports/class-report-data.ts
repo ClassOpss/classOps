@@ -42,11 +42,12 @@ export async function buildClassReportData(
   classId: string,
   month: number,
   year: number,
+  operationId: string,
 ): Promise<ClassReportData | null> {
   const { start, end } = monthWindow(month, year);
 
-  const klass = await prisma.class.findUnique({
-    where: { id: classId },
+  const klass = await prisma.class.findFirst({
+    where: { id: classId, operationId },
     select: {
       name: true,
       operationId: true,

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { submitAttendance } from "@/actions/attendance";
 import { markClassroomUploaded } from "@/actions/classroom-upload";
 import { sessionStart, sessionDeadline, isLate, formatCairo } from "@/lib/datetime";
+import { resolveConfig } from "@/lib/operation";
 import { LessonDetailsForm } from "./lesson-details-form";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -73,7 +74,7 @@ export default async function AttendancePage({
 
   const statusByStudent = new Map(existing.map((a) => [a.studentId, a.status]));
   const loggedAt = existing[0]?.loggedAt ?? null;
-  const deadline = sessionDeadline(session.scheduledDate);
+  const deadline = sessionDeadline(session.scheduledDate, await resolveConfig());
   const late = loggedAt ? isLate(loggedAt, deadline) : false;
   const uploadedAt = session.classroomUpload?.uploadedAt ?? null;
   const uploadLate = uploadedAt ? isLate(uploadedAt, deadline) : false;

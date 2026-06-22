@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { markParentUpdateSent } from "@/actions/parent-update";
 import { buildClassUpdateMessage } from "@/lib/whatsapp/class-update";
 import { sessionStart, sessionDeadline, isLate, formatCairo } from "@/lib/datetime";
+import { resolveConfig } from "@/lib/operation";
 import { CopyMessage } from "./copy-message";
 
 const longDate = new Intl.DateTimeFormat("en-GB", {
@@ -70,21 +71,25 @@ export default async function ParentUpdatePage({
     .map((a) => a.student.name)
     .sort();
 
+  const cfg = await resolveConfig();
   const hw = session.homework;
-  const message = buildClassUpdateMessage({
-    dateLabel: longDate.format(session.scheduledDate),
-    className: session.class.name,
-    schoolName: session.class.school.name,
-    topic: session.topic?.title,
-    attendanceLogged: attendance.length > 0,
-    absentNames,
-    newHomework: hw && !hw.noHomework ? hw.description : null,
-    homeworkDueLabel: hw && !hw.noHomework && hw.deadline ? longDate.format(hw.deadline) : null,
-    notes: session.messageNotes,
-  });
+  const message = buildClassUpdateMessage(
+    {
+      dateLabel: longDate.format(session.scheduledDate),
+      className: session.class.name,
+      schoolName: session.class.school.name,
+      topic: session.topic?.title,
+      attendanceLogged: attendance.length > 0,
+      absentNames,
+      newHomework: hw && !hw.noHomework ? hw.description : null,
+      homeworkDueLabel: hw && !hw.noHomework && hw.deadline ? longDate.format(hw.deadline) : null,
+      notes: session.messageNotes,
+    },
+    cfg.brandSignature,
+  );
 
   const sentAt = session.parentUpdate?.sentAt ?? null;
-  const late = sentAt ? isLate(sentAt, sessionDeadline(session.scheduledDate)) : false;
+  const late = sentAt ? isLate(sentAt, sessionDeadline(session.scheduledDate, cfg)) : false;
 
   return (
     <div className="flex flex-col gap-4">

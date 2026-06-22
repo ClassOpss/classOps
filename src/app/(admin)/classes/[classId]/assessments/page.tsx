@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
+import { currentOperationId, resolveConfigFor } from "@/lib/operation";
 import { deleteAssessment } from "@/actions/assessments";
 import { buildQuizAnnouncement, friendlyTime, topicsFromNotes } from "@/lib/whatsapp/quiz-announcement";
 import { AssessmentForm } from "./assessment-form";
@@ -27,11 +29,14 @@ export default async function AssessmentsAdminPage({
 }) {
   const user = await requireRole("admin", "teacher");
   const { classId } = await params;
+  const operationId = await currentOperationId();
 
-  const klass = await prisma.class.findUnique({
-    where: { id: classId },
+  const klass = await prisma.class.findFirst({
+    where: { id: classId, operationId },
     select: { name: true },
   });
+  if (!klass) notFound();
+  const cfg = await resolveConfigFor(operationId);
   const assessments = await prisma.assessment.findMany({
     where: { classId },
     orderBy: { date: "desc" },
@@ -80,11 +85,14 @@ export default async function AssessmentsAdminPage({
                   <td className="py-2">
                     <div className="flex flex-col gap-1">
                       <QuizAnnouncement
-                        message={buildQuizAnnouncement({
-                          dateLabel: dateFmt.format(a.date),
-                          timeLabel: friendlyTime(a.time),
-                          topics: topicsFromNotes(a.topicNotes, a.topic?.title),
-                        })}
+                        message={buildQuizAnnouncement(
+                          {
+                            dateLabel: dateFmt.format(a.date),
+                            timeLabel: friendlyTime(a.time),
+                            topics: topicsFromNotes(a.topicNotes, a.topic?.title),
+                          },
+                          cfg.brandSignature,
+                        )}
                       />
                       {user.role === "admin" && a._count.grades === 0 && (
                         <form action={deleteAssessment.bind(null, a.id)}>

@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
+import { currentOperationId } from "@/lib/operation";
 import { TopicChart, type TopicDatum } from "./topic-chart";
 
 const STOPWORDS = new Set([
@@ -26,21 +27,35 @@ function topKeywords(texts: (string | null)[], limit = 12): { word: string; n: n
 
 export default async function InsightsPage() {
   await requireRole("admin", "teacher");
+  const operationId = await currentOperationId();
 
   const [grades, attendance, classes, weakSubs, assistants, absenceGroups] = await Promise.all([
     prisma.assessmentGrade.findMany({
-      where: { assessment: { isDiagnostic: false, topicId: { not: null } }, percentage: { not: null } },
+      where: {
+        assessment: { isDiagnostic: false, topicId: { not: null }, class: { operationId } },
+        percentage: { not: null },
+      },
       select: { percentage: true, assessment: { select: { topic: { select: { title: true } } } } },
     }),
-    prisma.attendance.findMany({ select: { status: true, session: { select: { classId: true } } } }),
-    prisma.class.findMany({ where: { active: true }, select: { id: true, name: true } }),
-    prisma.homeworkSubmission.findMany({ where: { weakPoints: { not: null } }, select: { weakPoints: true } }),
+    prisma.attendance.findMany({
+      where: { session: { class: { operationId } } },
+      select: { status: true, session: { select: { classId: true } } },
+    }),
+    prisma.class.findMany({ where: { active: true, operationId }, select: { id: true, name: true } }),
+    prisma.homeworkSubmission.findMany({
+      where: { weakPoints: { not: null }, homework: { class: { operationId } } },
+      select: { weakPoints: true },
+    }),
     prisma.assistant.findMany({
-      where: { active: true },
+      where: { active: true, operationId },
       orderBy: { name: "asc" },
       select: { id: true, name: true, _count: { select: { incidents: true, officeHours: true } } },
     }),
-    prisma.attendance.groupBy({ by: ["studentId"], where: { status: "absent" }, _count: { _all: true } }),
+    prisma.attendance.groupBy({
+      by: ["studentId"],
+      where: { status: "absent", session: { class: { operationId } } },
+      _count: { _all: true },
+    }),
   ]);
 
   // Topic performance (diagnostics excluded)

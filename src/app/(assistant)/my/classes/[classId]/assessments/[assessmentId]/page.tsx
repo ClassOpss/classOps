@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { saturdayDeadline, isLate, formatCairo } from "@/lib/datetime";
+import { resolveConfig } from "@/lib/operation";
 import { GradeEntryForm, type GradeRow } from "./grade-entry-form";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -63,7 +64,7 @@ export default async function GradeEntryPage({
   const reviewed = grades.length;
   const complete = total > 0 && reviewed === total;
 
-  const correctionDeadline = saturdayDeadline(assessment.date);
+  const correctionDeadline = saturdayDeadline(assessment.date, await resolveConfig());
   const completionAt = complete
     ? grades.map((g) => g.loggedAt).sort((a, b) => b.getTime() - a.getTime())[0]
     : null;

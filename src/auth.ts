@@ -42,6 +42,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           role: user.role,
           assistantId: user.assistant?.id ?? null,
+          operationId: user.operationId,
         };
       },
     }),
@@ -57,6 +58,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           action: "login",
           entityType: "user",
           entityId: user.id,
+          operationId: user.operationId ?? null,
         },
       });
     },

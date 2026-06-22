@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { deactivateStudent } from "@/actions/students";
 import { schoolPrefix, uniqueStudentCode } from "@/lib/code";
+import { currentOperationId } from "@/lib/operation";
 import { ImportStudents } from "./import-students";
 import { AddStudentForm } from "./add-student-form";
 
@@ -13,9 +14,10 @@ export default async function StudentsPage({
 }) {
   const user = await requireRole("admin", "teacher");
   const { classId } = await params;
+  const operationId = await currentOperationId();
 
-  const klass = await prisma.class.findUnique({
-    where: { id: classId },
+  const klass = await prisma.class.findFirst({
+    where: { id: classId, operationId },
     include: {
       school: { select: { name: true } },
       students: { where: { active: true }, orderBy: { name: "asc" } },

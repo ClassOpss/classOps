@@ -22,6 +22,7 @@ export const authConfig = {
         token.uid = user.id;
         token.role = user.role;
         token.assistantId = user.assistantId ?? null;
+        token.operationId = user.operationId ?? null;
       }
       return token;
     },
@@ -30,6 +31,7 @@ export const authConfig = {
         session.user.id = (token.uid as string) ?? session.user.id;
         session.user.role = token.role as Role;
         session.user.assistantId = (token.assistantId as string | null) ?? null;
+        session.user.operationId = (token.operationId as string | null) ?? null;
       }
       return session;
     },

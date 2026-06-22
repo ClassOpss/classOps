@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { saturdayDeadline, formatCairo } from "@/lib/datetime";
+import { resolveConfig } from "@/lib/operation";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -35,6 +36,7 @@ export default async function HomeworkListPage({
     _count: { _all: true },
   });
   const reviewedBy = new Map(counts.map((c) => [c.homeworkId, c._count._all]));
+  const cfg = await resolveConfig();
 
   return (
     <div className="flex flex-col gap-4">
@@ -65,7 +67,7 @@ export default async function HomeworkListPage({
                     </span>
                   </div>
                   <p className="text-sm text-black/50 dark:text-white/50">
-                    Due {dateFmt.format(hw.deadline)} · enter by {formatCairo(saturdayDeadline(hw.deadline), "EEE d MMM, h:mm a")}
+                    Due {dateFmt.format(hw.deadline)} · enter by {formatCairo(saturdayDeadline(hw.deadline, cfg), "EEE d MMM, h:mm a")}
                   </p>
                 </Link>
               </li>

@@ -3,6 +3,7 @@ import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { submitHomeworkSubmissions } from "@/actions/homework";
 import { saturdayDeadline, isLate, formatCairo } from "@/lib/datetime";
+import { resolveConfig } from "@/lib/operation";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -61,7 +62,7 @@ export default async function HomeworkEntryPage({
   const reviewed = submissions.length;
   const complete = total > 0 && reviewed === total;
 
-  const correctionDeadline = saturdayDeadline(homework.deadline);
+  const correctionDeadline = saturdayDeadline(homework.deadline, await resolveConfig());
   // When the correction became complete = the last student first reviewed (max loggedAt).
   // loggedAt isn't bumped on edits, so later edits don't move this.
   const completionAt = complete

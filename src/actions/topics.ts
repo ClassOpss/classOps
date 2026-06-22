@@ -65,6 +65,9 @@ export async function createTopic(
 // Delete a topic. Optional FKs (plan items, sessions, assessments) null out automatically.
 export async function deleteTopic(topicId: string): Promise<void> {
   const user = await requireRole("admin", "teacher");
+  const operationId = await currentOperationId();
+  const topic = await prisma.topic.findUnique({ where: { id: topicId }, select: { operationId: true } });
+  if (!topic || topic.operationId !== operationId) return;
   await prisma.topic.delete({ where: { id: topicId } });
   await logActivity({
     actorId: user.id,

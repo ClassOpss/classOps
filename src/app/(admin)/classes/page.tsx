@@ -2,15 +2,22 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { scheduleLabel } from "@/lib/schedule";
+import { currentOperationId } from "@/lib/operation";
 import { NewSchoolForm, NewClassForm } from "./class-forms";
 
 export default async function ClassesPage() {
   const user = await requireRole("admin", "teacher");
   const isAdmin = user.role === "admin";
+  const operationId = await currentOperationId();
 
   const [schools, classes] = await Promise.all([
-    prisma.school.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.school.findMany({
+      where: { operationId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
     prisma.class.findMany({
+      where: { operationId },
       orderBy: [{ school: { name: "asc" } }, { name: "asc" }],
       include: { school: { select: { name: true } }, _count: { select: { students: true } } },
     }),

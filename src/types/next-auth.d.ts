@@ -8,6 +8,8 @@ declare module "next-auth" {
       id: string;
       role: Role;
       assistantId: string | null;
+      // null = super-admin (cross-operation); otherwise the user's home operation.
+      operationId: string | null;
     } & DefaultSession["user"];
   }
 
@@ -15,6 +17,7 @@ declare module "next-auth" {
   interface User {
     role: Role;
     assistantId?: string | null;
+    operationId?: string | null;
   }
 }
 
@@ -23,5 +26,6 @@ declare module "next-auth/jwt" {
     uid?: string;
     role?: Role;
     assistantId?: string | null;
+    operationId?: string | null;
   }
 }

@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { displayedLessonNumbers } from "@/lib/lesson-number";
 import { markDayOff, clearDayOff } from "@/actions/sessions";
+import { currentOperationId } from "@/lib/operation";
 import { GenerateSessions } from "./generate-sessions";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -21,9 +22,10 @@ export default async function SessionsPage({
   const user = await requireRole("admin", "teacher");
   const { classId } = await params;
   const isAdmin = user.role === "admin";
+  const operationId = await currentOperationId();
 
-  const klass = await prisma.class.findUnique({
-    where: { id: classId },
+  const klass = await prisma.class.findFirst({
+    where: { id: classId, operationId },
     select: {
       id: true,
       name: true,

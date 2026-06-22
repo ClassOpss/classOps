@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { divideAlphabetically, assignToSmallerGroup } from "@/lib/divide";
 import { reassignResponsibilities } from "@/actions/sessions";
+import { assertClassInOperation } from "@/lib/operation";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
@@ -29,6 +30,14 @@ export async function assignAssistant(
   const admin = await requireRole("admin");
   const assistantId = String(formData.get("assistantId") ?? "");
   if (!assistantId) return { error: "Pick an assistant." };
+
+  // Class + assistant must be in the same (active) operation — no cross-tenant mixing.
+  const operationId = await assertClassInOperation(classId);
+  const assistant = await prisma.assistant.findUnique({
+    where: { id: assistantId },
+    select: { operationId: true },
+  });
+  if (!assistant || assistant.operationId !== operationId) return { error: "Pick an assistant." };
 
   const active = await activeAssistantIds(classId);
   if (active.includes(assistantId)) return { error: "That assistant is already assigned." };

@@ -1,11 +1,14 @@
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
+import { currentOperationId } from "@/lib/operation";
 import { InviteAssistant } from "./invite-assistant";
 
 export default async function UsersPage() {
   await requireRole("admin");
+  const operationId = await currentOperationId();
 
   const assistants = await prisma.assistant.findMany({
+    where: { operationId },
     orderBy: { name: "asc" },
     include: { user: { select: { active: true, passwordHash: true } } },
   });

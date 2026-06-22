@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { saturdayDeadline, formatCairo } from "@/lib/datetime";
+import { resolveConfig } from "@/lib/operation";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -35,6 +36,7 @@ export default async function AssessmentsListPage({
     _count: { _all: true },
   });
   const gradedBy = new Map(counts.map((c) => [c.assessmentId, c._count._all]));
+  const cfg = await resolveConfig();
 
   return (
     <div className="flex flex-col gap-4">
@@ -67,7 +69,7 @@ export default async function AssessmentsListPage({
                   </div>
                   <p className="text-sm text-black/50 dark:text-white/50">
                     {dateFmt.format(a.date)} · max {a.maxMark} · enter by{" "}
-                    {formatCairo(saturdayDeadline(a.date), "EEE d MMM, h:mm a")}
+                    {formatCairo(saturdayDeadline(a.date, cfg), "EEE d MMM, h:mm a")}
                   </p>
                 </Link>
               </li>

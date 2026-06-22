@@ -13,9 +13,14 @@ export type CoverageCandidate = {
 // A session is a likely coverage when someone OTHER than its responsible assistant
 // actually logged its daily tasks (and it hasn't been marked covered yet). The admin
 // confirms these to apply the ±coverageAdjustment.
-export async function detectCoverageCandidates(): Promise<CoverageCandidate[]> {
+export async function detectCoverageCandidates(operationId: string): Promise<CoverageCandidate[]> {
   const sessions = await prisma.classSession.findMany({
-    where: { dayOff: false, responsibleAssistantId: { not: null }, coveredById: null },
+    where: {
+      dayOff: false,
+      responsibleAssistantId: { not: null },
+      coveredById: null,
+      class: { operationId },
+    },
     orderBy: { scheduledDate: "desc" },
     select: {
       id: true,

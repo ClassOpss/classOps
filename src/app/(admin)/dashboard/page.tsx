@@ -5,6 +5,7 @@ import { formatCairo } from "@/lib/datetime";
 import { waiveIncident, unwaiveIncident } from "@/actions/incidents";
 import { detectCoverageCandidates } from "@/lib/coverage";
 import { confirmCoverage } from "@/actions/coverage";
+import { currentOperationId } from "@/lib/operation";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -32,6 +33,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 export default async function DashboardPage() {
   const user = await requireRole("admin", "teacher");
   const isAdmin = user.role === "admin";
+  const operationId = await currentOperationId();
 
   const now = new Date();
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -40,16 +42,19 @@ export default async function DashboardPage() {
 
   const [activeClasses, activeAssistants, planned, delivered, openIncidentCount, activity] =
     await Promise.all([
-      prisma.class.count({ where: { active: true } }),
-      prisma.assistant.count({ where: { active: true, user: { active: true } } }),
+      prisma.class.count({ where: { active: true, operationId } }),
+      prisma.assistant.count({ where: { active: true, operationId, user: { active: true } } }),
       prisma.classSession.count({
-        where: { dayOff: false, scheduledDate: { gte: monthStart, lt: monthEnd }, class: { active: true } },
+        where: { dayOff: false, scheduledDate: { gte: monthStart, lt: monthEnd }, class: { active: true, operationId } },
       }),
       prisma.classSession.count({
-        where: { dayOff: false, scheduledDate: { gte: monthStart, lt: todayEnd }, class: { active: true } },
+        where: { dayOff: false, scheduledDate: { gte: monthStart, lt: todayEnd }, class: { active: true, operationId } },
       }),
-      isAdmin ? prisma.lateIncident.count({ where: { waived: false } }) : Promise.resolve(0),
+      isAdmin
+        ? prisma.lateIncident.count({ where: { waived: false, assistant: { operationId } } })
+        : Promise.resolve(0),
       prisma.activityLog.findMany({
+        where: { operationId },
         orderBy: { createdAt: "desc" },
         take: 20,
         select: { id: true, actorRole: true, action: true, createdAt: true },
@@ -58,6 +63,7 @@ export default async function DashboardPage() {
 
   const incidents = isAdmin
     ? await prisma.lateIncident.findMany({
+        where: { assistant: { operationId } },
         orderBy: { createdAt: "desc" },
         take: 60,
         include: {
@@ -68,7 +74,7 @@ export default async function DashboardPage() {
     : [];
   const outstanding = incidents.filter((i) => !i.waived);
   const dueTotal = outstanding.reduce((sum, i) => sum + Number(i.deductionAmount), 0);
-  const coverages = isAdmin ? await detectCoverageCandidates() : [];
+  const coverages = isAdmin ? await detectCoverageCandidates(operationId) : [];
 
   return (
     <div className="flex flex-col gap-8">

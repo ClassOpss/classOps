@@ -3,13 +3,15 @@ import type { YearGroup } from "@prisma/client";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { YEAR_GROUPS } from "@/lib/constants";
+import { currentOperationId } from "@/lib/operation";
 
 export default async function ProgressPage() {
   await requireRole("admin", "teacher");
+  const operationId = await currentOperationId();
 
   const now = new Date();
   const classes = await prisma.class.findMany({
-    where: { active: true },
+    where: { active: true, operationId },
     orderBy: { name: "asc" },
     select: {
       id: true,

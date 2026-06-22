@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { endAssignment, autoDivideStudents } from "@/actions/assignments";
+import { currentOperationId } from "@/lib/operation";
 import { AssignAssistant } from "./assign-assistant";
 
 export default async function AssistantsPage({
@@ -12,9 +13,10 @@ export default async function AssistantsPage({
   const user = await requireRole("admin", "teacher");
   const { classId } = await params;
   const isAdmin = user.role === "admin";
+  const operationId = await currentOperationId();
 
-  const klass = await prisma.class.findUnique({
-    where: { id: classId },
+  const klass = await prisma.class.findFirst({
+    where: { id: classId, operationId },
     select: { id: true, name: true, school: { select: { name: true } } },
   });
   if (!klass) {
@@ -32,7 +34,7 @@ export default async function AssistantsPage({
       orderBy: [{ startDate: "asc" }, { createdAt: "asc" }],
       include: { assistant: { select: { id: true, name: true } } },
     }),
-    prisma.assistant.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.assistant.findMany({ where: { active: true, operationId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.studentAssistantAssignment.findMany({
       where: { classId, endDate: null },
       include: { student: { select: { id: true, name: true, code: true } } },

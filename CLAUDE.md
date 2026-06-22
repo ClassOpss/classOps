@@ -355,8 +355,32 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     50) between coverer and owner (lib/pay + PayCalculation.coverageAdjustment column, Coverage column
     on the pay table). Verified end-to-end in-browser: dashboard "Assistant Bee covered Test Assistant"
     -> confirm -> Bee +50/Total 1050, owner -50/Total 950. Seeder: scripts/dev-cov.ts.
-[ ] FINAL — Multi-tenancy (logical: Operation table + operationId scoping; per-teacher
-    personalization incl. logo) + rigorous test pass, then Railway deploy. See multi-tenancy-decision memory.
+[~] FINAL — Multi-tenancy (logical: Operation table + operationId scoping; per-teacher
+    personalization). Decisions: only TIMEZONE stays a shared app default, every other tunable is
+    per-operation; super-admin uses an operation SWITCHER (cookie-scoped active operation). Chunked:
+    • Chunk 1 (committed 536e8b8) — Operation table + operationId on users(nullable=super-admin)/
+      schools/classes/assistants/topics/lesson_plans/pay_periods + activity_log(nullable). Composite
+      uniques (operationId+yearGroup, operationId+month+year). Migration backfills existing data to a
+      seeded default op (Math by Mo, id …0001). lib/operation.currentOperationId(). Create sites stamp
+      operationId. Dev scripts excluded from typecheck.
+    • Chunk 2 (committed 17cb7d4) — config resolver. lib/config split: APP_LOCALE.timeZone (shared) vs
+      OperationConfig + operationConfig(row). lib/operation.resolveConfig()/resolveConfigFor(id).
+      datetime deadline helpers take cfg (tz stays sync); pay/late-incidents/whatsapp/reports read
+      per-op config (defaults back-stop). Single-tenant behavior unchanged.
+    • Chunk 3 (WRITTEN; build+commit PENDING — blocked by a transient tooling-classifier outage that
+      gates bash/PowerShell) — auth+scoping. operationId in JWT/session/SessionUser; currentOperationId()
+      resolves from session (teacher/assistant) or super-admin active-operation cookie
+      (ACTIVE_OPERATION_COOKIE). requireClassAccess enforces class.operationId==current. Scoped all
+      admin/teacher list reads (classes/dashboard/users/pay/progress/insights + coverage detection),
+      class-detail pages (op-scoped findFirst), reports route. logActivity stamps operationId. Teacher-
+      write actions guarded (assessments/sessions/topics/lesson-plan items via assertClassInOperation
+      + op checks); assignAssistant requires same-op class+assistant.
+    • Chunk 4 (WRITTEN; build+commit PENDING) — actions/operations.ts (setActiveOperation cookie +
+      createOperation = new Operation w/ ALL config + teacher invite link + optional schools).
+      /operations super-admin page (list + switch + onboarding form). Nav "Operations" (admin-only) +
+      active-op shown in sidebar. routes ADMIN_ONLY_PREFIXES += /operations.
+    • REMAINING: build-verify chunks 3+4, browser-verify (switch op, onboard a 2nd teacher, confirm
+      isolation), rigorous test pass, then Railway deploy.
 [ ] — update this section as modules are completed —
 
 ### Notes / deviations from original assumptions

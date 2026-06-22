@@ -8,6 +8,7 @@ import { weeklySlotDates } from "@/lib/sessions";
 import { scheduleDays } from "@/lib/schedule";
 import { assignResponsibilities } from "@/lib/responsibility";
 import { activeAt } from "@/lib/roster";
+import { currentOperationId } from "@/lib/operation";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
@@ -46,9 +47,10 @@ export async function generateSessions(
   _formData: FormData,
 ): Promise<FormState> {
   const user = await requireRole("admin", "teacher");
+  const operationId = await currentOperationId();
 
-  const klass = await prisma.class.findUnique({
-    where: { id: classId },
+  const klass = await prisma.class.findFirst({
+    where: { id: classId, operationId },
     select: { id: true, operationId: true, yearGroup: true, schedule: true, planStartDate: true },
   });
   if (!klass) return { error: "Class not found." };

@@ -3,6 +3,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { auth } from "@/auth";
 import { buildClassReportData } from "@/lib/reports/class-report-data";
 import { ClassReportDoc } from "@/lib/reports/class-report-doc";
+import { currentOperationId } from "@/lib/operation";
 
 export const runtime = "nodejs";
 
@@ -21,7 +22,7 @@ export async function GET(
   const month = Number(url.searchParams.get("month")) || now.getUTCMonth() + 1;
   const year = Number(url.searchParams.get("year")) || now.getUTCFullYear();
 
-  const data = await buildClassReportData(classId, month, year);
+  const data = await buildClassReportData(classId, month, year, await currentOperationId());
   if (!data) return NextResponse.json({ error: "Class not found" }, { status: 404 });
 
   const buffer = await renderToBuffer(ClassReportDoc({ data }));

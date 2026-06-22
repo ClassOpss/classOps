@@ -3,11 +3,14 @@ import type { Role } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { homeFor } from "@/lib/routes";
+import { currentOperationId } from "@/lib/operation";
 
 export type SessionUser = {
   id: string;
   role: Role;
   assistantId: string | null;
+  // null = super-admin (cross-operation); otherwise the user's home operation.
+  operationId: string | null;
   name?: string | null;
   email?: string | null;
 };
@@ -31,6 +34,17 @@ export async function requireRole(...roles: Role[]): Promise<SessionUser> {
 // Admin/teacher pass through. Returns the (assistant) user when allowed.
 export async function requireClassAccess(classId: string): Promise<SessionUser> {
   const user = await requireUser();
+
+  const klass = await prisma.class.findUnique({
+    where: { id: classId },
+    select: { operationId: true },
+  });
+  if (!klass) redirect(homeFor(user.role));
+
+  // The class must belong to the operation in scope (the user's own, or the
+  // super-admin's active operation) — blocks cross-operation access via URL.
+  if (klass.operationId !== (await currentOperationId())) redirect(homeFor(user.role));
+
   if (user.role === "admin" || user.role === "teacher") return user;
 
   if (!user.assistantId) redirect("/my");

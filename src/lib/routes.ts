@@ -8,7 +8,8 @@ export function homeFor(role?: Role | string | null): string {
 }
 
 // Admin-only sections within the admin/teacher area (teacher is blocked from these).
-export const ADMIN_ONLY_PREFIXES = ["/pay", "/users", "/activity"];
+// /operations is the super-admin's tenant switcher + teacher onboarding.
+export const ADMIN_ONLY_PREFIXES = ["/pay", "/users", "/activity", "/operations"];
 
 // Unauthenticated-accessible pages.
 export const AUTH_PAGES = ["/login", "/set-password", "/reset-password"];

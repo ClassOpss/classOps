@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { signOutAction } from "@/actions/auth";
+import { currentOperationId, getOperation } from "@/lib/operation";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", adminOnly: false },
@@ -11,6 +12,7 @@ const NAV = [
   { href: "/pay", label: "Pay", adminOnly: true },
   { href: "/users", label: "Users", adminOnly: true },
   { href: "/activity", label: "Activity", adminOnly: true },
+  { href: "/operations", label: "Operations", adminOnly: true },
   { href: "/settings", label: "Settings", adminOnly: false },
 ];
 
@@ -22,6 +24,7 @@ export default async function AdminLayout({
   // Admin + Teacher share this shell; per-link admin-only items are hidden for teachers.
   const user = await requireRole("admin", "teacher");
   const isAdmin = user.role === "admin";
+  const operation = await getOperation(await currentOperationId());
 
   return (
     <div className="flex min-h-screen">
@@ -31,6 +34,12 @@ export default async function AdminLayout({
           <p className="text-xs text-black/50 capitalize dark:text-white/50">
             {user.role}
           </p>
+          {operation && (
+            <p className="mt-1 text-xs text-black/40 dark:text-white/40">
+              {isAdmin ? "Viewing: " : ""}
+              <span className="font-medium">{operation.name}</span>
+            </p>
+          )}
         </div>
         {NAV.filter((n) => isAdmin || !n.adminOnly).map((n) => (
           <Link

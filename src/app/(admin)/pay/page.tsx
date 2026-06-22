@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
+import { currentOperationId } from "@/lib/operation";
 import { CreatePeriodForm } from "./create-period-form";
 
 const MONTHS = [
@@ -10,8 +11,10 @@ const MONTHS = [
 
 export default async function PayPage() {
   await requireRole("admin");
+  const operationId = await currentOperationId();
 
   const periods = await prisma.payPeriod.findMany({
+    where: { operationId },
     orderBy: [{ year: "desc" }, { month: "desc" }],
     include: { _count: { select: { calculations: true } } },
   });

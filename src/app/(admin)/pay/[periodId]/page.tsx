@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { recalcPayPeriod, setAdjustment, approveCalc, sendCalc } from "@/actions/pay";
+import { currentOperationId } from "@/lib/operation";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -18,6 +19,7 @@ export default async function PayPeriodPage({
   await requireRole("admin");
   const { periodId } = await params;
 
+  const operationId = await currentOperationId();
   const period = await prisma.payPeriod.findUnique({
     where: { id: periodId },
     include: {
@@ -27,7 +29,7 @@ export default async function PayPeriodPage({
       },
     },
   });
-  if (!period) {
+  if (!period || period.operationId !== operationId) {
     return (
       <div>
         <h1 className="text-xl font-semibold">Pay period not found</h1>

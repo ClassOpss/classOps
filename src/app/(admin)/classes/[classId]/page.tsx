@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { setClassActive } from "@/actions/classes";
 import { scheduleDays, scheduleTime, scheduleLabel } from "@/lib/schedule";
+import { currentOperationId } from "@/lib/operation";
 import { EditClassForm, type ClassDefaults } from "./edit-class-form";
 
 const MONTHS = [
@@ -22,13 +23,14 @@ export default async function ClassOverviewPage({
 }) {
   const user = await requireRole("admin", "teacher");
   const { classId } = await params;
+  const operationId = await currentOperationId();
 
   const [klass, schools] = await Promise.all([
-    prisma.class.findUnique({
-      where: { id: classId },
+    prisma.class.findFirst({
+      where: { id: classId, operationId },
       include: { school: { select: { name: true } }, _count: { select: { students: true } } },
     }),
-    prisma.school.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.school.findMany({ where: { operationId }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   if (!klass) {
