@@ -3,8 +3,7 @@
 import { useActionState } from "react";
 import { saveLessonDetails, type FormState } from "@/actions/lesson-details";
 
-const inputCls =
-  "w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none focus:border-black/40 dark:border-white/20 dark:bg-transparent";
+const inputCls = "input";
 
 export type LessonDetails = {
   topicId: string;
@@ -28,8 +27,8 @@ export function LessonDetailsForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-3">
-      <label className="flex flex-col gap-1 text-sm">
-        Topic covered
+      <label className="block">
+        <span className="label">Topic covered</span>
         <select name="topicId" defaultValue={current.topicId} className={inputCls}>
           <option value="">—</option>
           {topics.map((t) => (
@@ -38,37 +37,33 @@ export function LessonDetailsForm({
         </select>
       </label>
 
-      <label className="flex flex-col gap-1 text-sm">
-        Homework
+      <label className="block">
+        <span className="label">Homework</span>
         <input name="homework" defaultValue={current.homework} placeholder="e.g. Exercise 4B, Q1–10" className={inputCls} />
       </label>
 
       <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          Due date
+        <label className="block">
+          <span className="label">Due date</span>
           <input type="date" name="homeworkDeadline" defaultValue={current.deadline} className={inputCls} />
         </label>
         <label className="flex items-center gap-2 py-2 text-sm">
-          <input type="checkbox" name="noHomework" defaultChecked={current.noHomework} className="h-4 w-4" />
+          <input type="checkbox" name="noHomework" defaultChecked={current.noHomework} className="h-4 w-4 accent-brand" />
           No homework given
         </label>
       </div>
 
-      <label className="flex flex-col gap-1 text-sm">
-        Quiz / announcement / notes
+      <label className="block">
+        <span className="label">Quiz / announcement / notes</span>
         <textarea name="notes" rows={2} defaultValue={current.notes} placeholder="e.g. Quiz next session on Indices" className={inputCls} />
       </label>
 
       <div className="flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={pending}
-          className="self-start rounded-md border border-black/15 px-4 py-2 text-sm hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/10"
-        >
+        <button type="submit" disabled={pending} className="btn-secondary">
           {pending ? "Saving…" : "Save lesson details"}
         </button>
-        {state?.ok ? <span className="text-sm text-green-600">Saved.</span> : null}
-        {state?.error ? <span className="text-sm text-red-600">{state.error}</span> : null}
+        {state?.ok ? <span className="text-sm text-success">Saved.</span> : null}
+        {state?.error ? <span className="text-sm text-danger">{state.error}</span> : null}
       </div>
     </form>
   );

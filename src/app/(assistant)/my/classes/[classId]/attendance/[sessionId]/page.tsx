@@ -87,13 +87,13 @@ export default async function AttendancePage({
     return (
       <div className="flex flex-col gap-4">
         <div>
-          <Link href={`/my/classes/${classId}`} className="text-sm text-blue-600 hover:underline">← Back</Link>
-          <h1 className="mt-1 text-lg font-semibold">Attendance</h1>
-          <p className="text-sm text-black/50 dark:text-white/50">
+          <Link href={`/my/classes/${classId}`} className="link text-sm">← Back</Link>
+          <h1 className="mt-1 text-lg font-semibold tracking-tight">Attendance</h1>
+          <p className="text-sm text-muted">
             {dateFmt.format(session.scheduledDate)} · {session.topic?.title ?? "—"}
           </p>
         </div>
-        <p className="text-sm text-black/60 dark:text-white/60">
+        <p className="card px-4 py-5 text-sm text-muted">
           {session.dayOff
             ? "This is a day off — there's no attendance to log."
             : `This class hasn't started yet. You can log attendance from ${formatCairo(start)}.`}
@@ -105,108 +105,82 @@ export default async function AttendancePage({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Link href={`/my/classes/${classId}`} className="text-sm text-blue-600 hover:underline">← Back</Link>
-        <h1 className="mt-1 text-lg font-semibold">Attendance</h1>
-        <p className="text-sm text-black/50 dark:text-white/50">
+        <Link href={`/my/classes/${classId}`} className="link text-sm">← Back</Link>
+        <h1 className="mt-1 text-lg font-semibold tracking-tight">Attendance</h1>
+        <p className="text-sm text-muted">
           {dateFmt.format(session.scheduledDate)} · {session.topic?.title ?? "—"}
         </p>
-        <p className="text-xs text-black/40 dark:text-white/40">
+        <p className="text-xs text-faint">
           Deadline: {formatCairo(deadline, "d MMM, h:mm a")}
         </p>
       </div>
 
       {loggedAt && (
-        <div
-          className={`rounded-md p-3 text-sm ${
-            late
-              ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30"
-              : "bg-green-50 text-green-700 dark:bg-green-950/30"
-          }`}
-        >
+        <div className={`rounded-lg px-3 py-2.5 text-sm ${late ? "bg-warn-soft text-warn" : "bg-success-soft text-success"}`}>
           Logged at {formatCairo(loggedAt)} — {late ? "Late (after the 9pm deadline)" : "On time"}
         </div>
       )}
 
       {loggedAt && (
-        <Link
-          href={`/my/classes/${classId}/parent-update/${sessionId}`}
-          className="text-sm text-blue-600 hover:underline"
-        >
+        <Link href={`/my/classes/${classId}/parent-update/${sessionId}`} className="btn-secondary w-full">
           Send parent update →
         </Link>
       )}
 
-      <form action={submitAttendance.bind(null, sessionId)} className="flex flex-col gap-2">
-        <p className="text-xs text-black/50 dark:text-white/50">
+      <form action={submitAttendance.bind(null, sessionId)} className="card overflow-hidden">
+        <p className="border-b border-border px-4 py-3 text-xs text-muted">
           Checked = present. Uncheck absent students, then submit.
         </p>
         {students.length === 0 ? (
-          <p className="text-sm text-black/60 dark:text-white/60">No students in this class yet.</p>
+          <p className="px-4 py-5 text-sm text-muted">No students in this class yet.</p>
         ) : (
-          <ul className="flex flex-col">
+          <ul className="divide-y divide-border">
             {students.map((s) => (
-              <li key={s.id} className="border-b border-black/5 dark:border-white/5">
-                <label className="flex items-center gap-3 py-3">
+              <li key={s.id}>
+                <label className="flex cursor-pointer items-center gap-3 px-4 py-3">
                   <input
                     type="checkbox"
                     name="present"
                     value={s.id}
                     defaultChecked={statusByStudent.get(s.id) !== "absent"}
-                    className="h-5 w-5"
+                    className="h-5 w-5 accent-brand"
                   />
-                  <span className="flex-1">{s.name}</span>
-                  <span className="text-xs text-black/40">{s.code}</span>
+                  <span className="flex-1 font-medium">{s.name}</span>
+                  <span className="text-xs text-faint">{s.code}</span>
                 </label>
               </li>
             ))}
           </ul>
         )}
         {students.length > 0 && (
-          <button
-            type="submit"
-            className="mt-2 rounded-md bg-foreground px-4 py-3 text-sm font-medium text-background hover:opacity-90"
-          >
-            {loggedAt ? "Update attendance" : "Submit attendance"}
-          </button>
+          <div className="border-t border-border p-3">
+            <button type="submit" className="btn-primary w-full">
+              {loggedAt ? "Update attendance" : "Submit attendance"}
+            </button>
+          </div>
         )}
       </form>
 
-      <section className="border-t border-black/10 pt-4 dark:border-white/10">
-        <h2 className="mb-1 font-medium">Lesson details</h2>
-        <p className="mb-3 text-xs text-black/50 dark:text-white/50">
+      <section className="card p-4">
+        <h2 className="section-title">Lesson details</h2>
+        <p className="mb-3 mt-0.5 text-xs text-muted">
           Topic, homework, and any quiz/announcement — these fill the parent update and are
           left out of the message when blank.
         </p>
         <LessonDetailsForm sessionId={sessionId} topics={topics} current={lessonDetails} />
       </section>
 
-      <section className="border-t border-black/10 pt-4 dark:border-white/10">
-        <h2 className="mb-1 font-medium">Google Classroom</h2>
+      <section className="card p-4">
+        <h2 className="section-title mb-2">Google Classroom</h2>
         {uploadedAt && (
-          <div
-            className={`mb-2 rounded-md p-3 text-sm ${
-              uploadLate
-                ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30"
-                : "bg-green-50 text-green-700 dark:bg-green-950/30"
-            }`}
-          >
+          <div className={`mb-2 rounded-lg px-3 py-2.5 text-sm ${uploadLate ? "bg-warn-soft text-warn" : "bg-success-soft text-success"}`}>
             Marked uploaded at {formatCairo(uploadedAt)} — {uploadLate ? "Late (after the 9pm deadline)" : "On time"}
             {session.classroomUpload?.notes ? ` · ${session.classroomUpload.notes}` : ""}
           </div>
         )}
-        <form
-          action={markClassroomUploaded.bind(null, sessionId)}
-          className="flex flex-wrap items-end gap-2"
-        >
-          <input
-            name="notes"
-            placeholder="what you uploaded (optional)"
-            className="flex-1 rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none focus:border-black/40 dark:border-white/20 dark:bg-transparent"
-          />
-          <button
-            type="submit"
-            className="rounded-md border border-black/15 px-4 py-2 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
-          >
+        <form action={markClassroomUploaded.bind(null, sessionId)} className="flex flex-wrap items-end gap-2">
+          <input name="notes" placeholder="what you uploaded (optional)" className="input flex-1" />
+          <button type="submit" className="btn-secondary">
             {uploadedAt ? "Update" : "Mark uploaded ✓"}
           </button>
         </form>
