@@ -9,10 +9,10 @@ import {
 
 function LinksPanel({ state }: { state: InviteState }) {
   if (!state) return null;
-  if (!state.ok) return <p className="text-sm text-red-600">{state.error}</p>;
+  if (!state.ok) return <p className="mt-3 text-sm text-danger">{state.error}</p>;
   return (
-    <div className="mt-3 rounded-md border border-green-600/30 bg-green-50 p-3 text-sm dark:bg-green-950/20">
-      <p className="mb-2 font-medium text-green-800 dark:text-green-300">
+    <div className="mt-4 rounded-lg border border-success/20 bg-success-soft p-4 text-sm">
+      <p className="mb-2 font-medium text-success">
         Invite link(s) created — send each to the assistant:
       </p>
       <ul className="flex flex-col gap-2">
@@ -20,7 +20,7 @@ function LinksPanel({ state }: { state: InviteState }) {
           <li key={l.email} className="break-all">
             <span className="font-medium">{l.email}</span>
             <br />
-            <code className="text-xs text-black/70 dark:text-white/70">{l.url}</code>
+            <code className="text-xs text-muted">{l.url}</code>
           </li>
         ))}
       </ul>
@@ -38,15 +38,13 @@ export function InviteAssistant() {
     undefined,
   );
 
-  const inputCls =
-    "rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none focus:border-black/40 dark:border-white/20 dark:bg-transparent";
-  const btnCls =
-    "rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50";
+  const inputCls = "input";
+  const btnCls = "btn-primary self-start";
 
   return (
-    <div className="grid gap-8 md:grid-cols-2">
-      <section>
-        <h2 className="mb-3 font-medium">Invite one assistant</h2>
+    <div className="grid gap-5 md:grid-cols-2">
+      <section className="card p-5">
+        <h2 className="section-title mb-3">Invite one assistant</h2>
         <form action={singleAction} className="flex flex-col gap-3">
           <input name="name" placeholder="Full name" required className={inputCls} />
           <input name="email" type="email" placeholder="email@example.com" required className={inputCls} />
@@ -57,8 +55,8 @@ export function InviteAssistant() {
         <LinksPanel state={single} />
       </section>
 
-      <section>
-        <h2 className="mb-3 font-medium">Bulk invite (paste emails)</h2>
+      <section className="card p-5">
+        <h2 className="section-title mb-3">Bulk invite (paste emails)</h2>
         <form action={bulkAction} className="flex flex-col gap-3">
           <textarea
             name="emails"

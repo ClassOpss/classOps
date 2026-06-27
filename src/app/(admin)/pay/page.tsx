@@ -23,36 +23,45 @@ export default async function PayPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <h1 className="text-xl font-semibold">Pay</h1>
+      <div>
+        <h1 className="page-title">Pay</h1>
+        <p className="page-subtitle">Open monthly periods and review each assistant&apos;s pay.</p>
+      </div>
 
-      <section className="rounded-md border border-black/10 p-4 dark:border-white/10">
-        <h2 className="mb-3 font-medium">Open a pay period</h2>
+      <section className="card p-5">
+        <h2 className="section-title mb-3">Open a pay period</h2>
         <CreatePeriodForm defaultMonth={now.getUTCMonth() + 1} defaultYear={now.getUTCFullYear()} />
       </section>
 
-      <section>
-        <h2 className="mb-3 font-medium">Pay periods ({periods.length})</h2>
+      <section className="card overflow-hidden">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="section-title">Pay periods ({periods.length})</h2>
+        </div>
         {periods.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">None yet.</p>
+          <p className="px-5 py-6 text-sm text-muted">None yet.</p>
         ) : (
-          <table className="w-full max-w-xl text-left text-sm">
-            <thead className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
+          <table className="table">
+            <thead>
               <tr>
-                <th className="py-2">Period</th>
-                <th className="py-2">Assistants</th>
-                <th className="py-2">Status</th>
+                <th>Period</th>
+                <th>Assistants</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
               {periods.map((p) => (
-                <tr key={p.id} className="border-b border-black/5 dark:border-white/5">
-                  <td className="py-2">
-                    <Link href={`/pay/${p.id}`} className="text-blue-600 hover:underline">
+                <tr key={p.id}>
+                  <td>
+                    <Link href={`/pay/${p.id}`} className="link">
                       {MONTHS[p.month - 1]} {p.year}
                     </Link>
                   </td>
-                  <td className="py-2">{p._count.calculations}</td>
-                  <td className="py-2 capitalize">{p.status}</td>
+                  <td>{p._count.calculations}</td>
+                  <td>
+                    <span className={p.status === "sent" ? "badge-success" : "badge-neutral"}>
+                      {p.status}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>

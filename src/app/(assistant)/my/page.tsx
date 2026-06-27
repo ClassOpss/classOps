@@ -9,8 +9,8 @@ export default async function MyClassesPage() {
   if (!user.assistantId) {
     return (
       <div>
-        <h1 className="text-lg font-semibold">My Classes</h1>
-        <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+        <h1 className="text-lg font-semibold tracking-tight">My Classes</h1>
+        <p className="mt-2 text-sm text-muted">
           This account has no assistant profile. (Admins manage classes from the admin area.)
         </p>
       </div>
@@ -41,26 +41,29 @@ export default async function MyClassesPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold">My Classes</h1>
+      <h1 className="text-lg font-semibold tracking-tight">My Classes</h1>
       {classes.length === 0 ? (
-        <p className="text-sm text-black/60 dark:text-white/60">No classes assigned to you yet.</p>
+        <p className="card px-4 py-6 text-center text-sm text-muted">No classes assigned to you yet.</p>
       ) : (
         <ul className="flex flex-col gap-3">
-          {classes.map((c) => {
-            return (
-              <li key={c.id}>
-                <Link
-                  href={`/my/classes/${c.id}`}
-                  className="block rounded-lg border border-black/10 p-4 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
-                >
-                  <p className="font-medium">{c.name}</p>
-                  <p className="text-sm text-black/50 dark:text-white/50">
+          {classes.map((c) => (
+            <li key={c.id}>
+              <Link
+                href={`/my/classes/${c.id}`}
+                className="card flex items-center justify-between p-4 transition-colors hover:border-border-strong"
+              >
+                <div>
+                  <p className="font-semibold">{c.name}</p>
+                  <p className="mt-0.5 text-sm text-muted">
                     {c.school.name} · {scheduleLabel(c.schedule as object)} · {c._count.students} students
                   </p>
-                </Link>
-              </li>
-            );
-          })}
+                </div>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-faint" aria-hidden>
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </Link>
+            </li>
+          ))}
         </ul>
       )}
     </div>

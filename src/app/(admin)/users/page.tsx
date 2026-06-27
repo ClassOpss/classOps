@@ -16,48 +16,50 @@ export default async function UsersPage() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-xl font-semibold">Assistants &amp; Users</h1>
-        <p className="mt-1 text-sm text-black/50 dark:text-white/50">
-          Invite assistants; they set their own password via the link.
-        </p>
+        <h1 className="page-title">Assistants &amp; Users</h1>
+        <p className="page-subtitle">Invite assistants; they set their own password via the link.</p>
       </div>
 
       <InviteAssistant />
 
-      <section>
-        <h2 className="mb-3 font-medium">Existing assistants ({assistants.length})</h2>
+      <section className="card overflow-hidden">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="section-title">Existing assistants ({assistants.length})</h2>
+        </div>
         {assistants.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">None yet.</p>
+          <p className="px-5 py-6 text-sm text-muted">None yet.</p>
         ) : (
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
-              <tr>
-                <th className="py-2">Name</th>
-                <th className="py-2">Email</th>
-                <th className="py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {assistants.map((a) => {
-                const pending = !a.user?.passwordHash;
-                return (
-                  <tr key={a.id} className="border-b border-black/5 dark:border-white/5">
-                    <td className="py-2">{a.name}</td>
-                    <td className="py-2">{a.email}</td>
-                    <td className="py-2">
-                      {!a.user?.active ? (
-                        <span className="text-red-600">Deactivated</span>
-                      ) : pending ? (
-                        <span className="text-amber-600">Invited (not set up)</span>
-                      ) : (
-                        <span className="text-green-600">Active</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {assistants.map((a) => {
+                  const pending = !a.user?.passwordHash;
+                  return (
+                    <tr key={a.id}>
+                      <td className="font-medium">{a.name}</td>
+                      <td className="text-muted">{a.email}</td>
+                      <td>
+                        {!a.user?.active ? (
+                          <span className="badge-danger">Deactivated</span>
+                        ) : pending ? (
+                          <span className="badge-warn">Invited (not set up)</span>
+                        ) : (
+                          <span className="badge-success">Active</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

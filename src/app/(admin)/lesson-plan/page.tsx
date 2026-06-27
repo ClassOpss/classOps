@@ -38,21 +38,21 @@ export default async function LessonPlanPage({
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-xl font-semibold">Lesson Plan</h1>
-        <p className="mt-1 text-sm text-black/50 dark:text-white/50">
+        <h1 className="page-title">Lesson Plan</h1>
+        <p className="page-subtitle">
           One shared plan per year group. Classes generate their dated sessions from it.
         </p>
       </div>
 
-      <nav className="flex gap-2">
+      <nav className="inline-flex w-fit gap-1 rounded-lg border border-border bg-card p-1">
         {YEAR_GROUPS.map((g) => (
           <Link
             key={g}
             href={`/lesson-plan?yg=${g}`}
-            className={`rounded-md px-3 py-1.5 text-sm ${
+            className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
               g === yearGroup
-                ? "bg-foreground text-background"
-                : "border border-black/15 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+                ? "bg-brand text-brand-fg"
+                : "text-muted hover:bg-card-muted hover:text-fg"
             }`}
           >
             {g}
@@ -60,55 +60,60 @@ export default async function LessonPlanPage({
         ))}
       </nav>
 
-      <section>
-        <h2 className="mb-3 font-medium">{yearGroup} plan ({items.length} lessons)</h2>
+      <section className="card overflow-hidden">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="section-title">{yearGroup} plan ({items.length} lessons)</h2>
+        </div>
         {items.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">No lessons yet — add topics below.</p>
+          <p className="px-5 py-6 text-sm text-muted">No lessons yet — add topics below.</p>
         ) : (
-          <ol className="flex flex-col gap-1">
+          <ol className="divide-y divide-border">
             {items.map((item, idx) => (
-              <li
-                key={item.id}
-                className="flex items-center gap-3 border-b border-black/5 py-2 text-sm dark:border-white/5"
-              >
-                <span className="w-6 text-black/40">{idx + 1}</span>
+              <li key={item.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-softfg">
+                  {idx + 1}
+                </span>
                 <span className="flex-1">{item.topic?.title ?? "— (topic deleted)"}</span>
                 <form action={movePlanItem.bind(null, item.id, "up")}>
-                  <button type="submit" disabled={idx === 0} className="px-1 text-black/50 disabled:opacity-30 hover:text-black dark:hover:text-white">↑</button>
+                  <button type="submit" disabled={idx === 0} className="px-1 text-muted disabled:opacity-30 hover:text-fg">↑</button>
                 </form>
                 <form action={movePlanItem.bind(null, item.id, "down")}>
-                  <button type="submit" disabled={idx === items.length - 1} className="px-1 text-black/50 disabled:opacity-30 hover:text-black dark:hover:text-white">↓</button>
+                  <button type="submit" disabled={idx === items.length - 1} className="px-1 text-muted disabled:opacity-30 hover:text-fg">↓</button>
                 </form>
                 <form action={removePlanItem.bind(null, item.id)}>
-                  <button type="submit" className="text-red-600 hover:underline">Remove</button>
+                  <button type="submit" className="font-medium text-danger hover:underline">Remove</button>
                 </form>
               </li>
             ))}
           </ol>
         )}
-        <div className="mt-4">
+        <div className="border-t border-border px-5 py-4">
           <AddPlanItemForm yearGroup={yearGroup} topics={topics} />
         </div>
       </section>
 
-      <section>
-        <h2 className="mb-3 font-medium">{yearGroup} topics ({topics.length})</h2>
+      <section className="card overflow-hidden">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="section-title">{yearGroup} topics ({topics.length})</h2>
+        </div>
         {topics.length > 0 && (
-          <ul className="mb-4 flex flex-col gap-1">
+          <ul className="divide-y divide-border">
             {topics.map((t) => (
-              <li key={t.id} className="flex items-center gap-3 text-sm">
+              <li key={t.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
                 <span className="flex-1">
                   {t.title}
-                  {t.chapter ? <span className="text-black/40"> · {t.chapter}</span> : null}
+                  {t.chapter ? <span className="text-faint"> · {t.chapter}</span> : null}
                 </span>
                 <form action={deleteTopic.bind(null, t.id)}>
-                  <button type="submit" className="text-red-600 hover:underline">Delete</button>
+                  <button type="submit" className="font-medium text-danger hover:underline">Delete</button>
                 </form>
               </li>
             ))}
           </ul>
         )}
-        <AddTopicForm yearGroup={yearGroup} />
+        <div className="border-t border-border px-5 py-4">
+          <AddTopicForm yearGroup={yearGroup} />
+        </div>
       </section>
     </div>
   );

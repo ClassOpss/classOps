@@ -34,15 +34,14 @@ export function NewOperationForm({ defaults }: { defaults: OperationDefaults }) 
     undefined,
   );
 
-  const input =
-    "rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none focus:border-black/40 dark:border-white/20 dark:bg-transparent";
-  const label = "flex flex-col gap-1 text-sm";
-  const hint = "text-xs text-black/50 dark:text-white/50";
+  const input = "input";
+  const label = "flex flex-col gap-1.5 text-[0.8rem] font-medium text-muted";
+  const hint = "text-xs font-normal text-faint";
 
   return (
     <form action={action} className="flex flex-col gap-6">
       <fieldset className="flex flex-col gap-3">
-        <legend className="mb-1 font-medium">Teacher &amp; operation</legend>
+        <legend className="section-title mb-2">Teacher &amp; operation</legend>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className={label}>
             Operation name
@@ -60,7 +59,7 @@ export function NewOperationForm({ defaults }: { defaults: OperationDefaults }) 
       </fieldset>
 
       <fieldset className="flex flex-col gap-3">
-        <legend className="mb-1 font-medium">Branding</legend>
+        <legend className="section-title mb-2">Branding</legend>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className={label}>
             Brand name
@@ -83,7 +82,7 @@ export function NewOperationForm({ defaults }: { defaults: OperationDefaults }) 
       </fieldset>
 
       <fieldset className="flex flex-col gap-3">
-        <legend className="mb-1 font-medium">Deadlines (Cairo time)</legend>
+        <legend className="section-title mb-2">Deadlines (Cairo time)</legend>
         <div className="grid gap-3 sm:grid-cols-3">
           <label className={label}>
             Daily deadline hour (0–23)
@@ -105,7 +104,7 @@ export function NewOperationForm({ defaults }: { defaults: OperationDefaults }) 
       </fieldset>
 
       <fieldset className="flex flex-col gap-3">
-        <legend className="mb-1 font-medium">Pay ({defaults.currency})</legend>
+        <legend className="section-title mb-2">Pay ({defaults.currency})</legend>
         <div className="grid gap-3 sm:grid-cols-3">
           <label className={label}>
             Per-class salary
@@ -131,28 +130,24 @@ export function NewOperationForm({ defaults }: { defaults: OperationDefaults }) 
       </fieldset>
 
       <fieldset className="flex flex-col gap-3">
-        <legend className="mb-1 font-medium">Schools (optional)</legend>
+        <legend className="section-title mb-2">Schools (optional)</legend>
         <label className={label}>
           One per line — can also be added later.
           <textarea name="schools" rows={4} placeholder={"Citadel\nNoon"} className={input} />
         </label>
       </fieldset>
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="self-start rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
-      >
+      <button type="submit" disabled={pending} className="btn-primary self-start">
         {pending ? "Creating…" : "Create operation + invite teacher"}
       </button>
 
-      {state && !state.ok && <p className="text-sm text-red-600">{state.error}</p>}
+      {state && !state.ok && <p className="text-sm text-danger">{state.error}</p>}
       {state && state.ok && (
-        <div className="rounded-md border border-green-600/30 bg-green-50 p-3 text-sm dark:bg-green-950/20">
-          <p className="mb-1 font-medium text-green-800 dark:text-green-300">
+        <div className="rounded-lg border border-success/20 bg-success-soft p-4 text-sm">
+          <p className="mb-1.5 font-medium text-success">
             Operation created. Send this setup link to {state.teacherEmail}:
           </p>
-          <code className="break-all text-xs text-black/70 dark:text-white/70">{state.setupUrl}</code>
+          <code className="break-all text-xs text-fg">{state.setupUrl}</code>
         </div>
       )}
     </form>

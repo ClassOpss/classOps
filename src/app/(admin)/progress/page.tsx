@@ -40,8 +40,8 @@ export default async function ProgressPage() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-xl font-semibold">Class Progress</h1>
-        <p className="mt-1 text-sm text-black/50 dark:text-white/50">
+        <h1 className="page-title">Class Progress</h1>
+        <p className="page-subtitle">
           Where each class is in its year-group plan. &quot;Behind&quot; is relative to the
           furthest-along class in the same year group.
         </p>
@@ -54,38 +54,38 @@ export default async function ProgressPage() {
         const ordered = [...group].sort((a, b) => b.delivered - a.delivered);
 
         return (
-          <section key={yg}>
-            <h2 className="mb-3 font-medium">{yg}</h2>
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
+          <section key={yg} className="card overflow-hidden">
+            <div className="border-b border-border px-5 py-3">
+              <h2 className="section-title">{yg}</h2>
+            </div>
+            <table className="table">
+              <thead>
                 <tr>
-                  <th className="py-2">Class</th>
-                  <th className="py-2">School</th>
-                  <th className="py-2">Progress</th>
-                  <th className="py-2">Status</th>
+                  <th>Class</th>
+                  <th>School</th>
+                  <th>Progress</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {ordered.map((r) => {
                   const behind = leader - r.delivered;
                   return (
-                    <tr key={r.id} className="border-b border-black/5 dark:border-white/5">
-                      <td className="py-2">
-                        <Link href={`/classes/${r.id}/sessions`} className="text-blue-600 hover:underline">
-                          {r.name}
-                        </Link>
+                    <tr key={r.id}>
+                      <td>
+                        <Link href={`/classes/${r.id}/sessions`} className="link">{r.name}</Link>
                       </td>
-                      <td className="py-2">{r.school}</td>
-                      <td className="py-2">
+                      <td className="text-muted">{r.school}</td>
+                      <td className="text-muted">
                         {r.hasSessions ? `Lesson ${r.delivered} of ${r.total}` : "—"}
                       </td>
-                      <td className="py-2">
+                      <td>
                         {!r.hasSessions ? (
-                          <span className="text-black/40">No sessions generated</span>
+                          <span className="badge-neutral">No sessions generated</span>
                         ) : behind === 0 ? (
-                          <span className="text-green-600">On track</span>
+                          <span className="badge-success">On track</span>
                         ) : (
-                          <span className="text-amber-600">Behind by {behind}</span>
+                          <span className="badge-warn">Behind by {behind}</span>
                         )}
                       </td>
                     </tr>
@@ -98,7 +98,7 @@ export default async function ProgressPage() {
       })}
 
       {rows.length === 0 && (
-        <p className="text-sm text-black/50 dark:text-white/50">No active classes yet.</p>
+        <p className="card px-5 py-6 text-sm text-muted">No active classes yet.</p>
       )}
     </div>
   );

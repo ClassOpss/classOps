@@ -103,43 +103,48 @@ export default async function InsightsPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <h1 className="text-xl font-semibold">Insights</h1>
+      <div>
+        <h1 className="page-title">Insights</h1>
+        <p className="page-subtitle">Performance, attendance and assistant activity across classes.</p>
+      </div>
 
-      <section>
-        <h2 className="mb-1 font-medium">Topic performance</h2>
-        <p className="mb-3 text-xs text-black/50 dark:text-white/50">
+      <section className="card p-5">
+        <h2 className="section-title">Topic performance</h2>
+        <p className="mb-4 mt-0.5 text-xs text-muted">
           Average assessment score per topic (diagnostics excluded). Green above the overall
           average, red below.
         </p>
         <TopicChart data={topicData} overallAvg={overallAvg} />
       </section>
 
-      <section>
-        <h2 className="mb-3 font-medium">Attendance by class</h2>
+      <section className="card overflow-hidden">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="section-title">Attendance by class</h2>
+        </div>
         {attRows.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">No attendance logged yet.</p>
+          <p className="px-5 py-6 text-sm text-muted">No attendance logged yet.</p>
         ) : (
-          <table className="w-full max-w-md text-left text-sm">
-            <thead className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
-              <tr><th className="py-2">Class</th><th className="py-2">Attendance rate</th></tr>
+          <table className="table">
+            <thead>
+              <tr><th>Class</th><th>Attendance rate</th></tr>
             </thead>
             <tbody>
               {attRows.map((r) => (
-                <tr key={r.name} className="border-b border-black/5 dark:border-white/5">
-                  <td className="py-2">{r.name}</td>
-                  <td className={`py-2 ${r.rate < 85 ? "text-amber-600" : "text-green-600"}`}>{r.rate.toFixed(0)}%</td>
+                <tr key={r.name}>
+                  <td>{r.name}</td>
+                  <td className={r.rate < 85 ? "font-medium text-warn" : "font-medium text-success"}>{r.rate.toFixed(0)}%</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
         {flagged.length > 0 && (
-          <div className="mt-3 text-sm">
-            <p className="font-medium text-red-600">Students with &gt;3 absences:</p>
-            <ul className="mt-1 flex flex-col gap-0.5">
+          <div className="border-t border-border px-5 py-4 text-sm">
+            <p className="font-medium text-danger">Students with &gt;3 absences</p>
+            <ul className="mt-2 flex flex-col gap-1">
               {flagged.map((s) => (
                 <li key={s.id}>
-                  {s.name} <span className="text-black/40">· {s.class.name} · {absenceCount.get(s.id)} absences</span>
+                  {s.name} <span className="text-faint">· {s.class.name} · {absenceCount.get(s.id)} absences</span>
                 </li>
               ))}
             </ul>
@@ -147,36 +152,38 @@ export default async function InsightsPage() {
         )}
       </section>
 
-      <section>
-        <h2 className="mb-3 font-medium">Common weak points</h2>
+      <section className="card p-5">
+        <h2 className="section-title mb-3">Common weak points</h2>
         {keywords.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">No weak-point notes yet.</p>
+          <p className="text-sm text-muted">No weak-point notes yet.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {keywords.map((k) => (
-              <span key={k.word} className="rounded-full border border-black/10 px-3 py-1 text-sm dark:border-white/10">
-                {k.word} <span className="text-black/40">×{k.n}</span>
+              <span key={k.word} className="badge-neutral">
+                {k.word} <span className="text-faint">×{k.n}</span>
               </span>
             ))}
           </div>
         )}
       </section>
 
-      <section>
-        <h2 className="mb-3 font-medium">Assistant activity</h2>
+      <section className="card overflow-hidden">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="section-title">Assistant activity</h2>
+        </div>
         {assistants.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">No assistants yet.</p>
+          <p className="px-5 py-6 text-sm text-muted">No assistants yet.</p>
         ) : (
-          <table className="w-full max-w-md text-left text-sm">
-            <thead className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
-              <tr><th className="py-2">Assistant</th><th className="py-2">Late incidents</th><th className="py-2">Office hours</th></tr>
+          <table className="table">
+            <thead>
+              <tr><th>Assistant</th><th>Late incidents</th><th>Office hours</th></tr>
             </thead>
             <tbody>
               {assistants.map((a) => (
-                <tr key={a.id} className="border-b border-black/5 dark:border-white/5">
-                  <td className="py-2">{a.name}</td>
-                  <td className={`py-2 ${a._count.incidents > 0 ? "text-amber-600" : ""}`}>{a._count.incidents}</td>
-                  <td className="py-2">{a._count.officeHours}</td>
+                <tr key={a.id}>
+                  <td className="font-medium">{a.name}</td>
+                  <td className={a._count.incidents > 0 ? "text-warn" : "text-muted"}>{a._count.incidents}</td>
+                  <td className="text-muted">{a._count.officeHours}</td>
                 </tr>
               ))}
             </tbody>

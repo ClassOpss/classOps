@@ -3,11 +3,11 @@ import { requireRole } from "@/lib/auth-guards";
 export default async function SettingsPage() {
   await requireRole("admin", "teacher");
   return (
-    <div>
-      <h1 className="text-xl font-semibold">Settings</h1>
-      <p className="mt-2 text-sm text-black/40 dark:text-white/40">
-        App settings land here in a later step.
-      </p>
+    <div className="flex flex-col gap-6">
+      <h1 className="page-title">Settings</h1>
+      <div className="card p-8 text-center">
+        <p className="text-sm text-muted">App settings land here in a later step.</p>
+      </div>
     </div>
   );
 }
