@@ -23,9 +23,9 @@ const INCIDENT_LABEL: Record<string, string> = {
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-      <p className="text-2xl font-semibold">{value}</p>
-      <p className="text-sm text-black/50 dark:text-white/50">{label}</p>
+    <div className="card p-5">
+      <p className="text-3xl font-semibold tracking-tight text-fg">{value}</p>
+      <p className="mt-1 text-sm text-muted">{label}</p>
     </div>
   );
 }
@@ -78,7 +78,10 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <h1 className="text-xl font-semibold">Dashboard</h1>
+      <div>
+        <h1 className="page-title">Dashboard</h1>
+        <p className="page-subtitle">Operations overview and recent activity.</p>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Active classes" value={activeClasses} />
@@ -88,29 +91,25 @@ export default async function DashboardPage() {
       </div>
 
       {isAdmin && coverages.length > 0 && (
-        <section>
-          <h2 className="mb-1 font-medium">Coverage to confirm</h2>
-          <p className="mb-3 text-sm text-black/50 dark:text-white/50">
-            Someone logged a session that wasn&apos;t theirs — confirm to move ±50 EGP.
-          </p>
-          <ul className="flex flex-col gap-1">
+        <section className="card overflow-hidden">
+          <div className="border-b border-border px-5 py-4">
+            <h2 className="section-title">Coverage to confirm</h2>
+            <p className="mt-0.5 text-sm text-muted">
+              Someone logged a session that wasn&apos;t theirs — confirm to move ±50 EGP.
+            </p>
+          </div>
+          <ul className="divide-y divide-border">
             {coverages.map((c) => (
-              <li
-                key={c.sessionId}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-black/5 py-2 text-sm dark:border-white/5"
-              >
+              <li key={c.sessionId} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm">
                 <span>
-                  <span className="font-medium">{c.covererName}</span> covered{" "}
+                  <span className="font-medium">{c.covererName}</span>{" "}
+                  <span className="text-muted">covered</span>{" "}
                   <span className="font-medium">{c.ownerName}</span>
                 </span>
-                <Link href={`/classes/${c.classId}`} className="text-blue-600 hover:underline">
-                  {c.className}
-                </Link>
-                <span className="text-black/40">{formatCairo(c.date, "d MMM")}</span>
+                <Link href={`/classes/${c.classId}`} className="link">{c.className}</Link>
+                <span className="text-faint">{formatCairo(c.date, "d MMM")}</span>
                 <form action={confirmCoverage.bind(null, c.sessionId, c.covererId)} className="ml-auto">
-                  <button type="submit" className="text-blue-600 hover:underline">
-                    Confirm (+50 / −50)
-                  </button>
+                  <button type="submit" className="btn-secondary btn-sm">Confirm (+50 / −50)</button>
                 </form>
               </li>
             ))}
@@ -119,46 +118,44 @@ export default async function DashboardPage() {
       )}
 
       {isAdmin && (
-        <section>
-          <h2 className="mb-1 font-medium">Late incidents</h2>
-          <p className="mb-3 text-sm text-black/50 dark:text-white/50">
-            {outstanding.length} unwaived · {dueTotal} EGP in deductions
-          </p>
+        <section className="card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <div>
+              <h2 className="section-title">Late incidents</h2>
+              <p className="mt-0.5 text-sm text-muted">
+                {outstanding.length} unwaived · {dueTotal} EGP in deductions
+              </p>
+            </div>
+          </div>
           {incidents.length === 0 ? (
-            <p className="text-sm text-black/50 dark:text-white/50">None — everyone&apos;s on time.</p>
+            <p className="px-5 py-6 text-sm text-muted">None — everyone&apos;s on time.</p>
           ) : (
-            <ul className="flex flex-col gap-1">
+            <ul className="divide-y divide-border">
               {incidents.map((i) => (
                 <li
                   key={i.id}
-                  className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-black/5 py-2 text-sm dark:border-white/5 ${
-                    i.waived ? "text-black/40" : ""
-                  }`}
+                  className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 px-5 py-3 text-sm ${i.waived ? "opacity-60" : ""}`}
                 >
                   <span className="font-medium">{i.assistant.name}</span>
-                  <span>{INCIDENT_LABEL[i.type]}</span>
+                  <span className="badge-neutral">{INCIDENT_LABEL[i.type]}</span>
                   {i.session?.class ? (
-                    <Link href={`/classes/${i.session.class.id}`} className="text-blue-600 hover:underline">
-                      {i.session.class.name}
-                    </Link>
+                    <Link href={`/classes/${i.session.class.id}`} className="link">{i.session.class.name}</Link>
                   ) : null}
-                  <span className="text-black/40">{formatCairo(i.deadline, "d MMM, h:mm a")}</span>
-                  <span className={i.waived ? "" : "text-red-600"}>
-                    {i.waived ? `Waived${i.waiveReason ? ` · ${i.waiveReason}` : ""}` : `-${Number(i.deductionAmount)} EGP`}
-                  </span>
+                  <span className="text-faint">{formatCairo(i.deadline, "d MMM, h:mm a")}</span>
+                  {i.waived ? (
+                    <span className="badge-neutral">Waived{i.waiveReason ? ` · ${i.waiveReason}` : ""}</span>
+                  ) : (
+                    <span className="badge-danger">−{Number(i.deductionAmount)} EGP</span>
+                  )}
                   <span className="ml-auto">
                     {i.waived ? (
                       <form action={unwaiveIncident.bind(null, i.id)}>
-                        <button type="submit" className="text-blue-600 hover:underline">Un-waive</button>
+                        <button type="submit" className="link">Un-waive</button>
                       </form>
                     ) : (
-                      <form action={waiveIncident.bind(null, i.id)} className="flex items-center gap-1">
-                        <input
-                          name="reason"
-                          placeholder="reason"
-                          className="w-28 rounded-md border border-black/15 bg-white px-2 py-1 text-xs outline-none focus:border-black/40 dark:border-white/20 dark:bg-transparent"
-                        />
-                        <button type="submit" className="text-blue-600 hover:underline">Waive</button>
+                      <form action={waiveIncident.bind(null, i.id)} className="flex items-center gap-2">
+                        <input name="reason" placeholder="reason" className="input !w-32 !py-1.5 text-xs" />
+                        <button type="submit" className="btn-secondary btn-sm">Waive</button>
                       </form>
                     )}
                   </span>
@@ -169,19 +166,21 @@ export default async function DashboardPage() {
         </section>
       )}
 
-      <section>
-        <h2 className="mb-3 font-medium">Recent activity</h2>
+      <section className="card overflow-hidden">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="section-title">Recent activity</h2>
+        </div>
         {activity.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">Nothing yet.</p>
+          <p className="px-5 py-6 text-sm text-muted">Nothing yet.</p>
         ) : (
-          <ul className="flex flex-col gap-1 text-sm">
+          <ul className="divide-y divide-border">
             {activity.map((a) => (
-              <li key={a.id} className="flex justify-between border-b border-black/5 py-1 dark:border-white/5">
+              <li key={a.id} className="flex items-center justify-between px-5 py-2.5 text-sm">
                 <span>
-                  <span className="capitalize text-black/50 dark:text-white/50">{a.actorRole}</span>{" "}
-                  {a.action.replace(/_/g, " ")}
+                  <span className="badge-neutral mr-2 capitalize">{a.actorRole}</span>
+                  <span className="text-fg">{a.action.replace(/_/g, " ")}</span>
                 </span>
-                <span className="text-black/40">{formatCairo(a.createdAt, "d MMM, h:mm a")}</span>
+                <span className="text-faint">{formatCairo(a.createdAt, "d MMM, h:mm a")}</span>
               </li>
             ))}
           </ul>

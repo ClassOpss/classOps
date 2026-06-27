@@ -1,26 +1,160 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ----------------------------------------------------------------------------
+   Design tokens — a calm, professional light theme with an indigo brand accent.
+   Exposed as Tailwind v4 theme colors so utilities like bg-card / border-border /
+   text-muted / bg-brand are available everywhere.
+---------------------------------------------------------------------------- */
+@theme {
+  --color-canvas: #f7f8fa; /* app background */
+  --color-card: #ffffff; /* surfaces */
+  --color-card-muted: #f9fafb; /* subtle inner surfaces */
+  --color-border: #e8eaed; /* hairline borders */
+  --color-border-strong: #d6d9de;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --color-fg: #0f1729; /* primary text */
+  --color-muted: #5b6472; /* secondary text */
+  --color-faint: #98a1ae; /* tertiary text */
+
+  --color-brand: #4f46e5; /* indigo-600 */
+  --color-brand-hover: #4338ca; /* indigo-700 */
+  --color-brand-fg: #ffffff;
+  --color-brand-soft: #eef2ff; /* indigo-50 */
+  --color-brand-softfg: #4338ca;
+
+  --color-success: #15803d;
+  --color-success-soft: #f0fdf4;
+  --color-warn: #b45309;
+  --color-warn-soft: #fffbeb;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--color-canvas);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  h1, h2, h3 {
+    letter-spacing: -0.011em;
+  }
+  /* Refined focus ring across interactive elements */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-brand) 55%, transparent);
+    outline-offset: 1px;
+    border-radius: 6px;
+  }
+  /* Slim, unobtrusive scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-strong) transparent;
+  }
+  *::-webkit-scrollbar { width: 9px; height: 9px; }
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-border-strong);
+    border-radius: 9999px;
+    border: 2px solid var(--color-canvas);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
+/* ----------------------------------------------------------------------------
+   Reusable component classes
+---------------------------------------------------------------------------- */
+@layer components {
+  .card {
+    @apply rounded-xl border border-border bg-card;
+    box-shadow: 0 1px 2px rgba(16, 23, 41, 0.04), 0 1px 1px rgba(16, 23, 41, 0.02);
+  }
+
+  .page-title {
+    @apply text-[1.7rem] font-semibold tracking-tight text-fg;
+  }
+  .page-subtitle {
+    @apply mt-1 text-sm text-muted;
+  }
+  .section-title {
+    @apply text-sm font-semibold tracking-tight text-fg;
+  }
+  .eyebrow {
+    @apply text-[0.7rem] font-semibold uppercase tracking-wider text-faint;
+  }
+
+  /* Buttons — shared base on a grouped selector (no @apply of a custom class) */
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-lg px-3.5 py-2
+      text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary { @apply bg-brand text-brand-fg hover:bg-brand-hover; }
+  .btn-secondary { @apply border border-border-strong bg-card text-fg hover:bg-card-muted; }
+  .btn-ghost { @apply text-muted hover:bg-card-muted hover:text-fg; }
+  .btn-danger { @apply bg-danger text-white hover:opacity-90; }
+  .btn-sm { @apply px-2.5 py-1.5 text-[0.8rem]; }
+  /* Inline text-style action (used in dense tables) */
+  .link { @apply font-medium text-brand hover:underline; }
+
+  /* Form controls */
+  .input,
+  .select,
+  .textarea {
+    @apply w-full rounded-lg border border-border-strong bg-card px-3 py-2 text-sm text-fg
+      placeholder:text-faint focus:border-brand focus:outline-none;
+  }
+  .label {
+    @apply mb-1.5 block text-[0.8rem] font-medium text-muted;
+  }
+  .field-hint {
+    @apply mt-1 text-xs text-faint;
+  }
+
+  /* Badges — shared base on a grouped selector */
+  .badge,
+  .badge-neutral,
+  .badge-brand,
+  .badge-success,
+  .badge-warn,
+  .badge-danger {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+  .badge-neutral { @apply bg-card-muted text-muted; }
+  .badge-brand   { @apply bg-brand-soft text-brand-softfg; }
+  .badge-success { @apply bg-success-soft text-success; }
+  .badge-warn    { @apply bg-warn-soft text-warn; }
+  .badge-danger  { @apply bg-danger-soft text-danger; }
+
+  /* Tables */
+  .table {
+    @apply w-full border-collapse text-left text-sm;
+  }
+  .table thead th {
+    @apply border-b border-border px-3 py-2.5 text-[0.72rem] font-semibold uppercase
+      tracking-wide text-faint;
+  }
+  .table tbody td {
+    @apply border-b border-border px-3 py-2.5 align-middle text-fg;
+  }
+  .table tbody tr:last-child td { @apply border-b-0; }
+  .table tbody tr:hover td { background: var(--color-card-muted); }
 }
