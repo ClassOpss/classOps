@@ -28,7 +28,7 @@ export default async function StudentsPage({
     return (
       <div>
         <h1 className="text-xl font-semibold">Class not found</h1>
-        <Link href="/classes" className="text-sm text-blue-600 hover:underline">← Back to classes</Link>
+        <Link href="/classes" className="link text-sm">← Back to classes</Link>
       </div>
     );
   }
@@ -40,50 +40,49 @@ export default async function StudentsPage({
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-xl font-semibold">
-          {klass.name} — Students ({klass.students.length})
-        </h1>
-        <p className="mt-1 text-sm text-black/50 dark:text-white/50">
-          {klass.school.name} · {klass.yearGroup}
-        </p>
+        <Link href={`/classes/${classId}`} className="link text-sm">← {klass.name}</Link>
+        <h1 className="page-title mt-1">Students ({klass.students.length})</h1>
+        <p className="page-subtitle">{klass.school.name} · {klass.yearGroup}</p>
       </div>
 
       {user.role === "admin" && (
-        <section>
-          <h2 className="mb-3 font-medium">Import students from PDF</h2>
+        <section className="card p-5">
+          <h2 className="section-title mb-3">Import students from PDF</h2>
           <ImportStudents classId={classId} prefix={prefix} existingCodes={existingCodes} />
         </section>
       )}
 
       {user.role === "admin" && (
-        <section>
-          <h2 className="mb-3 font-medium">Add a student manually</h2>
+        <section className="card p-5">
+          <h2 className="section-title mb-3">Add a student manually</h2>
           <AddStudentForm classId={classId} suggestedCode={suggestedCode} />
         </section>
       )}
 
-      <section>
-        <h2 className="mb-3 font-medium">Roster</h2>
+      <section className="card overflow-hidden">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="section-title">Roster</h2>
+        </div>
         {klass.students.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">No students yet.</p>
+          <p className="px-5 py-6 text-sm text-muted">No students yet.</p>
         ) : (
-          <table className="w-full max-w-lg text-left text-sm">
-            <thead className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
+          <table className="table">
+            <thead>
               <tr>
-                <th className="w-20 py-2">Code</th>
-                <th className="py-2">Name</th>
-                {user.role === "admin" && <th className="w-20 py-2"></th>}
+                <th className="w-20">Code</th>
+                <th>Name</th>
+                {user.role === "admin" && <th className="w-20"></th>}
               </tr>
             </thead>
             <tbody>
               {klass.students.map((s) => (
-                <tr key={s.id} className="border-b border-black/5 dark:border-white/5">
-                  <td className="py-2">{s.code}</td>
-                  <td className="py-2">{s.name}</td>
+                <tr key={s.id}>
+                  <td><span className="badge-neutral">{s.code}</span></td>
+                  <td className="font-medium">{s.name}</td>
                   {user.role === "admin" && (
-                    <td className="py-2">
+                    <td>
                       <form action={deactivateStudent.bind(null, s.id)}>
-                        <button type="submit" className="text-sm text-red-600 hover:underline">
+                        <button type="submit" className="font-medium text-danger hover:underline">
                           Remove
                         </button>
                       </form>

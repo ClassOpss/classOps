@@ -33,7 +33,7 @@ export default async function PayPeriodPage({
     return (
       <div>
         <h1 className="text-xl font-semibold">Pay period not found</h1>
-        <Link href="/pay" className="text-sm text-blue-600 hover:underline">← Pay</Link>
+        <Link href="/pay" className="link text-sm">← Pay</Link>
       </div>
     );
   }

@@ -23,7 +23,7 @@ export default async function AssistantsPage({
     return (
       <div>
         <h1 className="text-xl font-semibold">Class not found</h1>
-        <Link href="/classes" className="text-sm text-blue-600 hover:underline">← Classes</Link>
+        <Link href="/classes" className="link text-sm">← Classes</Link>
       </div>
     );
   }
@@ -56,28 +56,28 @@ export default async function AssistantsPage({
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <Link href={`/classes/${classId}`} className="text-sm text-blue-600 hover:underline">← {klass.name}</Link>
-        <h1 className="mt-1 text-xl font-semibold">Assistants — {klass.name}</h1>
-        <p className="mt-1 text-sm text-black/50 dark:text-white/50">
+        <Link href={`/classes/${classId}`} className="link text-sm">← {klass.name}</Link>
+        <h1 className="page-title mt-1">Assistants</h1>
+        <p className="page-subtitle">
           {klass.school.name} · {studentCount} students · {assignments.length}/2 assistants
         </p>
       </div>
 
-      <section>
-        <h2 className="mb-3 font-medium">Assigned assistants</h2>
+      <section className="card p-5">
+        <h2 className="section-title mb-3">Assigned assistants</h2>
         {assignments.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">None assigned yet.</p>
+          <p className="text-sm text-muted">None assigned yet.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {assignments.map((a, i) => (
               <li key={a.id} className="flex items-center gap-3 text-sm">
                 <span className="font-medium">{a.assistant.name}</span>
                 {i === 0 && assignments.length > 1 && (
-                  <span className="text-xs text-black/40">(first — gets the extra student)</span>
+                  <span className="text-xs text-faint">(first — gets the extra student)</span>
                 )}
                 {isAdmin && (
-                  <form action={endAssignment.bind(null, a.id)}>
-                    <button type="submit" className="text-sm text-red-600 hover:underline">End</button>
+                  <form action={endAssignment.bind(null, a.id)} className="ml-auto">
+                    <button type="submit" className="font-medium text-danger hover:underline">End</button>
                   </form>
                 )}
               </li>
@@ -87,57 +87,53 @@ export default async function AssistantsPage({
       </section>
 
       {isAdmin && (
-        <section>
-          <h2 className="mb-3 font-medium">Assign an assistant</h2>
+        <section className="card p-5">
+          <h2 className="section-title mb-3">Assign an assistant</h2>
           <AssignAssistant classId={classId} available={available} />
         </section>
       )}
 
       {isAdmin && (
-        <section>
-          <h2 className="mb-1 font-medium">Divide students</h2>
-          <p className="mb-3 text-sm text-black/50 dark:text-white/50">
+        <section className="card p-5">
+          <h2 className="section-title mb-1">Divide students</h2>
+          <p className="mb-3 text-sm text-muted">
             Splits the roster into alphabetical halves between the two assistants (the first
             assistant gets the extra on odd counts). Re-running re-divides everyone.
           </p>
           <form action={autoDivideStudents.bind(null, classId)}>
-            <button
-              type="submit"
-              disabled={assignments.length < 2}
-              className="rounded-md border border-black/15 px-3 py-2 text-sm hover:bg-black/5 disabled:opacity-40 dark:border-white/20 dark:hover:bg-white/10"
-            >
+            <button type="submit" disabled={assignments.length < 2} className="btn-secondary">
               Auto-divide students
             </button>
           </form>
           {assignments.length < 2 && (
-            <p className="mt-2 text-xs text-black/40">Assign 2 assistants to enable dividing.</p>
+            <p className="mt-2 text-xs text-faint">Assign 2 assistants to enable dividing.</p>
           )}
         </section>
       )}
 
-      <section>
-        <h2 className="mb-3 font-medium">Sub-groups</h2>
+      <section className="card p-5">
+        <h2 className="section-title mb-3">Sub-groups</h2>
         {assignments.length <= 1 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">
+          <p className="text-sm text-muted">
             {assignments.length === 1
               ? `${assignments[0].assistant.name} is responsible for all ${studentCount} students.`
               : "No assistants assigned."}
           </p>
         ) : !divided ? (
-          <p className="text-sm text-amber-600">Two assistants assigned — run “Auto-divide students” to split the roster.</p>
+          <p className="text-sm text-warn">Two assistants assigned — run “Auto-divide students” to split the roster.</p>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2">
             {assignments.map((a) => {
               const list = studentsFor(a.assistant.id);
               return (
                 <div key={a.id}>
-                  <h3 className="mb-2 text-sm font-medium">
+                  <h3 className="mb-2 text-sm font-semibold">
                     {a.assistant.name} ({list.length})
                   </h3>
                   <ul className="flex flex-col gap-1 text-sm">
                     {list.map((s) => (
                       <li key={s.id}>
-                        <span className="text-black/40">{s.code}</span> {s.name}
+                        <span className="text-faint">{s.code}</span> {s.name}
                       </li>
                     ))}
                   </ul>

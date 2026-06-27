@@ -40,7 +40,7 @@ export default async function ParentUpdatePage({
     return (
       <div>
         <h1 className="text-lg font-semibold">Session not found</h1>
-        <Link href={`/my/classes/${classId}`} className="text-sm text-blue-600 hover:underline">← Back</Link>
+        <Link href={`/my/classes/${classId}`} className="link text-sm">← Back</Link>
       </div>
     );
   }
@@ -51,9 +51,9 @@ export default async function ParentUpdatePage({
   if (session.dayOff || notStarted) {
     return (
       <div className="flex flex-col gap-4">
-        <Link href={`/my/classes/${classId}`} className="text-sm text-blue-600 hover:underline">← Back</Link>
+        <Link href={`/my/classes/${classId}`} className="link text-sm">← Back</Link>
         <h1 className="text-lg font-semibold">Parent update</h1>
-        <p className="text-sm text-black/60 dark:text-white/60">
+        <p className="text-sm text-muted">
           {session.dayOff
             ? "This is a day off — no parent update to send."
             : "Send the parent update after the class has taken place."}

@@ -16,7 +16,7 @@ export type TopicDatum = { topic: string; avg: number; n: number };
 // Bar per topic; green above the overall average, red below (spec 5.14 colour rule).
 export function TopicChart({ data, overallAvg }: { data: TopicDatum[]; overallAvg: number }) {
   if (data.length === 0) {
-    return <p className="text-sm text-black/50 dark:text-white/50">No graded (non-diagnostic) assessments with a topic yet.</p>;
+    return <p className="text-sm text-muted">No graded (non-diagnostic) assessments with a topic yet.</p>;
   }
   return (
     <ResponsiveContainer width="100%" height={Math.max(180, data.length * 38)}>

@@ -79,66 +79,62 @@ export function ImportStudents({
     });
   }
 
-  const inputCls =
-    "w-full rounded-md border border-black/15 bg-white px-2 py-1 text-sm outline-none focus:border-black/40 dark:border-white/20 dark:bg-transparent";
+  const inputCls = "input !py-1.5";
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
-        <label className="inline-flex cursor-pointer items-center rounded-md border border-black/15 px-3 py-2 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10">
+        <label className="btn-secondary cursor-pointer">
           {parsing ? "Reading PDF…" : "Upload class-list PDF"}
           <input type="file" accept="application/pdf" className="hidden" onChange={onFile} disabled={parsing} />
         </label>
-        <button type="button" onClick={addRow} className="text-sm text-blue-600 hover:underline">
+        <button type="button" onClick={addRow} className="link text-sm">
           + Add row manually
         </button>
       </div>
 
-      {error ? <p className="text-sm text-amber-600">{error}</p> : null}
+      {error ? <p className="text-sm text-warn">{error}</p> : null}
       {result ? (
-        <p className="text-sm text-green-600">
+        <p className="text-sm text-success">
           {result.added} added{result.skipped ? `, ${result.skipped} skipped (duplicate/blank)` : ""}.
         </p>
       ) : null}
 
       {rows.length > 0 && (
         <>
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
-              <tr>
-                <th className="w-10 py-2">#</th>
-                <th className="py-2">Name</th>
-                <th className="w-28 py-2">Code</th>
-                <th className="w-16 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => (
-                <tr key={i} className="border-b border-black/5 dark:border-white/5">
-                  <td className="py-1 text-black/40">{i + 1}</td>
-                  <td className="py-1 pr-2">
-                    <input value={row.name} onChange={(e) => update(i, { name: e.target.value })} className={inputCls} />
-                  </td>
-                  <td className="py-1 pr-2">
-                    <input value={row.code} onChange={(e) => update(i, { code: e.target.value })} className={inputCls} />
-                  </td>
-                  <td className="py-1">
-                    <button type="button" onClick={() => removeRow(i)} className="text-sm text-red-600 hover:underline">
-                      Remove
-                    </button>
-                  </td>
+          <div className="card overflow-hidden">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th className="w-10">#</th>
+                  <th>Name</th>
+                  <th className="w-28">Code</th>
+                  <th className="w-16"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((row, i) => (
+                  <tr key={i}>
+                    <td className="text-faint">{i + 1}</td>
+                    <td className="pr-2">
+                      <input value={row.name} onChange={(e) => update(i, { name: e.target.value })} className={inputCls} />
+                    </td>
+                    <td className="pr-2">
+                      <input value={row.code} onChange={(e) => update(i, { code: e.target.value })} className={inputCls} />
+                    </td>
+                    <td>
+                      <button type="button" onClick={() => removeRow(i)} className="font-medium text-danger hover:underline">
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           <div>
-            <button
-              type="button"
-              onClick={save}
-              disabled={isSaving}
-              className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
-            >
+            <button type="button" onClick={save} disabled={isSaving} className="btn-primary">
               {isSaving ? "Importing…" : `Import ${rows.length} student${rows.length === 1 ? "" : "s"}`}
             </button>
           </div>

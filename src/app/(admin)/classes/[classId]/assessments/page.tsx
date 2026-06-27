@@ -46,43 +46,46 @@ export default async function AssessmentsAdminPage({
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <Link href={`/classes/${classId}`} className="text-sm text-blue-600 hover:underline">← {klass?.name}</Link>
-        <h1 className="mt-1 text-xl font-semibold">Assessments</h1>
+        <Link href={`/classes/${classId}`} className="link text-sm">← {klass?.name}</Link>
+        <h1 className="page-title mt-1">Assessments</h1>
       </div>
 
-      <section>
-        <h2 className="mb-3 font-medium">New assessment</h2>
+      <section className="card p-5">
+        <h2 className="section-title mb-3">New assessment</h2>
         <AssessmentForm classId={classId} />
       </section>
 
-      <section>
-        <h2 className="mb-3 font-medium">All assessments ({assessments.length})</h2>
+      <section className="card overflow-hidden">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="section-title">All assessments ({assessments.length})</h2>
+        </div>
         {assessments.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">None yet.</p>
+          <p className="px-5 py-6 text-sm text-muted">None yet.</p>
         ) : (
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
+          <div className="overflow-x-auto">
+          <table className="table">
+            <thead>
               <tr>
-                <th className="py-2">Label</th>
-                <th className="py-2">Type</th>
-                <th className="py-2">Date</th>
-                <th className="py-2">Max</th>
-                <th className="py-2">Grades</th>
-                <th className="py-2"></th>
+                <th>Label</th>
+                <th>Type</th>
+                <th>Date</th>
+                <th>Max</th>
+                <th>Grades</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {assessments.map((a) => (
-                <tr key={a.id} className="border-b border-black/5 dark:border-white/5">
-                  <td className="py-2">
+                <tr key={a.id}>
+                  <td className="font-medium">
                     {a.label}
-                    {a.isDiagnostic ? <span className="ml-1 text-xs text-black/40">· Diagnostic</span> : null}
+                    {a.isDiagnostic ? <span className="ml-1.5 badge-neutral">Diagnostic</span> : null}
                   </td>
-                  <td className="py-2">{TYPE_LABEL[a.type]}</td>
-                  <td className="py-2">{dateFmt.format(a.date)}</td>
-                  <td className="py-2">{a.maxMark}</td>
-                  <td className="py-2">{a._count.grades}</td>
-                  <td className="py-2">
+                  <td className="text-muted">{TYPE_LABEL[a.type]}</td>
+                  <td className="text-muted">{dateFmt.format(a.date)}</td>
+                  <td>{a.maxMark}</td>
+                  <td>{a._count.grades}</td>
+                  <td>
                     <div className="flex flex-col gap-1">
                       <QuizAnnouncement
                         message={buildQuizAnnouncement(
@@ -96,7 +99,7 @@ export default async function AssessmentsAdminPage({
                       />
                       {user.role === "admin" && a._count.grades === 0 && (
                         <form action={deleteAssessment.bind(null, a.id)}>
-                          <button type="submit" className="text-red-600 hover:underline">Delete</button>
+                          <button type="submit" className="font-medium text-danger hover:underline">Delete</button>
                         </form>
                       )}
                     </div>
@@ -105,6 +108,7 @@ export default async function AssessmentsAdminPage({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
     </div>

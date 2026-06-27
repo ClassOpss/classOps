@@ -28,7 +28,7 @@ export default async function GradeEntryPage({
     return (
       <div>
         <h1 className="text-lg font-semibold">Assessment not found</h1>
-        <Link href={`/my/classes/${classId}/assessments`} className="text-sm text-blue-600 hover:underline">← Assessments</Link>
+        <Link href={`/my/classes/${classId}/assessments`} className="link text-sm">← Assessments</Link>
       </div>
     );
   }

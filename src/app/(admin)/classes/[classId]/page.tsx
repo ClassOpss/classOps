@@ -37,7 +37,7 @@ export default async function ClassOverviewPage({
     return (
       <div>
         <h1 className="text-xl font-semibold">Class not found</h1>
-        <Link href="/classes" className="text-sm text-blue-600 hover:underline">← Back to classes</Link>
+        <Link href="/classes" className="link text-sm">← Back to classes</Link>
       </div>
     );
   }
@@ -57,74 +57,61 @@ export default async function ClassOverviewPage({
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <Link href="/classes" className="text-sm text-blue-600 hover:underline">← Classes</Link>
-        <h1 className="mt-1 text-xl font-semibold">{klass.name}</h1>
-        <p className="mt-1 text-sm text-black/50 dark:text-white/50">
+        <Link href="/classes" className="link text-sm">← Classes</Link>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <h1 className="page-title">{klass.name}</h1>
+          <span className={klass.active ? "badge-success" : "badge-neutral"}>
+            {klass.active ? "Active" : "Inactive"}
+          </span>
+        </div>
+        <p className="page-subtitle">
           {klass.school.name} · {klass.yearGroup} · {scheduleLabel(klass.schedule as object)} ·{" "}
-          {klass._count.students} students · {klass.active ? "Active" : "Inactive"}
+          {klass._count.students} students
         </p>
       </div>
 
-      <div className="flex gap-4 text-sm">
-        <Link href={`/classes/${classId}/students`} className="text-blue-600 hover:underline">
-          Manage students →
-        </Link>
-        <Link href={`/classes/${classId}/assistants`} className="text-blue-600 hover:underline">
-          Assistants &amp; sub-groups →
-        </Link>
-        <Link href={`/classes/${classId}/sessions`} className="text-blue-600 hover:underline">
-          Sessions &amp; day-offs →
-        </Link>
-        <Link href={`/classes/${classId}/assessments`} className="text-blue-600 hover:underline">
-          Assessments →
-        </Link>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { href: `/classes/${classId}/students`, label: "Manage students" },
+          { href: `/classes/${classId}/assistants`, label: "Assistants & sub-groups" },
+          { href: `/classes/${classId}/sessions`, label: "Sessions & day-offs" },
+          { href: `/classes/${classId}/assessments`, label: "Assessments" },
+        ].map((l) => (
+          <Link key={l.href} href={l.href} className="card flex items-center justify-between px-4 py-3 text-sm font-medium text-fg transition-colors hover:border-border-strong">
+            {l.label}
+            <span className="text-faint">→</span>
+          </Link>
+        ))}
       </div>
 
-      <section>
-        <h2 className="mb-2 font-medium">Monthly report (PDF)</h2>
+      <section className="card p-5">
+        <h2 className="section-title mb-3">Monthly report (PDF)</h2>
         <form
           action={`/api/reports/class/${classId}`}
           method="get"
           target="_blank"
           className="flex flex-wrap items-end gap-2"
         >
-          <select
-            name="month"
-            defaultValue={new Date().getUTCMonth() + 1}
-            className="rounded-md border border-black/15 bg-white px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
-          >
+          <select name="month" defaultValue={new Date().getUTCMonth() + 1} className="select w-auto">
             {MONTHS.map((m, i) => (
               <option key={m} value={i + 1}>{m}</option>
             ))}
           </select>
-          <input
-            name="year"
-            type="number"
-            defaultValue={new Date().getUTCFullYear()}
-            className="w-24 rounded-md border border-black/15 bg-white px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
-          />
-          <button
-            type="submit"
-            className="rounded-md border border-black/15 px-3 py-2 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
-          >
-            Download PDF
-          </button>
+          <input name="year" type="number" defaultValue={new Date().getUTCFullYear()} className="input w-24" />
+          <button type="submit" className="btn-secondary">Download PDF</button>
         </form>
       </section>
 
       {isAdmin && (
         <>
-          <section>
-            <h2 className="mb-3 font-medium">Edit class</h2>
+          <section className="card p-5">
+            <h2 className="section-title mb-3">Edit class</h2>
             <EditClassForm classId={classId} schools={schools} defaults={defaults} />
           </section>
 
           <section>
             <form action={setClassActive.bind(null, classId, !klass.active)}>
-              <button
-                type="submit"
-                className="rounded-md border border-black/15 px-3 py-2 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
-              >
+              <button type="submit" className="btn-secondary">
                 {klass.active ? "Deactivate class" : "Reactivate class"}
               </button>
             </form>

@@ -42,7 +42,7 @@ export default async function AttendancePage({
     return (
       <div>
         <h1 className="text-lg font-semibold">Session not found</h1>
-        <Link href={`/my/classes/${classId}`} className="text-sm text-blue-600 hover:underline">← Back</Link>
+        <Link href={`/my/classes/${classId}`} className="link text-sm">← Back</Link>
       </div>
     );
   }

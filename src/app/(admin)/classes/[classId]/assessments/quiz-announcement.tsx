@@ -8,16 +8,12 @@ export function QuizAnnouncement({ message }: { message: string }) {
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="text-blue-600 hover:underline"
-      >
+      <button type="button" onClick={() => setOpen((o) => !o)} className="link">
         {open ? "Hide announcement" : "Quiz announcement"}
       </button>
       {open && (
         <div className="mt-2 flex flex-col gap-2">
-          <pre className="whitespace-pre-wrap rounded-md border border-black/10 bg-black/[.03] p-3 text-xs dark:border-white/10 dark:bg-white/[.04]">
+          <pre className="whitespace-pre-wrap rounded-lg border border-border bg-card-muted p-3 text-xs">
             {message}
           </pre>
           <button
@@ -31,7 +27,7 @@ export function QuizAnnouncement({ message }: { message: string }) {
               setCopied(true);
               setTimeout(() => setCopied(false), 2000);
             }}
-            className="self-start rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90"
+            className="btn-primary btn-sm self-start"
           >
             {copied ? "Copied!" : "Copy message"}
           </button>

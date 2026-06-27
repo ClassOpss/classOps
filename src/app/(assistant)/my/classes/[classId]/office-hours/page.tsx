@@ -27,7 +27,7 @@ export default async function OfficeHoursPage({
     return (
       <div>
         <h1 className="text-lg font-semibold">Class not found</h1>
-        <Link href="/my" className="text-sm text-blue-600 hover:underline">← My Classes</Link>
+        <Link href="/my" className="link text-sm">← My Classes</Link>
       </div>
     );
   }

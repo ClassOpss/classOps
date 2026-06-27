@@ -39,7 +39,7 @@ export default async function HomeworkEntryPage({
     return (
       <div>
         <h1 className="text-lg font-semibold">Homework not found</h1>
-        <Link href={`/my/classes/${classId}/homework`} className="text-sm text-blue-600 hover:underline">← Homework</Link>
+        <Link href={`/my/classes/${classId}/homework`} className="link text-sm">← Homework</Link>
       </div>
     );
   }
