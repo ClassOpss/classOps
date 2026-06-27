@@ -16,7 +16,7 @@ export function CopyMessage({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }}
-      className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90"
+      className={copied ? "btn-secondary" : "btn-primary"}
     >
       {copied ? "Copied!" : "Copy message"}
     </button>

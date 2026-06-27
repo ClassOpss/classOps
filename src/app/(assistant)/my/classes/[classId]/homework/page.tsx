@@ -41,12 +41,12 @@ export default async function HomeworkListPage({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Link href={`/my/classes/${classId}`} className="text-sm text-blue-600 hover:underline">← {klass?.name}</Link>
-        <h1 className="mt-1 text-lg font-semibold">Homework</h1>
+        <Link href={`/my/classes/${classId}`} className="link text-sm">← {klass?.name}</Link>
+        <h1 className="mt-1 text-lg font-semibold tracking-tight">Homework</h1>
       </div>
 
       {homeworks.length === 0 ? (
-        <p className="text-sm text-black/60 dark:text-white/60">
+        <p className="card px-4 py-6 text-center text-sm text-muted">
           No homework assigned yet. Homework is added from a session&apos;s lesson details.
         </p>
       ) : (
@@ -58,15 +58,15 @@ export default async function HomeworkListPage({
               <li key={hw.id}>
                 <Link
                   href={`/my/classes/${classId}/homework/${hw.id}`}
-                  className="block rounded-lg border border-black/10 p-3 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+                  className="card block p-3.5 transition-colors hover:border-border-strong"
                 >
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">{hw.description ?? "Homework"}</p>
-                    <span className={`text-sm ${complete ? "text-green-600" : "text-amber-600"}`}>
-                      {complete ? "Complete" : `${reviewed}/${total} reviewed →`}
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold">{hw.description ?? "Homework"}</p>
+                    <span className={complete ? "badge-success" : "badge-warn"}>
+                      {complete ? "Complete" : `${reviewed}/${total} reviewed`}
                     </span>
                   </div>
-                  <p className="text-sm text-black/50 dark:text-white/50">
+                  <p className="mt-0.5 text-sm text-muted">
                     Due {dateFmt.format(hw.deadline)} · enter by {formatCairo(saturdayDeadline(hw.deadline, cfg), "EEE d MMM, h:mm a")}
                   </p>
                 </Link>

@@ -57,34 +57,36 @@ export default async function OfficeHoursPage({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href={`/my/classes/${classId}`} className="text-sm text-blue-600 hover:underline">← {klass.name}</Link>
-        <h1 className="mt-1 text-lg font-semibold">Office hours</h1>
-        <p className="text-sm text-black/50 dark:text-white/50">{sessions.length} logged · +100 EGP each</p>
+        <Link href={`/my/classes/${classId}`} className="link text-sm">← {klass.name}</Link>
+        <h1 className="mt-1 text-lg font-semibold tracking-tight">Office hours</h1>
+        <p className="text-sm text-muted">{sessions.length} logged · +100 EGP each</p>
       </div>
 
-      <section>
-        <h2 className="mb-3 font-medium">Log a session</h2>
+      <section className="card p-4">
+        <h2 className="section-title mb-3">Log a session</h2>
         <OfficeHourForm classId={classId} students={students} topics={topics} />
       </section>
 
-      <section>
-        <h2 className="mb-3 font-medium">Logged sessions</h2>
+      <section className="card overflow-hidden">
+        <div className="border-b border-border px-4 py-3">
+          <h2 className="section-title">Logged sessions</h2>
+        </div>
         {sessions.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">None yet.</p>
+          <p className="px-4 py-5 text-sm text-muted">None yet.</p>
         ) : (
-          <ul className="flex flex-col gap-1 text-sm">
+          <ul className="divide-y divide-border text-sm">
             {sessions.map((s) => (
-              <li key={s.id} className="flex items-center gap-3 border-b border-black/5 py-2 dark:border-white/5">
+              <li key={s.id} className="flex items-center gap-3 px-4 py-2.5">
                 <span className="flex-1">
                   <span className="font-medium">{s.student.name}</span>
                   {s.topic?.title || s.topicNotes ? (
-                    <span className="text-black/50 dark:text-white/50"> · {s.topic?.title ?? s.topicNotes}</span>
+                    <span className="text-muted"> · {s.topic?.title ?? s.topicNotes}</span>
                   ) : null}
-                  {s.durationMin ? <span className="text-black/40"> · {s.durationMin}m</span> : null}
+                  {s.durationMin ? <span className="text-faint"> · {s.durationMin}m</span> : null}
                 </span>
-                <span className="text-black/40">{dateFmt.format(s.date)}</span>
+                <span className="text-faint">{dateFmt.format(s.date)}</span>
                 <form action={deleteOfficeHour.bind(null, s.id)}>
-                  <button type="submit" className="text-red-600 hover:underline">Remove</button>
+                  <button type="submit" className="font-medium text-danger hover:underline">Remove</button>
                 </form>
               </li>
             ))}

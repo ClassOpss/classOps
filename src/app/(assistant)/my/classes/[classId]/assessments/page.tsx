@@ -41,12 +41,12 @@ export default async function AssessmentsListPage({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Link href={`/my/classes/${classId}`} className="text-sm text-blue-600 hover:underline">← {klass?.name}</Link>
-        <h1 className="mt-1 text-lg font-semibold">Assessments</h1>
+        <Link href={`/my/classes/${classId}`} className="link text-sm">← {klass?.name}</Link>
+        <h1 className="mt-1 text-lg font-semibold tracking-tight">Assessments</h1>
       </div>
 
       {assessments.length === 0 ? (
-        <p className="text-sm text-black/60 dark:text-white/60">No assessments yet.</p>
+        <p className="card px-4 py-6 text-center text-sm text-muted">No assessments yet.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {assessments.map((a) => {
@@ -56,18 +56,18 @@ export default async function AssessmentsListPage({
               <li key={a.id}>
                 <Link
                   href={`/my/classes/${classId}/assessments/${a.id}`}
-                  className="block rounded-lg border border-black/10 p-3 hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+                  className="card block p-3.5 transition-colors hover:border-border-strong"
                 >
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold">
                       {a.label}
-                      {a.isDiagnostic ? <span className="ml-1 text-xs text-black/40">· Diagnostic</span> : null}
+                      {a.isDiagnostic ? <span className="ml-1.5 badge-neutral">Diagnostic</span> : null}
                     </p>
-                    <span className={`text-sm ${complete ? "text-green-600" : "text-amber-600"}`}>
-                      {complete ? "Complete" : `${graded}/${total} graded →`}
+                    <span className={complete ? "badge-success" : "badge-warn"}>
+                      {complete ? "Complete" : `${graded}/${total} graded`}
                     </span>
                   </div>
-                  <p className="text-sm text-black/50 dark:text-white/50">
+                  <p className="mt-0.5 text-sm text-muted">
                     {dateFmt.format(a.date)} · max {a.maxMark} · enter by{" "}
                     {formatCairo(saturdayDeadline(a.date, cfg), "EEE d MMM, h:mm a")}
                   </p>

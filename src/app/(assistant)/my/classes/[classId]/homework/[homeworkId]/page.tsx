@@ -13,9 +13,9 @@ const dateFmt = new Intl.DateTimeFormat("en-GB", {
 });
 
 const STATUS_STYLE: Record<string, string> = {
-  on_time: "text-green-600",
-  late: "text-amber-600",
-  missing: "text-red-600",
+  on_time: "badge-success",
+  late: "badge-warn",
+  missing: "badge-danger",
 };
 const STATUS_LABEL: Record<string, string> = {
   on_time: "On time",
@@ -71,32 +71,25 @@ export default async function HomeworkEntryPage({
   const late = completionAt ? isLate(completionAt, correctionDeadline) : false;
 
   const deadlineValue = homework.deadline.toISOString().slice(0, 10);
-  const inputCls =
-    "rounded-md border border-black/15 bg-white px-2 py-1 text-sm outline-none focus:border-black/40 dark:border-white/20 dark:bg-transparent";
+  const inputCls = "input";
 
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Link href={`/my/classes/${classId}/homework`} className="text-sm text-blue-600 hover:underline">← Homework</Link>
-        <h1 className="mt-1 text-lg font-semibold">{homework.description ?? "Homework"}</h1>
-        <p className="text-sm text-black/50 dark:text-white/50">
+        <Link href={`/my/classes/${classId}/homework`} className="link text-sm">← Homework</Link>
+        <h1 className="mt-1 text-lg font-semibold tracking-tight">{homework.description ?? "Homework"}</h1>
+        <p className="text-sm text-muted">
           Due {dateFmt.format(homework.deadline)} · enter by {formatCairo(correctionDeadline, "EEE d MMM, h:mm a")}
         </p>
       </div>
 
       {complete ? (
-        <div
-          className={`rounded-md p-3 text-sm ${
-            late
-              ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30"
-              : "bg-green-50 text-green-700 dark:bg-green-950/30"
-          }`}
-        >
+        <div className={`rounded-lg px-3 py-2.5 text-sm ${late ? "bg-warn-soft text-warn" : "bg-success-soft text-success"}`}>
           All {total} reviewed · completed {completionAt ? formatCairo(completionAt) : ""} —{" "}
           {late ? "Late (after 9pm Saturday)" : "On time"}
         </div>
       ) : (
-        <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-950/30">
+        <div className="rounded-lg bg-warn-soft px-3 py-2.5 text-sm text-warn">
           Incomplete — {reviewed} of {total} students reviewed. Mark every student before this
           counts as done.
         </div>
@@ -104,9 +97,9 @@ export default async function HomeworkEntryPage({
 
       <form action={submitHomeworkSubmissions.bind(null, homeworkId)} className="flex flex-col gap-3">
         {students.length === 0 ? (
-          <p className="text-sm text-black/60 dark:text-white/60">No students assigned to you in this class.</p>
+          <p className="card px-4 py-5 text-sm text-muted">No students assigned to you in this class.</p>
         ) : (
-          <ul className="flex flex-col gap-3">
+          <ul className="flex flex-col gap-2">
             {students.map((s) => {
               const sub = byStudent.get(s.id);
               const isSubmitted = !!sub && sub.submissionDate !== null;
@@ -117,26 +110,24 @@ export default async function HomeworkEntryPage({
               return (
                 <li
                   key={s.id}
-                  className={`rounded-md border-l-2 pl-3 pb-3 ${
-                    sub ? "border-transparent" : "border-amber-400"
-                  }`}
+                  className={`card p-3.5 ${sub ? "" : "border-l-2 border-l-warn"}`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-medium">{s.name}</span>
+                    <span className="font-semibold">{s.name}</span>
                     {sub?.status ? (
-                      <span className={`text-xs ${STATUS_STYLE[sub.status]}`}>{STATUS_LABEL[sub.status]}</span>
+                      <span className={STATUS_STYLE[sub.status]}>{STATUS_LABEL[sub.status]}</span>
                     ) : (
-                      <span className="text-xs text-amber-600">needs review</span>
+                      <span className="badge-warn">needs review</span>
                     )}
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-3">
-                    <label className="flex items-center gap-1 text-sm">
-                      <input type="radio" name={`state_${s.id}`} value="submitted" defaultChecked={isSubmitted} />
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-1.5 text-sm">
+                      <input type="radio" name={`state_${s.id}`} value="submitted" defaultChecked={isSubmitted} className="accent-brand" />
                       Submitted
                     </label>
-                    <input type="date" name={`date_${s.id}`} defaultValue={dateVal} className={inputCls} />
-                    <label className="flex items-center gap-1 text-sm">
-                      <input type="radio" name={`state_${s.id}`} value="not_submitted" defaultChecked={isNotSubmitted} />
+                    <input type="date" name={`date_${s.id}`} defaultValue={dateVal} className="input w-auto !py-1.5" />
+                    <label className="flex items-center gap-1.5 text-sm">
+                      <input type="radio" name={`state_${s.id}`} value="not_submitted" defaultChecked={isNotSubmitted} className="accent-brand" />
                       Not submitted
                     </label>
                   </div>
@@ -144,7 +135,7 @@ export default async function HomeworkEntryPage({
                     name={`weak_${s.id}`}
                     defaultValue={sub?.weakPoints ?? ""}
                     placeholder="weak points (optional)"
-                    className={`${inputCls} mt-2 w-full`}
+                    className={`${inputCls} mt-2`}
                   />
                 </li>
               );
@@ -152,10 +143,7 @@ export default async function HomeworkEntryPage({
           </ul>
         )}
         {students.length > 0 && (
-          <button
-            type="submit"
-            className="mt-1 self-start rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90"
-          >
+          <button type="submit" className="btn-primary self-start">
             Save homework data
           </button>
         )}

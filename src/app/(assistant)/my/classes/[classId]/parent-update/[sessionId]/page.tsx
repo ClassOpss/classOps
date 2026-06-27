@@ -94,43 +94,34 @@ export default async function ParentUpdatePage({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Link href={`/my/classes/${classId}`} className="text-sm text-blue-600 hover:underline">← Back</Link>
-        <h1 className="mt-1 text-lg font-semibold">Parent update</h1>
-        <p className="text-sm text-black/50 dark:text-white/50">
+        <Link href={`/my/classes/${classId}`} className="link text-sm">← Back</Link>
+        <h1 className="mt-1 text-lg font-semibold tracking-tight">Parent update</h1>
+        <p className="text-sm text-muted">
           {longDate.format(session.scheduledDate)} · {session.class.name}
         </p>
       </div>
 
       {attendance.length === 0 && (
-        <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-950/30">
+        <p className="rounded-lg bg-warn-soft px-3 py-2.5 text-sm text-warn">
           Log attendance first so absentees appear in the message.
         </p>
       )}
 
-      <pre className="whitespace-pre-wrap rounded-lg border border-black/10 bg-black/[.03] p-4 text-sm dark:border-white/10 dark:bg-white/[.04]">
+      <pre className="card whitespace-pre-wrap bg-card-muted p-4 text-sm">
         {message}
       </pre>
 
       <div className="flex flex-wrap items-center gap-3">
         <CopyMessage text={message} />
         <form action={markParentUpdateSent.bind(null, sessionId)}>
-          <button
-            type="submit"
-            className="rounded-md border border-black/15 px-4 py-2 text-sm hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
-          >
+          <button type="submit" className="btn-secondary">
             {sentAt ? "Mark as sent again" : "Mark as sent →"}
           </button>
         </form>
       </div>
 
       {sentAt && (
-        <div
-          className={`rounded-md p-3 text-sm ${
-            late
-              ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30"
-              : "bg-green-50 text-green-700 dark:bg-green-950/30"
-          }`}
-        >
+        <div className={`rounded-lg px-3 py-2.5 text-sm ${late ? "bg-warn-soft text-warn" : "bg-success-soft text-success"}`}>
           Sent at {formatCairo(sentAt)} — {late ? "Late (after the 9pm deadline)" : "On time"}
         </div>
       )}

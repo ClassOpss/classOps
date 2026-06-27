@@ -73,30 +73,24 @@ export default async function GradeEntryPage({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <Link href={`/my/classes/${classId}/assessments`} className="text-sm text-blue-600 hover:underline">← Assessments</Link>
-        <h1 className="mt-1 text-lg font-semibold">
+        <Link href={`/my/classes/${classId}/assessments`} className="link text-sm">← Assessments</Link>
+        <h1 className="mt-1 text-lg font-semibold tracking-tight">
           {assessment.label}
-          {assessment.isDiagnostic ? <span className="ml-1 text-xs text-black/40">· Diagnostic</span> : null}
+          {assessment.isDiagnostic ? <span className="ml-1.5 badge-neutral">Diagnostic</span> : null}
         </h1>
-        <p className="text-sm text-black/50 dark:text-white/50">
+        <p className="text-sm text-muted">
           {dateFmt.format(assessment.date)} · max {assessment.maxMark} · enter by{" "}
           {formatCairo(correctionDeadline, "EEE d MMM, h:mm a")}
         </p>
       </div>
 
       {complete ? (
-        <div
-          className={`rounded-md p-3 text-sm ${
-            late
-              ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30"
-              : "bg-green-50 text-green-700 dark:bg-green-950/30"
-          }`}
-        >
+        <div className={`rounded-lg px-3 py-2.5 text-sm ${late ? "bg-warn-soft text-warn" : "bg-success-soft text-success"}`}>
           All {total} graded · completed {completionAt ? formatCairo(completionAt) : ""} —{" "}
           {late ? "Late (after 9pm Saturday)" : "On time"}
         </div>
       ) : (
-        <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-950/30">
+        <div className="rounded-lg bg-warn-soft px-3 py-2.5 text-sm text-warn">
           Incomplete — {reviewed} of {total} students graded.
         </div>
       )}
