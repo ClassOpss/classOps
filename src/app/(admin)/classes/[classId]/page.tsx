@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { setClassActive } from "@/actions/classes";
-import { scheduleDays, scheduleTime, scheduleLabel } from "@/lib/schedule";
+import { scheduleSlots, scheduleLabel } from "@/lib/schedule";
 import { currentOperationId } from "@/lib/operation";
 import { EditClassForm, type ClassDefaults } from "./edit-class-form";
 
@@ -42,13 +42,12 @@ export default async function ClassOverviewPage({
     );
   }
 
-  const days = scheduleDays(klass.schedule as object);
+  const slots = scheduleSlots(klass.schedule as object);
   const defaults: ClassDefaults = {
     schoolId: klass.schoolId,
     yearGroup: klass.yearGroup,
     name: klass.name,
-    days: days.length ? days : ["Sunday"],
-    time: scheduleTime(klass.schedule as object) ?? "16:00",
+    times: Object.fromEntries(slots.map((s) => [s.day, s.time || "16:00"])),
     planStartDate: toDateInput(klass.planStartDate),
     notes: klass.notes ?? "",
   };

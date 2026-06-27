@@ -37,6 +37,35 @@
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 
+/* Dark theme — applied automatically when the OS prefers dark. The utilities all
+   read these CSS variables, so overriding them here re-themes the whole app. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas: #0b0e14;
+    --color-card: #151a22;
+    --color-card-muted: #1c222d;
+    --color-border: #272e3a;
+    --color-border-strong: #3a4354;
+
+    --color-fg: #e8ebf1;
+    --color-muted: #9aa4b3;
+    --color-faint: #66707f;
+
+    --color-brand: #6366f1;
+    --color-brand-hover: #7c7ef7;
+    --color-brand-fg: #ffffff;
+    --color-brand-soft: #20243c;
+    --color-brand-softfg: #c7d2fe;
+
+    --color-success: #4ade80;
+    --color-success-soft: #16271d;
+    --color-warn: #fbbf24;
+    --color-warn-soft: #2a2210;
+    --color-danger: #f87171;
+    --color-danger-soft: #2a1518;
+  }
+}
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;

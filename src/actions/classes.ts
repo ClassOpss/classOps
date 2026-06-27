@@ -14,19 +14,30 @@ const classSchema = z.object({
   schoolId: z.string().min(1, "Pick a school."),
   yearGroup: z.enum(["Y9", "Y10", "S1"]),
   name: z.string().min(1, "Name is required.").max(100),
-  days: z.array(z.enum(DAYS)).min(1, "Pick at least one day."),
-  time: z.string().regex(/^\d{2}:\d{2}$/, "Time must be HH:MM."),
+  // One slot per selected weekday, each with its own start time.
+  slots: z
+    .array(
+      z.object({
+        day: z.enum(DAYS),
+        time: z.string().regex(/^\d{2}:\d{2}$/, "Each day needs a start time."),
+      }),
+    )
+    .min(1, "Pick at least one day."),
   planStartDate: z.string().optional(),
   notes: z.string().optional(),
 });
 
 function parseForm(formData: FormData) {
+  // A day is selected when its checkbox is on; pair it with its own time input.
+  const slots = DAYS.filter((d) => formData.get(`day_${d}`) === "on").map((d) => ({
+    day: d,
+    time: String(formData.get(`time_${d}`) ?? "").trim() || "16:00",
+  }));
   return classSchema.safeParse({
     schoolId: String(formData.get("schoolId") ?? ""),
     yearGroup: String(formData.get("yearGroup") ?? ""),
     name: String(formData.get("name") ?? "").trim(),
-    days: formData.getAll("days").map(String),
-    time: String(formData.get("time") ?? ""),
+    slots,
     planStartDate: String(formData.get("planStartDate") ?? "").trim() || undefined,
     notes: String(formData.get("notes") ?? "").trim() || undefined,
   });
@@ -44,7 +55,7 @@ export async function createClass(_prev: FormState, formData: FormData): Promise
       schoolId: d.schoolId,
       yearGroup: d.yearGroup,
       name: d.name,
-      schedule: { days: d.days, time: d.time },
+      schedule: { slots: d.slots },
       planStartDate: d.planStartDate ? new Date(d.planStartDate) : null,
       notes: d.notes,
     },
@@ -77,7 +88,7 @@ export async function updateClass(
       schoolId: d.schoolId,
       yearGroup: d.yearGroup,
       name: d.name,
-      schedule: { days: d.days, time: d.time },
+      schedule: { slots: d.slots },
       planStartDate: d.planStartDate ? new Date(d.planStartDate) : null,
       notes: d.notes,
     },

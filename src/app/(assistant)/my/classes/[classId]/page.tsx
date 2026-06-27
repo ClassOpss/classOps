@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireClassAccess } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { sessionStart } from "@/lib/datetime";
-import { scheduleTime } from "@/lib/schedule";
+import { scheduleTimeForDate } from "@/lib/schedule";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   weekday: "short",
@@ -56,7 +56,7 @@ export default async function AssistantClassPage({
     },
   })) as SessionRow[];
 
-  const time = scheduleTime(klass.schedule as object);
+  const schedule = klass.schedule as object;
   const now = new Date();
   const myId = user.assistantId;
 
@@ -68,7 +68,7 @@ export default async function AssistantClassPage({
 
   function SessionItem({ s }: { s: SessionRow }) {
     const logged = s._count.attendance > 0;
-    const upcoming = !s.dayOff && now < sessionStart(s.scheduledDate, time);
+    const upcoming = !s.dayOff && now < sessionStart(s.scheduledDate, scheduleTimeForDate(schedule, s.scheduledDate));
     const loggable = !s.dayOff && !upcoming;
     const status = s.dayOff ? "Day off" : upcoming ? "Upcoming" : logged ? "Logged" : "Log →";
     const badgeCls =

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireClassAccess } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { sessionStart } from "@/lib/datetime";
+import { scheduleTimeForDate } from "@/lib/schedule";
 
 // Record that the assistant sent the class-update message (spec 5.5). sent_at drives the
 // 9pm lateness check (shown in the UI; the incident record itself lands in the cron step).
@@ -25,8 +26,8 @@ export async function markParentUpdateSent(sessionId: string): Promise<void> {
   if (!user.assistantId) return;
   if (session.dayOff) return;
 
-  const sched = (session.class.schedule ?? {}) as { time?: string };
-  if (new Date() < sessionStart(session.scheduledDate, sched.time)) return;
+  const time = scheduleTimeForDate(session.class.schedule as object, session.scheduledDate);
+  if (new Date() < sessionStart(session.scheduledDate, time)) return;
 
   await prisma.parentUpdateLog.upsert({
     where: { sessionId },

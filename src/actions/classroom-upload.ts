@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireClassAccess } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { sessionStart } from "@/lib/datetime";
+import { scheduleTimeForDate } from "@/lib/schedule";
 
 // Spec 5.6: assistant marks the session's materials as uploaded to Google Classroom.
 // uploaded_at drives the 9pm lateness check (incident record lands in the cron step).
@@ -25,8 +26,8 @@ export async function markClassroomUploaded(sessionId: string, formData: FormDat
   if (!user.assistantId) return;
   if (session.dayOff) return;
 
-  const sched = (session.class.schedule ?? {}) as { time?: string };
-  if (new Date() < sessionStart(session.scheduledDate, sched.time)) return;
+  const time = scheduleTimeForDate(session.class.schedule as object, session.scheduledDate);
+  if (new Date() < sessionStart(session.scheduledDate, time)) return;
 
   const notes = String(formData.get("notes") ?? "").trim() || null;
 

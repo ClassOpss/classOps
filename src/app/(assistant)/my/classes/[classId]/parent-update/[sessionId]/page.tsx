@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { markParentUpdateSent } from "@/actions/parent-update";
 import { buildClassUpdateMessage } from "@/lib/whatsapp/class-update";
 import { sessionStart, sessionDeadline, isLate, formatCairo } from "@/lib/datetime";
+import { scheduleTimeForDate } from "@/lib/schedule";
 import { resolveConfig } from "@/lib/operation";
 import { CopyMessage } from "./copy-message";
 
@@ -45,8 +46,8 @@ export default async function ParentUpdatePage({
     );
   }
 
-  const sched = (session.class.schedule ?? {}) as { time?: string };
-  const notStarted = !session.dayOff && new Date() < sessionStart(session.scheduledDate, sched.time);
+  const startTime = scheduleTimeForDate(session.class.schedule as object, session.scheduledDate);
+  const notStarted = !session.dayOff && new Date() < sessionStart(session.scheduledDate, startTime);
 
   if (session.dayOff || notStarted) {
     return (

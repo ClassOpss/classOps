@@ -49,7 +49,7 @@ export function NewOperationForm({ defaults }: { defaults: OperationDefaults }) 
           </label>
           <label className={label}>
             Teacher full name
-            <input name="teacherName" required placeholder="Mohamed …" className={input} />
+            <input name="teacherName" required placeholder="Omar Mowafek" className={input} />
           </label>
           <label className={label}>
             Teacher email (invite link)

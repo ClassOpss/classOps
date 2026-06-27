@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { submitAttendance } from "@/actions/attendance";
 import { markClassroomUploaded } from "@/actions/classroom-upload";
 import { sessionStart, sessionDeadline, isLate, formatCairo } from "@/lib/datetime";
+import { scheduleTimeForDate } from "@/lib/schedule";
 import { resolveConfig } from "@/lib/operation";
 import { LessonDetailsForm } from "./lesson-details-form";
 
@@ -78,8 +79,7 @@ export default async function AttendancePage({
   const late = loggedAt ? isLate(loggedAt, deadline) : false;
   const uploadedAt = session.classroomUpload?.uploadedAt ?? null;
   const uploadLate = uploadedAt ? isLate(uploadedAt, deadline) : false;
-  const sched = (session.class.schedule ?? {}) as { time?: string };
-  const start = sessionStart(session.scheduledDate, sched.time);
+  const start = sessionStart(session.scheduledDate, scheduleTimeForDate(session.class.schedule as object, session.scheduledDate));
   const notStarted = !session.dayOff && new Date() < start;
 
   // Can't log a day off, or a class that hasn't started yet.

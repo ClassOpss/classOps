@@ -10,8 +10,8 @@ export type ClassDefaults = {
   schoolId: string;
   yearGroup: string;
   name: string;
-  days: string[];
-  time: string;
+  // Per-day start times, keyed by weekday name; absent day = not scheduled.
+  times: Record<string, string>;
   planStartDate: string; // yyyy-mm-dd or ""
   notes: string;
 };
@@ -44,22 +44,22 @@ export function EditClassForm({
           <option value="S1">S1</option>
         </select>
       </label>
-      <label className="block">
+      <label className="block sm:col-span-2">
         <span className="label">Class name</span>
         <input name="name" required className={inputCls} defaultValue={defaults.name} />
       </label>
-      <label className="block">
-        <span className="label">Start time</span>
-        <input name="time" type="time" required className={inputCls} defaultValue={defaults.time || "16:00"} />
-      </label>
       <fieldset className="sm:col-span-2">
-        <legend className="label">Days</legend>
-        <div className="flex flex-wrap gap-2">
+        <legend className="label">Days &amp; start times</legend>
+        <p className="field-hint mb-2 mt-0">Tick each day this class meets and set its start time.</p>
+        <div className="flex flex-col gap-1.5">
           {DAYS.map((d) => (
-            <label key={d} className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-border-strong bg-card px-2.5 py-1.5 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-soft has-[:checked]:text-brand-softfg">
-              <input type="checkbox" name="days" value={d} defaultChecked={defaults.days.includes(d)} className="accent-brand" />
-              {d.slice(0, 3)}
-            </label>
+            <div key={d} className="flex items-center gap-3">
+              <label className="flex w-36 cursor-pointer items-center gap-2 rounded-lg border border-border-strong bg-card px-2.5 py-1.5 text-sm has-[:checked]:border-brand has-[:checked]:bg-brand-soft has-[:checked]:text-brand-softfg">
+                <input type="checkbox" name={`day_${d}`} defaultChecked={d in defaults.times} className="accent-brand" />
+                {d}
+              </label>
+              <input type="time" name={`time_${d}`} defaultValue={defaults.times[d] || "16:00"} className="input w-auto" />
+            </div>
           ))}
         </div>
       </fieldset>
