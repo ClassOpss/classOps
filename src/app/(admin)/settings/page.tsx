@@ -1,13 +1,95 @@
 import { requireRole } from "@/lib/auth-guards";
+import { prisma } from "@/lib/db";
+import { currentOperationId } from "@/lib/operation";
+import { removeLogo } from "@/actions/branding";
+import { LogoUpload } from "./logo-upload";
 
 export default async function SettingsPage() {
   await requireRole("admin", "teacher");
-  return (
-    <div className="flex flex-col gap-6">
-      <h1 className="page-title">Settings</h1>
-      <div className="card p-8 text-center">
-        <p className="text-sm text-muted">App settings land here in a later step.</p>
+  const operationId = await currentOperationId();
+  const op = await prisma.operation.findUnique({ where: { id: operationId } });
+
+  if (!op) {
+    return (
+      <div className="flex flex-col gap-6">
+        <h1 className="page-title">Settings</h1>
+        <div className="card p-6 text-sm text-muted">No operation in scope.</div>
       </div>
+    );
+  }
+
+  const hasUpload = !!op.logoData;
+  const logoSrc = hasUpload
+    ? `data:${op.logoMime};base64,${Buffer.from(op.logoData!).toString("base64")}`
+    : op.logoPath;
+
+  const money = (v: unknown) => `${Number(v).toLocaleString("en-US")} ${op.currency}`;
+
+  return (
+    <div className="flex flex-col gap-8">
+      <div>
+        <h1 className="page-title">Settings</h1>
+        <p className="page-subtitle">Branding and configuration for {op.name}.</p>
+      </div>
+
+      {/* Logo */}
+      <section className="card overflow-hidden">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="section-title">Logo</h2>
+          <p className="mt-0.5 text-sm text-muted">
+            Appears as the watermark on monthly PDF reports. Upload a new one any time.
+          </p>
+        </div>
+        <div className="flex flex-col gap-5 px-5 py-5 sm:flex-row sm:items-center">
+          <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-xl border border-border bg-card-muted">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoSrc} alt={`${op.name} logo`} className="max-h-full max-w-full object-contain" />
+          </div>
+          <div className="flex flex-1 flex-col gap-3">
+            <LogoUpload />
+            <div className="flex items-center gap-3">
+              <span className="badge-neutral">{hasUpload ? "Custom upload" : "Default logo"}</span>
+              {hasUpload && (
+                <form action={removeLogo}>
+                  <button type="submit" className="text-sm font-medium text-danger hover:underline">
+                    Remove
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Configuration (read-only summary) */}
+      <section className="card overflow-hidden">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="section-title">Configuration</h2>
+          <p className="mt-0.5 text-sm text-muted">These were set when the operation was created.</p>
+        </div>
+        <dl className="grid grid-cols-1 gap-x-8 gap-y-4 px-5 py-5 sm:grid-cols-2">
+          <Row label="Brand name" value={op.brandName} />
+          <Row label="Message signature" value={op.brandSignature} />
+          <Row label="Currency" value={op.currency} />
+          <Row label="Per-class salary" value={money(op.perClassSalary)} />
+          <Row label="Office-hour bonus" value={money(op.officeHourBonus)} />
+          <Row label="Late deduction" value={money(op.lateDeduction)} />
+          <Row label="Coverage adjustment" value={money(op.coverageAdjustment)} />
+          <Row
+            label="Deadlines"
+            value={`Daily ${op.dailyDeadlineHour}:00 · Weekly ${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][op.weeklyDeadlineWeekday]} ${op.weeklyDeadlineHour}:00 (Cairo)`}
+          />
+        </dl>
+      </section>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium uppercase tracking-wide text-faint">{label}</dt>
+      <dd className="mt-0.5 text-sm text-fg">{value}</dd>
     </div>
   );
 }

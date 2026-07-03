@@ -28,7 +28,16 @@ export type ClassReportData = {
   homeworks: { description: string; due: string; submissionRate: string }[];
 };
 
-async function loadLogo(logoPath: string): Promise<string | null> {
+// Prefer a teacher-uploaded logo (stored on the Operation row); fall back to the
+// file-based default (logoPath) for operations that never uploaded one.
+async function resolveLogo(operationId: string, logoPath: string): Promise<string | null> {
+  const op = await prisma.operation.findUnique({
+    where: { id: operationId },
+    select: { logoData: true, logoMime: true },
+  });
+  if (op?.logoData) {
+    return `data:${op.logoMime ?? "image/png"};base64,${Buffer.from(op.logoData).toString("base64")}`;
+  }
   try {
     const file = path.join(process.cwd(), "public", logoPath.replace(/^\//, ""));
     const buf = await fs.readFile(file);
@@ -99,7 +108,7 @@ export async function buildClassReportData(
         submissions: { where: { status: { in: ["on_time", "late"] } }, select: { id: true } },
       },
     }),
-    loadLogo(cfg.logoPath),
+    resolveLogo(klass.operationId, cfg.logoPath),
   ]);
 
   const activeStudentCount = students.length;

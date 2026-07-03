@@ -92,7 +92,12 @@ model Operation {
   // Branding / personalization
   brandName      String  @map("brand_name")
   brandSignature String  @map("brand_signature") // signs WhatsApp messages
+  // logoPath = file-based default (e.g. Math by Mo's bundled logo). When a teacher
+  // uploads a logo it's stored in logoData/logoMime and takes precedence (Railway's
+  // filesystem is ephemeral, so uploads can't live on disk).
   logoPath       String  @map("logo_path")
+  logoData       Bytes?  @map("logo_data")
+  logoMime       String? @map("logo_mime")
   currency       String  @default("EGP")
 
   // Deadlines (Cairo time; the timezone itself is a shared app default)
