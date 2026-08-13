@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
-import { ACTIVE_OPERATION_COOKIE } from "@/lib/operation";
+import { ACTIVE_OPERATION_COOKIE, DEFAULT_OPERATION_ID } from "@/lib/operation";
 import { createSetupToken, setupUrl } from "@/lib/tokens";
 import { sendEmail, resolveOperationSender, actionEmail } from "@/lib/email";
 
@@ -35,6 +35,58 @@ export async function setActiveOperation(operationId: string): Promise<void> {
     maxAge: 60 * 60 * 24 * 365,
   });
   revalidatePath("/", "layout");
+}
+
+export type DeleteState = { ok?: boolean; error?: string } | undefined;
+
+// Super-admin: permanently delete a teacher's operation and ALL of its data. Requires
+// typing the operation name to confirm. The default operation cannot be deleted.
+export async function deleteOperation(
+  operationId: string,
+  _prev: DeleteState,
+  formData: FormData,
+): Promise<DeleteState> {
+  const admin = await requireRole("admin");
+  if (operationId === DEFAULT_OPERATION_ID) {
+    return { error: "The primary operation cannot be deleted." };
+  }
+  const op = await prisma.operation.findUnique({ where: { id: operationId }, select: { name: true } });
+  if (!op) return { error: "Operation not found." };
+
+  const confirm = String(formData.get("confirm") ?? "").trim();
+  if (confirm !== op.name) return { error: `Type "${op.name}" exactly to confirm.` };
+
+  // Delete children in FK-safe order (most tables cascade from Class; the rest are
+  // scoped to the operation), then the operation itself.
+  await prisma.$transaction([
+    prisma.lateIncident.deleteMany({ where: { assistant: { operationId } } }),
+    prisma.activityLog.deleteMany({ where: { operationId } }),
+    prisma.class.deleteMany({ where: { operationId } }), // cascades students/sessions/etc.
+    prisma.payPeriod.deleteMany({ where: { operationId } }), // cascades calculations
+    prisma.lessonPlan.deleteMany({ where: { operationId } }), // cascades items
+    prisma.topic.deleteMany({ where: { operationId } }),
+    prisma.user.deleteMany({ where: { operationId } }), // cascades assistants + auth rows
+    prisma.assistant.deleteMany({ where: { operationId } }), // safety
+    prisma.school.deleteMany({ where: { operationId } }),
+    prisma.operation.delete({ where: { id: operationId } }),
+  ]);
+
+  // If the deleted op was the super-admin's active view, drop the cookie.
+  const cookieStore = await cookies();
+  if (cookieStore.get(ACTIVE_OPERATION_COOKIE)?.value === operationId) {
+    cookieStore.delete(ACTIVE_OPERATION_COOKIE);
+  }
+
+  await logActivity({
+    actorId: admin.id,
+    actorRole: admin.role,
+    action: "deleted_operation",
+    entityType: "operation",
+    entityId: operationId,
+    metadata: { name: op.name },
+  });
+  revalidatePath("/operations");
+  return { ok: true };
 }
 
 const schema = z.object({

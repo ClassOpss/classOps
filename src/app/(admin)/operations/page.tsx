@@ -1,9 +1,10 @@
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
-import { currentOperationId } from "@/lib/operation";
+import { currentOperationId, DEFAULT_OPERATION_ID } from "@/lib/operation";
 import { OPERATION_DEFAULTS } from "@/lib/config";
 import { setActiveOperation } from "@/actions/operations";
 import { NewOperationForm } from "./new-operation-form";
+import { DeleteOperation } from "./delete-operation";
 
 export default async function OperationsPage() {
   await requireRole("admin");
@@ -58,13 +59,18 @@ export default async function OperationsPage() {
                     <td>{o._count.assistants}</td>
                     <td>{o._count.users}</td>
                     <td>
-                      {isActive ? (
-                        <span className="text-faint">Current view</span>
-                      ) : (
-                        <form action={setActiveOperation.bind(null, o.id)}>
-                          <button type="submit" className="btn-secondary btn-sm">Switch to this</button>
-                        </form>
-                      )}
+                      <div className="flex flex-col items-start gap-2">
+                        {isActive ? (
+                          <span className="text-faint">Current view</span>
+                        ) : (
+                          <form action={setActiveOperation.bind(null, o.id)}>
+                            <button type="submit" className="btn-secondary btn-sm">Switch to this</button>
+                          </form>
+                        )}
+                        {o.id !== DEFAULT_OPERATION_ID && (
+                          <DeleteOperation operationId={o.id} name={o.name} />
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
