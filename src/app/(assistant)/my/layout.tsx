@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { signOutAction } from "@/actions/auth";
 import { BottomNav } from "@/components/bottom-nav";
@@ -25,6 +26,15 @@ export default async function AssistantLayout({
           </svg>
         </div>
         <p className="font-semibold tracking-tight">ClassOps</p>
+        <Link
+          href="/my/account"
+          aria-label="Account"
+          className="ml-auto grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-card-muted hover:text-fg"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden>
+            <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-4 0-7 2-7 5v1h14v-1c0-3-3-5-7-5Z" />
+          </svg>
+        </Link>
       </header>
 
       <main className="mx-auto w-full max-w-xl flex-1 px-4 py-5 pb-24">{children}</main>

@@ -12,7 +12,7 @@ export function homeFor(role?: Role | string | null): string {
 export const ADMIN_ONLY_PREFIXES = ["/pay", "/users", "/activity", "/operations"];
 
 // Unauthenticated-accessible pages.
-export const AUTH_PAGES = ["/login", "/set-password", "/reset-password"];
+export const AUTH_PAGES = ["/login", "/set-password", "/reset-password", "/forgot-password"];
 
 export function pathMatches(path: string, prefixes: string[]): boolean {
   return prefixes.some((p) => path === p || path.startsWith(p + "/"));

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { authenticate, type LoginState } from "@/actions/auth";
 
@@ -39,6 +40,10 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
       <button type="submit" disabled={isPending} className="btn-primary mt-1 w-full">
         {isPending ? "Signing in…" : "Sign in"}
       </button>
+
+      <Link href="/forgot-password" className="text-center text-sm text-muted hover:text-brand">
+        Forgot password?
+      </Link>
     </form>
   );
 }

@@ -10,6 +10,13 @@ export function emailConfigured(): boolean {
   return !!process.env.BREVO_API_KEY && !!process.env.BREVO_SENDER_EMAIL;
 }
 
+// The platform's fallback sender (for users not tied to an operation, e.g. the super-admin).
+export function platformSender(): { fromEmail: string; fromName: string; replyTo: null } | null {
+  const fromEmail = process.env.BREVO_SENDER_EMAIL;
+  if (!fromEmail) return null;
+  return { fromEmail, fromName: process.env.BREVO_SENDER_NAME ?? "ClassOps", replyTo: null };
+}
+
 type SendArgs = {
   to: string;
   toName?: string | null;
