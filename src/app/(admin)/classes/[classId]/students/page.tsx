@@ -6,6 +6,7 @@ import { schoolPrefix, uniqueStudentCode } from "@/lib/code";
 import { currentOperationId } from "@/lib/operation";
 import { ImportStudents } from "./import-students";
 import { AddStudentForm } from "./add-student-form";
+import { PasteImport } from "./paste-import";
 
 export default async function StudentsPage({
   params,
@@ -39,17 +40,34 @@ export default async function StudentsPage({
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <Link href={`/classes/${classId}`} className="link text-sm">← {klass.name}</Link>
-        <h1 className="page-title mt-1">Students ({klass.students.length})</h1>
-        <p className="page-subtitle">{klass.school.name} · {klass.yearGroup}</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <Link href={`/classes/${classId}`} className="link text-sm">← {klass.name}</Link>
+          <h1 className="page-title mt-1">Students ({klass.students.length})</h1>
+          <p className="page-subtitle">{klass.school.name} · {klass.yearGroup}</p>
+        </div>
+        <Link href={`/classes/${classId}/invites`} className="btn-secondary btn-sm">
+          Onboarding &amp; invites →
+        </Link>
       </div>
 
       {user.role === "admin" && (
         <section className="card p-5">
-          <h2 className="section-title mb-3">Import students from PDF</h2>
-          <ImportStudents classId={classId} prefix={prefix} existingCodes={existingCodes} />
+          <h2 className="section-title mb-1">Import students from spreadsheet</h2>
+          <p className="mb-3 text-sm text-muted">
+            Captures names, emails, and student/parent phones — used for Classroom &amp; WhatsApp invites.
+          </p>
+          <PasteImport classId={classId} />
         </section>
+      )}
+
+      {user.role === "admin" && (
+        <details className="card p-5">
+          <summary className="section-title cursor-pointer">Import from PDF (names only)</summary>
+          <div className="mt-3">
+            <ImportStudents classId={classId} prefix={prefix} existingCodes={existingCodes} />
+          </div>
+        </details>
       )}
 
       {user.role === "admin" && (
@@ -66,32 +84,41 @@ export default async function StudentsPage({
         {klass.students.length === 0 ? (
           <p className="px-5 py-6 text-sm text-muted">No students yet.</p>
         ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th className="w-20">Code</th>
-                <th>Name</th>
-                {user.role === "admin" && <th className="w-20"></th>}
-              </tr>
-            </thead>
-            <tbody>
-              {klass.students.map((s) => (
-                <tr key={s.id}>
-                  <td><span className="badge-neutral">{s.code}</span></td>
-                  <td className="font-medium">{s.name}</td>
-                  {user.role === "admin" && (
-                    <td>
-                      <form action={deactivateStudent.bind(null, s.id)}>
-                        <button type="submit" className="font-medium text-danger hover:underline">
-                          Remove
-                        </button>
-                      </form>
-                    </td>
-                  )}
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th className="w-20">Code</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Parent</th>
+                  {user.role === "admin" && <th className="w-20"></th>}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {klass.students.map((s) => (
+                  <tr key={s.id}>
+                    <td><span className="badge-neutral">{s.code}</span></td>
+                    <td className="font-medium">{s.name}</td>
+                    <td className="text-muted">{s.email ?? "—"}</td>
+                    <td className="text-muted">
+                      {s.parentName ?? "—"}
+                      {s.parentPhone ? <span className="text-faint"> · {s.parentPhone}</span> : null}
+                    </td>
+                    {user.role === "admin" && (
+                      <td>
+                        <form action={deactivateStudent.bind(null, s.id)}>
+                          <button type="submit" className="font-medium text-danger hover:underline">
+                            Remove
+                          </button>
+                        </form>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

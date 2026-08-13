@@ -223,6 +223,11 @@ model Class {
   planStartDate DateTime? @map("plan_start_date") @db.Date
   active       Boolean   @default(true)
   notes        String?
+  // Per-class destinations for onboarding students/parents. Invite links are pasted
+  // once; ClassOps sends each student/parent their link (no risky auto-adding).
+  googleClassroomLink String? @map("google_classroom_link")
+  studentGroupLink    String? @map("student_group_link")
+  parentCommunityLink String? @map("parent_community_link")
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   operation       Operation                    @relation(fields: [operationId], references: [id])
@@ -242,12 +247,17 @@ model Class {
 }
 
 model Student {
-  id        String   @id @default(uuid())
-  classId   String   @map("class_id")
-  name      String
-  code      String
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id          String   @id @default(uuid())
+  classId     String   @map("class_id")
+  name        String
+  code        String
+  // Contact details captured at import (for Classroom invites + WhatsApp link sends).
+  email       String?
+  phone       String?
+  parentName  String?  @map("parent_name")
+  parentPhone String?  @map("parent_phone")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   class          Class                        @relation(fields: [classId], references: [id], onDelete: Cascade)
   subAssignments StudentAssistantAssignment[]

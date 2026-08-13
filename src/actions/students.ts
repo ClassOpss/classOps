@@ -7,8 +7,20 @@ import { logActivity } from "@/lib/activity";
 import { schoolPrefix, uniqueStudentCode } from "@/lib/code";
 import { autoAssignNewStudents } from "@/actions/assignments";
 
-export type ImportRow = { name: string; code: string };
+export type ImportRow = {
+  name: string;
+  code: string;
+  email?: string;
+  phone?: string;
+  parentName?: string;
+  parentPhone?: string;
+};
 export type ImportResult = { added: number; skipped: number; error?: string };
+
+const clean = (v?: string) => {
+  const t = (v ?? "").trim();
+  return t.length ? t : null;
+};
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
 async function syncStudentCount(classId: string) {
@@ -97,7 +109,15 @@ export async function importStudents(
   const seenNames = new Set(existing.map((s) => s.name.toLowerCase()));
   const seenCodes = new Set(existing.map((s) => s.code));
 
-  const toInsert: { classId: string; name: string; code: string }[] = [];
+  const toInsert: {
+    classId: string;
+    name: string;
+    code: string;
+    email: string | null;
+    phone: string | null;
+    parentName: string | null;
+    parentPhone: string | null;
+  }[] = [];
   let skipped = 0;
 
   for (const row of rows) {
@@ -116,7 +136,15 @@ export async function importStudents(
     if (!code || seenCodes.has(code)) code = uniqueStudentCode(prefix, seenCodes);
     seenNames.add(name.toLowerCase());
     seenCodes.add(code);
-    toInsert.push({ classId, name, code });
+    toInsert.push({
+      classId,
+      name,
+      code,
+      email: clean(row.email),
+      phone: clean(row.phone),
+      parentName: clean(row.parentName),
+      parentPhone: clean(row.parentPhone),
+    });
   }
 
   const result =

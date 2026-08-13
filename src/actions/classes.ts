@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { DAYS } from "@/lib/constants";
-import { currentOperationId } from "@/lib/operation";
+import { currentOperationId, assertClassInOperation } from "@/lib/operation";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
@@ -119,4 +119,37 @@ export async function setClassActive(classId: string, active: boolean): Promise<
   });
   revalidatePath("/classes");
   revalidatePath(`/classes/${classId}`);
+}
+
+// Store the per-class onboarding destinations (Google Classroom + WhatsApp links).
+export async function setClassLinks(
+  classId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const admin = await requireRole("admin", "teacher");
+  await assertClassInOperation(classId);
+
+  const trim = (k: string) => {
+    const v = String(formData.get(k) ?? "").trim();
+    return v.length ? v : null;
+  };
+  await prisma.class.update({
+    where: { id: classId },
+    data: {
+      googleClassroomLink: trim("googleClassroomLink"),
+      studentGroupLink: trim("studentGroupLink"),
+      parentCommunityLink: trim("parentCommunityLink"),
+    },
+  });
+  await logActivity({
+    actorId: admin.id,
+    actorRole: admin.role,
+    action: "updated_class_links",
+    entityType: "class",
+    entityId: classId,
+    classId,
+  });
+  revalidatePath(`/classes/${classId}/invites`);
+  return { ok: true };
 }
