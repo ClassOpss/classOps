@@ -47,6 +47,7 @@ export default async function ClassOverviewPage({
     schoolId: klass.schoolId,
     yearGroup: klass.yearGroup,
     name: klass.name,
+    lmsType: klass.lmsType,
     times: Object.fromEntries(slots.map((s) => [s.day, s.time || "16:00"])),
     planStartDate: toDateInput(klass.planStartDate),
     notes: klass.notes ?? "",

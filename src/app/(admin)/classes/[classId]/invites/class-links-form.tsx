@@ -6,9 +6,11 @@ import type { FormState } from "@/actions/classes";
 
 export function ClassLinksForm({
   classId,
+  showClassroom = true,
   defaults,
 }: {
   classId: string;
+  showClassroom?: boolean;
   defaults: { googleClassroomLink: string; studentGroupLink: string; parentCommunityLink: string };
 }) {
   const [state, action, pending] = useActionState<FormState, FormData>(
@@ -18,13 +20,19 @@ export function ClassLinksForm({
 
   return (
     <form action={action} className="flex flex-col gap-4">
-      <Field
-        name="googleClassroomLink"
-        label="Google Classroom invite link"
-        hint="Classroom → your class → Settings → invite/class link."
-        defaultValue={defaults.googleClassroomLink}
-        placeholder="https://classroom.google.com/c/…"
-      />
+      {showClassroom ? (
+        <Field
+          name="googleClassroomLink"
+          label="Google Classroom invite link"
+          hint="Classroom → your class → Settings → invite/class link."
+          defaultValue={defaults.googleClassroomLink}
+          placeholder="https://classroom.google.com/c/…"
+        />
+      ) : (
+        <p className="rounded-lg bg-card-muted px-3 py-2 text-sm text-muted">
+          This class uses <span className="font-medium">IE Learn</span> — no Google Classroom invites are sent.
+        </p>
+      )}
       <Field
         name="studentGroupLink"
         label="Student WhatsApp group link"

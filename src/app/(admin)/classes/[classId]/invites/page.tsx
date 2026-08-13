@@ -15,6 +15,7 @@ export default async function InvitesPage({ params }: { params: Promise<{ classI
     where: { id: classId, operationId },
     select: {
       name: true,
+      lmsType: true,
       googleClassroomLink: true,
       studentGroupLink: true,
       parentCommunityLink: true,
@@ -27,7 +28,10 @@ export default async function InvitesPage({ params }: { params: Promise<{ classI
   });
   if (!klass) notFound();
 
-  const hasLinks = !!(klass.googleClassroomLink || klass.studentGroupLink || klass.parentCommunityLink);
+  const usesClassroom = klass.lmsType === "google_classroom";
+  // For IE Learn classes we don't send Google Classroom invites at all.
+  const classroomLink = usesClassroom ? klass.googleClassroomLink : null;
+  const hasLinks = !!(classroomLink || klass.studentGroupLink || klass.parentCommunityLink);
 
   return (
     <div className="flex flex-col gap-8">
@@ -50,6 +54,7 @@ export default async function InvitesPage({ params }: { params: Promise<{ classI
         <div className="px-5 py-5">
           <ClassLinksForm
             classId={classId}
+            showClassroom={usesClassroom}
             defaults={{
               googleClassroomLink: klass.googleClassroomLink ?? "",
               studentGroupLink: klass.studentGroupLink ?? "",
@@ -91,7 +96,7 @@ export default async function InvitesPage({ params }: { params: Promise<{ classI
                       className: klass.name,
                       studentName: s.name,
                       studentGroupLink: klass.studentGroupLink,
-                      classroomLink: klass.googleClassroomLink,
+                      classroomLink,
                     }),
                   );
                   const parentHref = waLink(

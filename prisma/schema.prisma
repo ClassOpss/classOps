@@ -32,6 +32,11 @@ enum YearGroup {
   shared
 }
 
+enum LmsType {
+  google_classroom
+  ie_learn
+}
+
 enum SessionStatus {
   scheduled
   completed
@@ -219,6 +224,8 @@ model Class {
   schoolId     String    @map("school_id")
   yearGroup    YearGroup @map("year_group")
   name         String
+  // Which platform this class uses — gates Google Classroom onboarding (IE Learn = none).
+  lmsType      LmsType   @default(google_classroom) @map("lms_type")
   studentCount Int       @default(0) @map("student_count")
   // schedule: { "day": "Sunday", "time": "16:00" } — drives late-detection deadlines
   schedule     Json

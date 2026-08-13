@@ -10,6 +10,7 @@ export type ClassDefaults = {
   schoolId: string;
   yearGroup: string;
   name: string;
+  lmsType: string;
   // Per-day start times, keyed by weekday name; absent day = not scheduled.
   times: Record<string, string>;
   planStartDate: string; // yyyy-mm-dd or ""
@@ -47,6 +48,13 @@ export function EditClassForm({
       <label className="block sm:col-span-2">
         <span className="label">Class name</span>
         <input name="name" required className={inputCls} defaultValue={defaults.name} />
+      </label>
+      <label className="block sm:col-span-2">
+        <span className="label">Platform</span>
+        <select name="lmsType" required className={inputCls} defaultValue={defaults.lmsType}>
+          <option value="google_classroom">Google Classroom</option>
+          <option value="ie_learn">IE Learn (no Classroom invites)</option>
+        </select>
       </label>
       <fieldset className="sm:col-span-2">
         <legend className="label">Days &amp; start times</legend>

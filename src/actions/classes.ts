@@ -14,6 +14,7 @@ const classSchema = z.object({
   schoolId: z.string().min(1, "Pick a school."),
   yearGroup: z.enum(["Y9", "Y10", "S1"]),
   name: z.string().min(1, "Name is required.").max(100),
+  lmsType: z.enum(["google_classroom", "ie_learn"]).default("google_classroom"),
   // One slot per selected weekday, each with its own start time.
   slots: z
     .array(
@@ -37,6 +38,7 @@ function parseForm(formData: FormData) {
     schoolId: String(formData.get("schoolId") ?? ""),
     yearGroup: String(formData.get("yearGroup") ?? ""),
     name: String(formData.get("name") ?? "").trim(),
+    lmsType: String(formData.get("lmsType") ?? "google_classroom"),
     slots,
     planStartDate: String(formData.get("planStartDate") ?? "").trim() || undefined,
     notes: String(formData.get("notes") ?? "").trim() || undefined,
@@ -55,6 +57,7 @@ export async function createClass(_prev: FormState, formData: FormData): Promise
       schoolId: d.schoolId,
       yearGroup: d.yearGroup,
       name: d.name,
+      lmsType: d.lmsType,
       schedule: { slots: d.slots },
       planStartDate: d.planStartDate ? new Date(d.planStartDate) : null,
       notes: d.notes,
@@ -88,6 +91,7 @@ export async function updateClass(
       schoolId: d.schoolId,
       yearGroup: d.yearGroup,
       name: d.name,
+      lmsType: d.lmsType,
       schedule: { slots: d.slots },
       planStartDate: d.planStartDate ? new Date(d.planStartDate) : null,
       notes: d.notes,

@@ -52,6 +52,13 @@ export function NewClassForm({ schools }: { schools: { id: string; name: string 
         <span className="label">Class name</span>
         <input name="name" placeholder="e.g. Y9-Citadel" required className={inputCls} />
       </label>
+      <label className="block sm:col-span-2">
+        <span className="label">Platform</span>
+        <select name="lmsType" required className={inputCls} defaultValue="google_classroom">
+          <option value="google_classroom">Google Classroom</option>
+          <option value="ie_learn">IE Learn (no Classroom invites)</option>
+        </select>
+      </label>
       <fieldset className="sm:col-span-2">
         <legend className="label">Days &amp; start times</legend>
         <p className="field-hint mb-2 mt-0">Tick each day this class meets and set its start time.</p>
