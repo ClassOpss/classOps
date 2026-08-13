@@ -98,6 +98,9 @@ model Operation {
   logoPath       String  @map("logo_path")
   logoData       Bytes?  @map("logo_data")
   logoMime       String? @map("logo_mime")
+  // The teacher's own email used as the invite "from" (if verified in Brevo);
+  // otherwise it becomes the Reply-To behind the platform's fallback sender.
+  senderEmail    String? @map("sender_email")
   currency       String  @default("EGP")
 
   // Deadlines (Cairo time; the timezone itself is a shared app default)

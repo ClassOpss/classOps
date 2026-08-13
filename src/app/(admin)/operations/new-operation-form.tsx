@@ -145,7 +145,9 @@ export function NewOperationForm({ defaults }: { defaults: OperationDefaults }) 
       {state && state.ok && (
         <div className="rounded-lg border border-success/20 bg-success-soft p-4 text-sm">
           <p className="mb-1.5 font-medium text-success">
-            Operation created. Send this setup link to {state.teacherEmail}:
+            {state.emailed
+              ? `Operation created — setup email sent to ${state.teacherEmail} ✓ (link below as a backup):`
+              : `Operation created. Send this setup link to ${state.teacherEmail}:`}
           </p>
           <code className="break-all text-xs text-fg">{state.setupUrl}</code>
         </div>

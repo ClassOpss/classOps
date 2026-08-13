@@ -7,10 +7,11 @@ import { requireRole } from "@/lib/auth-guards";
 import { createSetupToken, setupUrl } from "@/lib/tokens";
 import { logActivity } from "@/lib/activity";
 import { currentOperationId } from "@/lib/operation";
+import { sendEmail, resolveOperationSender, actionEmail } from "@/lib/email";
 
 const emailSchema = z.string().email();
 
-export type InviteLink = { email: string; url: string };
+export type InviteLink = { email: string; url: string; emailed: boolean };
 export type InviteState =
   | { ok: true; links: InviteLink[] }
   | { ok: false; error: string }
@@ -47,7 +48,33 @@ async function inviteOne(name: string, rawEmail: string, operationId: string): P
   }
 
   const token = await createSetupToken(email);
-  return { email, url: setupUrl(email, token) };
+  const url = setupUrl(email, token);
+
+  // Email the setup link (from the operation's resolved sender); fall back to the
+  // copyable link if email isn't configured or the send fails.
+  let emailed = false;
+  const sender = await resolveOperationSender(operationId);
+  if (sender) {
+    const { html, text } = actionEmail({
+      brandName: sender.fromName,
+      heading: "You've been invited as an assistant",
+      intro: `${name}, you've been added as an assistant on ${sender.fromName}. Set your password to get started.`,
+      buttonLabel: "Set your password",
+      url,
+    });
+    const res = await sendEmail({
+      to: email,
+      toName: name,
+      subject: `Set up your ${sender.fromName} assistant account`,
+      html,
+      text,
+      fromEmail: sender.fromEmail,
+      fromName: sender.fromName,
+      replyTo: sender.replyTo,
+    });
+    emailed = res.ok;
+  }
+  return { email, url, emailed };
 }
 
 export async function inviteAssistantAction(

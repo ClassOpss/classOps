@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { currentOperationId } from "@/lib/operation";
 import { removeLogo } from "@/actions/branding";
 import { LogoUpload } from "./logo-upload";
+import { SenderEmailForm } from "./sender-email-form";
 
 export default async function SettingsPage() {
   await requireRole("admin", "teacher");
@@ -58,6 +59,17 @@ export default async function SettingsPage() {
               )}
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Invite sender email */}
+      <section className="card overflow-hidden">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="section-title">Invite sender email</h2>
+          <p className="mt-0.5 text-sm text-muted">The &quot;from&quot; address for teacher/assistant invites.</p>
+        </div>
+        <div className="px-5 py-5">
+          <SenderEmailForm defaultValue={op.senderEmail ?? ""} />
         </div>
       </section>
 

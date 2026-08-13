@@ -8,9 +8,10 @@ import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { ACTIVE_OPERATION_COOKIE } from "@/lib/operation";
 import { createSetupToken, setupUrl } from "@/lib/tokens";
+import { sendEmail, resolveOperationSender, actionEmail } from "@/lib/email";
 
 export type OperationFormState =
-  | { ok: true; teacherEmail: string; setupUrl: string }
+  | { ok: true; teacherEmail: string; setupUrl: string; emailed: boolean }
   | { ok: false; error: string }
   | undefined;
 
@@ -102,6 +103,7 @@ export async function createOperation(
       brandName: d.brandName,
       brandSignature: d.brandSignature,
       logoPath: d.logoPath,
+      senderEmail: email, // the teacher's own email as the intended invite "from"
       currency: d.currency,
       dailyDeadlineHour: d.dailyDeadlineHour,
       weeklyDeadlineWeekday: d.weeklyDeadlineWeekday,
@@ -137,6 +139,31 @@ export async function createOperation(
   }
 
   const token = await createSetupToken(email);
+  const url = setupUrl(email, token);
+
+  // Email the teacher their setup link (from the new operation's brand/sender).
+  let emailed = false;
+  const sender = await resolveOperationSender(operation.id);
+  if (sender) {
+    const { html, text } = actionEmail({
+      brandName: sender.fromName,
+      heading: `Welcome to ${d.brandName}`,
+      intro: `${d.teacherName}, your ${d.brandName} account on ClassOps is ready. Set your password to sign in.`,
+      buttonLabel: "Set your password",
+      url,
+    });
+    const res = await sendEmail({
+      to: email,
+      toName: d.teacherName,
+      subject: `Set up your ${d.brandName} account`,
+      html,
+      text,
+      fromEmail: sender.fromEmail,
+      fromName: sender.fromName,
+      replyTo: sender.replyTo,
+    });
+    emailed = res.ok;
+  }
 
   await logActivity({
     actorId: admin.id,
@@ -149,5 +176,5 @@ export async function createOperation(
   });
 
   revalidatePath("/operations");
-  return { ok: true, teacherEmail: email, setupUrl: setupUrl(email, token) };
+  return { ok: true, teacherEmail: email, setupUrl: url, emailed };
 }

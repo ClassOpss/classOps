@@ -47,3 +47,18 @@ export async function removeLogo(): Promise<void> {
   });
   revalidatePath("/settings");
 }
+
+// Set the operation's invite "from" email. Must be verified in Brevo to send truly
+// from it; otherwise it becomes the Reply-To behind the platform fallback sender.
+export async function setSenderEmail(_prev: BrandingState, formData: FormData): Promise<BrandingState> {
+  await requireRole("admin", "teacher");
+  const operationId = await currentOperationId();
+  const raw = String(formData.get("senderEmail") ?? "").trim();
+  if (raw && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(raw)) return { error: "Enter a valid email." };
+  await prisma.operation.update({
+    where: { id: operationId },
+    data: { senderEmail: raw || null },
+  });
+  revalidatePath("/settings");
+  return { ok: true };
+}
