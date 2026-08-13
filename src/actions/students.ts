@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { schoolPrefix, uniqueStudentCode } from "@/lib/code";
 import { autoAssignNewStudents } from "@/actions/assignments";
+import { assertClassInOperation } from "@/lib/operation";
 
 export type ImportRow = {
   name: string;
@@ -72,6 +73,38 @@ export async function addStudent(
     classId,
   });
   revalidatePath(`/classes/${classId}/students`);
+  return { ok: true };
+}
+
+// Edit a student's contact details (numbers/emails often unknown at form-fill time).
+export async function updateStudentContacts(
+  studentId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requireRole("admin", "teacher");
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+    select: { classId: true },
+  });
+  if (!student) return { error: "Student not found." };
+  await assertClassInOperation(student.classId);
+
+  const clean = (k: string) => {
+    const v = String(formData.get(k) ?? "").trim();
+    return v.length ? v : null;
+  };
+  await prisma.student.update({
+    where: { id: studentId },
+    data: {
+      email: clean("email"),
+      phone: clean("phone"),
+      parentName: clean("parentName"),
+      parentPhone: clean("parentPhone"),
+    },
+  });
+  revalidatePath(`/classes/${student.classId}/students`);
+  revalidatePath(`/classes/${student.classId}/invites`);
   return { ok: true };
 }
 

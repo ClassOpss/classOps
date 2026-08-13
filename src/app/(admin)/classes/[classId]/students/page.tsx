@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
-import { deactivateStudent } from "@/actions/students";
 import { schoolPrefix, uniqueStudentCode } from "@/lib/code";
 import { currentOperationId } from "@/lib/operation";
 import { ImportStudents } from "./import-students";
 import { AddStudentForm } from "./add-student-form";
 import { PasteImport } from "./paste-import";
+import { EditableStudentRow } from "./editable-student-row";
 
 export default async function StudentsPage({
   params,
@@ -92,29 +92,24 @@ export default async function StudentsPage({
                   <th>Name</th>
                   <th>Email</th>
                   <th>Parent</th>
-                  {user.role === "admin" && <th className="w-20"></th>}
+                  <th className="w-28"></th>
                 </tr>
               </thead>
               <tbody>
                 {klass.students.map((s) => (
-                  <tr key={s.id}>
-                    <td><span className="badge-neutral">{s.code}</span></td>
-                    <td className="font-medium">{s.name}</td>
-                    <td className="text-muted">{s.email ?? "—"}</td>
-                    <td className="text-muted">
-                      {s.parentName ?? "—"}
-                      {s.parentPhone ? <span className="text-faint"> · {s.parentPhone}</span> : null}
-                    </td>
-                    {user.role === "admin" && (
-                      <td>
-                        <form action={deactivateStudent.bind(null, s.id)}>
-                          <button type="submit" className="font-medium text-danger hover:underline">
-                            Remove
-                          </button>
-                        </form>
-                      </td>
-                    )}
-                  </tr>
+                  <EditableStudentRow
+                    key={s.id}
+                    isAdmin={user.role === "admin"}
+                    student={{
+                      id: s.id,
+                      code: s.code,
+                      name: s.name,
+                      email: s.email,
+                      phone: s.phone,
+                      parentName: s.parentName,
+                      parentPhone: s.parentPhone,
+                    }}
+                  />
                 ))}
               </tbody>
             </table>
