@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { createSchool, type FormState } from "@/actions/schools";
 import { createClass } from "@/actions/classes";
 import { DAYS } from "@/lib/constants";
@@ -24,6 +24,16 @@ export function NewSchoolForm() {
 
 export function NewClassForm({ schools }: { schools: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState<FormState, FormData>(createClass, undefined);
+  const [schoolId, setSchoolId] = useState("");
+  const [year, setYear] = useState("Y9");
+  const [name, setName] = useState("");
+  const [edited, setEdited] = useState(false);
+
+  const schoolName = schools.find((s) => s.id === schoolId)?.name ?? "";
+  // Default the class name to "<School> <Year>" until the admin types their own.
+  useEffect(() => {
+    if (!edited) setName(schoolName ? `${schoolName} ${year}` : "");
+  }, [schoolName, year, edited]);
 
   if (schools.length === 0) {
     return <p className="text-sm text-muted">Add a school first.</p>;
@@ -33,7 +43,7 @@ export function NewClassForm({ schools }: { schools: { id: string; name: string 
     <form action={action} className="grid gap-3 sm:grid-cols-2">
       <label className="block">
         <span className="label">School</span>
-        <select name="schoolId" required className={inputCls} defaultValue="">
+        <select name="schoolId" required className={inputCls} value={schoolId} onChange={(e) => setSchoolId(e.target.value)}>
           <option value="" disabled>Select…</option>
           {schools.map((s) => (
             <option key={s.id} value={s.id}>{s.name}</option>
@@ -42,7 +52,7 @@ export function NewClassForm({ schools }: { schools: { id: string; name: string 
       </label>
       <label className="block">
         <span className="label">Year group</span>
-        <select name="yearGroup" required className={inputCls} defaultValue="Y9">
+        <select name="yearGroup" required className={inputCls} value={year} onChange={(e) => setYear(e.target.value)}>
           <option value="Y9">Y9</option>
           <option value="Y10">Y10</option>
           <option value="S1">S1</option>
@@ -50,7 +60,14 @@ export function NewClassForm({ schools }: { schools: { id: string; name: string 
       </label>
       <label className="block sm:col-span-2">
         <span className="label">Class name</span>
-        <input name="name" placeholder="e.g. Y9-Citadel" required className={inputCls} />
+        <input
+          name="name"
+          placeholder="e.g. Citadel Y9"
+          required
+          className={inputCls}
+          value={name}
+          onChange={(e) => { setName(e.target.value); setEdited(true); }}
+        />
       </label>
       <label className="block sm:col-span-2">
         <span className="label">Platform</span>
