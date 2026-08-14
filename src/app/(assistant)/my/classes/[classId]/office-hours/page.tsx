@@ -84,6 +84,11 @@ export default async function OfficeHoursPage({
                   ) : null}
                   {s.durationMin ? <span className="text-faint"> · {s.durationMin}m</span> : null}
                 </span>
+                {s.approved ? (
+                  <span className="badge-success">Approved</span>
+                ) : (
+                  <span className="badge-warn">Pending</span>
+                )}
                 <span className="text-faint">{dateFmt.format(s.date)}</span>
                 <form action={deleteOfficeHour.bind(null, s.id)}>
                   <button type="submit" className="font-medium text-danger hover:underline">Remove</button>

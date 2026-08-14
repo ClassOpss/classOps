@@ -590,6 +590,8 @@ model OfficeHourSession {
   topicId     String?  @map("topic_id")
   topicNotes  String?  @map("topic_notes")
   durationMin Int?     @map("duration_min")
+  // Admin must approve before the office-hour bonus counts toward pay.
+  approved    Boolean  @default(false)
   loggedAt    DateTime @default(now()) @map("logged_at") @db.Timestamptz(6)
 
   class     Class     @relation(fields: [classId], references: [id], onDelete: Cascade)

@@ -49,7 +49,8 @@ export async function computePayComponents(
       where: { assistantId, waived: false, deadline: inMonth },
       _sum: { deductionAmount: true },
     }),
-    prisma.officeHourSession.count({ where: { assistantId, date: inMonth } }),
+    // Only admin-approved office hours count toward the bonus.
+    prisma.officeHourSession.count({ where: { assistantId, date: inMonth, approved: true } }),
     // Sessions I covered for a colleague (+).
     prisma.classSession.count({ where: { coveredById: assistantId, scheduledDate: inMonth } }),
     // My sessions a colleague covered (−).

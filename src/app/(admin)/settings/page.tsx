@@ -4,10 +4,11 @@ import { currentOperationId } from "@/lib/operation";
 import { removeLogo } from "@/actions/branding";
 import { LogoUpload } from "./logo-upload";
 import { SenderEmailForm } from "./sender-email-form";
+import { ConfigForm } from "./config-form";
 import { ChangePasswordForm } from "@/components/change-password-form";
 
 export default async function SettingsPage() {
-  await requireRole("admin", "teacher");
+  const user = await requireRole("admin", "teacher");
   const operationId = await currentOperationId();
   const op = await prisma.operation.findUnique({ where: { id: operationId } });
 
@@ -85,25 +86,43 @@ export default async function SettingsPage() {
         </div>
       </section>
 
-      {/* Configuration (read-only summary) */}
+      {/* Configuration */}
       <section className="card overflow-hidden">
         <div className="border-b border-border px-5 py-4">
           <h2 className="section-title">Configuration</h2>
-          <p className="mt-0.5 text-sm text-muted">These were set when the operation was created.</p>
+          <p className="mt-0.5 text-sm text-muted">
+            {user.role === "admin" ? "Branding, pay and deadlines — editable any time." : "Set by your admin."}
+          </p>
         </div>
-        <dl className="grid grid-cols-1 gap-x-8 gap-y-4 px-5 py-5 sm:grid-cols-2">
-          <Row label="Brand name" value={op.brandName} />
-          <Row label="Message signature" value={op.brandSignature} />
-          <Row label="Currency" value={op.currency} />
-          <Row label="Per-class salary" value={money(op.perClassSalary)} />
-          <Row label="Office-hour bonus" value={money(op.officeHourBonus)} />
-          <Row label="Late deduction" value={money(op.lateDeduction)} />
-          <Row label="Coverage adjustment" value={money(op.coverageAdjustment)} />
-          <Row
-            label="Deadlines"
-            value={`Daily ${op.dailyDeadlineHour}:00 · Weekly ${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][op.weeklyDeadlineWeekday]} ${op.weeklyDeadlineHour}:00 (Cairo)`}
-          />
-        </dl>
+        <div className="px-5 py-5">
+          {user.role === "admin" ? (
+            <ConfigForm
+              defaults={{
+                brandName: op.brandName,
+                brandSignature: op.brandSignature,
+                currency: op.currency,
+                dailyDeadlineHour: op.dailyDeadlineHour,
+                weeklyDeadlineWeekday: op.weeklyDeadlineWeekday,
+                weeklyDeadlineHour: op.weeklyDeadlineHour,
+                perClassSalary: Number(op.perClassSalary),
+                officeHourBonus: Number(op.officeHourBonus),
+                lateDeduction: Number(op.lateDeduction),
+                coverageAdjustment: Number(op.coverageAdjustment),
+                payMultiplier: Number(op.payMultiplier),
+              }}
+            />
+          ) : (
+            <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+              <Row label="Brand name" value={op.brandName} />
+              <Row label="Message signature" value={op.brandSignature} />
+              <Row label="Currency" value={op.currency} />
+              <Row label="Per-class salary" value={money(op.perClassSalary)} />
+              <Row label="Office-hour bonus" value={money(op.officeHourBonus)} />
+              <Row label="Late deduction" value={money(op.lateDeduction)} />
+              <Row label="Coverage adjustment" value={money(op.coverageAdjustment)} />
+            </dl>
+          )}
+        </div>
       </section>
     </div>
   );

@@ -5,6 +5,7 @@ import { formatCairo } from "@/lib/datetime";
 import { waiveIncident, unwaiveIncident } from "@/actions/incidents";
 import { detectCoverageCandidates } from "@/lib/coverage";
 import { confirmCoverage } from "@/actions/coverage";
+import { approveOfficeHour, rejectOfficeHour } from "@/actions/office-hours";
 import { currentOperationId } from "@/lib/operation";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -75,6 +76,22 @@ export default async function DashboardPage() {
   const outstanding = incidents.filter((i) => !i.waived);
   const dueTotal = outstanding.reduce((sum, i) => sum + Number(i.deductionAmount), 0);
   const coverages = isAdmin ? await detectCoverageCandidates(operationId) : [];
+  const pendingOfficeHours = isAdmin
+    ? await prisma.officeHourSession.findMany({
+        where: { approved: false, assistant: { operationId } },
+        orderBy: { date: "desc" },
+        take: 40,
+        select: {
+          id: true,
+          date: true,
+          topicNotes: true,
+          durationMin: true,
+          assistant: { select: { name: true } },
+          student: { select: { name: true } },
+          class: { select: { id: true, name: true } },
+        },
+      })
+    : [];
 
   return (
     <div className="flex flex-col gap-8">
@@ -89,6 +106,37 @@ export default async function DashboardPage() {
         <StatCard label="Sessions this month (delivered / planned)" value={`${delivered} / ${planned}`} />
         {isAdmin && <StatCard label="Open late incidents" value={openIncidentCount} />}
       </div>
+
+      {isAdmin && pendingOfficeHours.length > 0 && (
+        <section className="card overflow-hidden">
+          <div className="border-b border-border px-5 py-4">
+            <h2 className="section-title">Office hours to approve ({pendingOfficeHours.length})</h2>
+            <p className="mt-0.5 text-sm text-muted">
+              Approve to count the bonus toward pay, or reject to remove it.
+            </p>
+          </div>
+          <ul className="divide-y divide-border">
+            {pendingOfficeHours.map((oh) => (
+              <li key={oh.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-5 py-3 text-sm">
+                <span className="font-medium">{oh.assistant.name}</span>
+                <span className="text-muted">with {oh.student.name}</span>
+                <Link href={`/classes/${oh.class.id}`} className="link">{oh.class.name}</Link>
+                <span className="text-faint">{formatCairo(oh.date, "d MMM")}</span>
+                {oh.durationMin ? <span className="badge-neutral">{oh.durationMin} min</span> : null}
+                {oh.topicNotes ? <span className="text-muted">· {oh.topicNotes}</span> : null}
+                <span className="ml-auto flex items-center gap-3">
+                  <form action={approveOfficeHour.bind(null, oh.id)}>
+                    <button type="submit" className="text-success hover:underline">Approve</button>
+                  </form>
+                  <form action={rejectOfficeHour.bind(null, oh.id)}>
+                    <button type="submit" className="text-danger hover:underline">Reject</button>
+                  </form>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {isAdmin && coverages.length > 0 && (
         <section className="card overflow-hidden">

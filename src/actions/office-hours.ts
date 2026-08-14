@@ -2,13 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
+import { requireClassAccess, getVisibleStudentIds, requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
+import { currentOperationId } from "@/lib/operation";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
 // Assistant logs a 1-on-1 office-hour session for a student in their sub-group (spec 5.11).
-// +100 EGP bonus per session — picked up automatically by the pay calculation.
+// Logged as PENDING — the bonus only counts once an admin approves it.
 export async function logOfficeHour(
   classId: string,
   _prev: FormState,
@@ -56,6 +57,40 @@ export async function logOfficeHour(
   });
   revalidatePath(`/my/classes/${classId}/office-hours`);
   return { ok: true };
+}
+
+// Admin approves a pending office hour so its bonus counts toward pay.
+export async function approveOfficeHour(officeHourId: string): Promise<void> {
+  const admin = await requireRole("admin");
+  const operationId = await currentOperationId();
+  const oh = await prisma.officeHourSession.findUnique({
+    where: { id: officeHourId },
+    select: { assistant: { select: { operationId: true } }, classId: true },
+  });
+  if (!oh || oh.assistant.operationId !== operationId) return;
+  await prisma.officeHourSession.update({ where: { id: officeHourId }, data: { approved: true } });
+  await logActivity({
+    actorId: admin.id,
+    actorRole: admin.role,
+    action: "approved_office_hour",
+    entityType: "office_hour",
+    entityId: officeHourId,
+    classId: oh.classId,
+  });
+  revalidatePath("/dashboard");
+}
+
+// Admin rejects (deletes) a pending office hour.
+export async function rejectOfficeHour(officeHourId: string): Promise<void> {
+  const operationId = await currentOperationId();
+  await requireRole("admin");
+  const oh = await prisma.officeHourSession.findUnique({
+    where: { id: officeHourId },
+    select: { assistant: { select: { operationId: true } } },
+  });
+  if (!oh || oh.assistant.operationId !== operationId) return;
+  await prisma.officeHourSession.delete({ where: { id: officeHourId } });
+  revalidatePath("/dashboard");
 }
 
 export async function deleteOfficeHour(officeHourId: string): Promise<void> {
