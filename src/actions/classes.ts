@@ -177,7 +177,7 @@ export async function setClassLinks(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const admin = await requireRole("admin", "teacher");
+  const admin = await requireRole("admin");
   await assertClassInOperation(classId);
 
   const trim = (k: string) => {

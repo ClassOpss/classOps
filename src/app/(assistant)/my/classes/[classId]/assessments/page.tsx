@@ -3,6 +3,7 @@ import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { saturdayDeadline, formatCairo } from "@/lib/datetime";
 import { resolveConfig } from "@/lib/operation";
+import { AssessmentForm } from "@/app/(admin)/classes/[classId]/assessments/assessment-form";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -44,6 +45,13 @@ export default async function AssessmentsListPage({
         <Link href={`/my/classes/${classId}`} className="link text-sm">← {klass?.name}</Link>
         <h1 className="mt-1 text-lg font-semibold tracking-tight">Assessments</h1>
       </div>
+
+      <details className="card p-4">
+        <summary className="section-title cursor-pointer">New assessment</summary>
+        <div className="mt-3">
+          <AssessmentForm classId={classId} />
+        </div>
+      </details>
 
       {assessments.length === 0 ? (
         <p className="card px-4 py-6 text-center text-sm text-muted">No assessments yet.</p>

@@ -3,9 +3,8 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireRole } from "@/lib/auth-guards";
+import { requireClassAccess } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
-import { assertClassInOperation } from "@/lib/operation";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
@@ -24,7 +23,8 @@ export async function createAssessment(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const user = await requireRole("admin", "teacher");
+  // Admin, teacher, or an assigned assistant of this class.
+  const user = await requireClassAccess(classId);
   const parsed = schema.safeParse({
     type: String(formData.get("type") ?? ""),
     label: String(formData.get("label") ?? "").trim(),
@@ -37,7 +37,6 @@ export async function createAssessment(
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const d = parsed.data;
-  await assertClassInOperation(classId);
 
   const assessment = await prisma.assessment.create({
     data: {
@@ -64,13 +63,12 @@ export async function createAssessment(
 }
 
 export async function deleteAssessment(assessmentId: string): Promise<void> {
-  const user = await requireRole("admin", "teacher");
   const found = await prisma.assessment.findUnique({
     where: { id: assessmentId },
     select: { classId: true },
   });
   if (!found) return;
-  await assertClassInOperation(found.classId);
+  const user = await requireClassAccess(found.classId);
   const a = await prisma.assessment.delete({
     where: { id: assessmentId },
     select: { classId: true },

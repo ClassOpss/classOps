@@ -13,7 +13,7 @@ export type StudentRow = {
   parentPhone: string | null;
 };
 
-export function EditableStudentRow({ student, isAdmin }: { student: StudentRow; isAdmin: boolean }) {
+export function EditableStudentRow({ student, canRemove }: { student: StudentRow; canRemove: boolean }) {
   const [editing, setEditing] = useState(false);
   const [state, action, pending] = useActionState<FormState, FormData>(
     updateStudentContacts.bind(null, student.id),
@@ -62,7 +62,7 @@ export function EditableStudentRow({ student, isAdmin }: { student: StudentRow; 
       <td>
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => setEditing(true)} className="link">Edit</button>
-          {isAdmin && (
+          {canRemove && (
             <form action={deactivateStudent.bind(null, student.id)}>
               <button type="submit" className="font-medium text-danger hover:underline">Remove</button>
             </form>

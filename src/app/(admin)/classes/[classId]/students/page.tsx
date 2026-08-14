@@ -99,7 +99,7 @@ export default async function StudentsPage({
                 {klass.students.map((s) => (
                   <EditableStudentRow
                     key={s.id}
-                    isAdmin={user.role === "admin"}
+                    canRemove={user.role === "admin" || user.role === "teacher"}
                     student={{
                       id: s.id,
                       code: s.code,

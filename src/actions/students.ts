@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireRole } from "@/lib/auth-guards";
+import { requireRole, requireClassAccess } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { schoolPrefix, uniqueStudentCode } from "@/lib/code";
 import { autoAssignNewStudents } from "@/actions/assignments";
@@ -35,7 +35,7 @@ export async function addStudent(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const admin = await requireRole("admin");
+  const admin = await requireClassAccess(classId);
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Name is required." };
 
@@ -82,13 +82,12 @@ export async function updateStudentContacts(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireRole("admin", "teacher");
   const student = await prisma.student.findUnique({
     where: { id: studentId },
     select: { classId: true },
   });
   if (!student) return { error: "Student not found." };
-  await assertClassInOperation(student.classId);
+  await requireClassAccess(student.classId);
 
   const clean = (k: string) => {
     const v = String(formData.get(k) ?? "").trim();
@@ -108,9 +107,12 @@ export async function updateStudentContacts(
   return { ok: true };
 }
 
-// Soft-deactivate a student (kept for historical records).
+// Soft-deactivate a student (kept for historical records). Admin or teacher.
 export async function deactivateStudent(studentId: string): Promise<void> {
-  await requireRole("admin");
+  await requireRole("admin", "teacher");
+  const target = await prisma.student.findUnique({ where: { id: studentId }, select: { classId: true } });
+  if (!target) return;
+  await assertClassInOperation(target.classId);
   const student = await prisma.student.update({
     where: { id: studentId },
     data: { active: false },
@@ -120,13 +122,13 @@ export async function deactivateStudent(studentId: string): Promise<void> {
   revalidatePath(`/classes/${student.classId}/students`);
 }
 
-// Admin batch-insert of students into a class. Dedupes by name (case-insensitive)
-// and code within the class; uses createMany(skipDuplicates) for the bulk insert.
+// Batch-insert of students into a class (admin, teacher, or assigned assistant).
+// Dedupes by name (case-insensitive) and code within the class.
 export async function importStudents(
   classId: string,
   rows: ImportRow[],
 ): Promise<ImportResult> {
-  const admin = await requireRole("admin");
+  const admin = await requireClassAccess(classId);
 
   const klass = await prisma.class.findUnique({
     where: { id: classId },
