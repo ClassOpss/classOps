@@ -35,6 +35,35 @@ export function studentInviteMessage(opts: {
   return lines.join("\n").trim();
 }
 
+// A private per-student progress report for the parent (sent 1:1 over WhatsApp).
+export function parentReportMessage(opts: {
+  brandName: string;
+  className: string;
+  studentName: string;
+  parentName?: string | null;
+  periodLabel?: string | null;
+  attendance: { present: number; total: number };
+  avgPercent: number | null;
+  hw: { onTime: number; late: number; missing: number };
+}): string {
+  const who = opts.parentName ? opts.parentName : "there";
+  const att = opts.attendance;
+  const attLine =
+    att.total > 0
+      ? `Attendance: ${att.present}/${att.total} (${Math.round((att.present / att.total) * 100)}%)`
+      : "Attendance: —";
+  const lines = [
+    `Hello ${who}, here is ${opts.studentName}'s progress report — ${opts.className}${opts.periodLabel ? ` (${opts.periodLabel})` : ""}:`,
+    "",
+    attLine,
+    `Average grade: ${opts.avgPercent == null ? "—" : Math.round(opts.avgPercent) + "%"}`,
+    `Homework: ${opts.hw.onTime} on time · ${opts.hw.late} late · ${opts.hw.missing} missing`,
+    "",
+    `— ${opts.brandName}`,
+  ];
+  return lines.join("\n");
+}
+
 export function parentInviteMessage(opts: {
   className: string;
   parentName?: string | null;

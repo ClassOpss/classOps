@@ -76,6 +76,8 @@ export default async function ClassOverviewPage({
           { href: `/classes/${classId}/assistants`, label: "Assistants & sub-groups" },
           { href: `/classes/${classId}/sessions`, label: "Sessions & day-offs" },
           { href: `/classes/${classId}/assessments`, label: "Assessments" },
+          { href: `/classes/${classId}/invites`, label: "Onboarding & invites" },
+          { href: `/classes/${classId}/parent-reports`, label: "Parent reports" },
         ].map((l) => (
           <Link key={l.href} href={l.href} className="card flex items-center justify-between px-4 py-3 text-sm font-medium text-fg transition-colors hover:border-border-strong">
             {l.label}
