@@ -125,6 +125,52 @@ export async function setClassActive(classId: string, active: boolean): Promise<
   revalidatePath(`/classes/${classId}`);
 }
 
+export type ArchiveState = { ok?: boolean; error?: string; archived?: number } | undefined;
+
+// Start-of-year rollover: deactivate every active class in the operation and end
+// their open assistant assignments (so they stop counting toward pay). History is
+// kept — deactivated classes just drop off the active lists. New classes are then
+// created fresh for the new year.
+export async function archiveAllClasses(_prev: ArchiveState, formData: FormData): Promise<ArchiveState> {
+  const admin = await requireRole("admin");
+  const operationId = await currentOperationId();
+  if (String(formData.get("confirm") ?? "").trim().toUpperCase() !== "ARCHIVE") {
+    return { error: 'Type "ARCHIVE" to confirm.' };
+  }
+
+  const classes = await prisma.class.findMany({
+    where: { operationId, active: true },
+    select: { id: true },
+  });
+  const classIds = classes.map((c) => c.id);
+  if (classIds.length === 0) return { ok: true, archived: 0 };
+
+  const today = new Date();
+  await prisma.$transaction([
+    prisma.class.updateMany({ where: { id: { in: classIds } }, data: { active: false } }),
+    prisma.classAssignment.updateMany({
+      where: { classId: { in: classIds }, endDate: null },
+      data: { endDate: today },
+    }),
+    prisma.studentAssistantAssignment.updateMany({
+      where: { classId: { in: classIds }, endDate: null },
+      data: { endDate: today },
+    }),
+  ]);
+
+  await logActivity({
+    actorId: admin.id,
+    actorRole: admin.role,
+    action: "archived_classes",
+    entityType: "operation",
+    entityId: operationId,
+    operationId,
+    metadata: { count: classIds.length },
+  });
+  revalidatePath("/classes");
+  return { ok: true, archived: classIds.length };
+}
+
 // Store the per-class onboarding destinations (Google Classroom + WhatsApp links).
 export async function setClassLinks(
   classId: string,

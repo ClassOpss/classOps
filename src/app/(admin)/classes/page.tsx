@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { scheduleLabel } from "@/lib/schedule";
 import { currentOperationId } from "@/lib/operation";
 import { NewSchoolForm, NewClassForm } from "./class-forms";
+import { NewYear } from "./new-year";
 
 export default async function ClassesPage() {
   const user = await requireRole("admin", "teacher");
@@ -25,9 +26,12 @@ export default async function ClassesPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="page-title">Classes</h1>
-        <p className="page-subtitle">Schools, classes, schedules and rosters.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="page-title">Classes</h1>
+          <p className="page-subtitle">Schools, classes, schedules and rosters.</p>
+        </div>
+        {isAdmin && <NewYear />}
       </div>
 
       {isAdmin && (
