@@ -11,6 +11,34 @@ import { sendEmail, resolveOperationSender, actionEmail } from "@/lib/email";
 
 const emailSchema = z.string().email();
 
+export type SalaryState = { ok?: boolean; error?: string } | undefined;
+
+// Admin: set (or clear) an assistant's per-class rate override (seniority).
+export async function setAssistantSalary(
+  assistantId: string,
+  _prev: SalaryState,
+  formData: FormData,
+): Promise<SalaryState> {
+  await requireRole("admin");
+  const operationId = await currentOperationId();
+  const assistant = await prisma.assistant.findUnique({
+    where: { id: assistantId },
+    select: { operationId: true },
+  });
+  if (!assistant || assistant.operationId !== operationId) return { error: "Not found." };
+
+  const raw = String(formData.get("perClassSalary") ?? "").trim();
+  let value: number | null = null;
+  if (raw) {
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) return { error: "Enter a valid amount." };
+    value = n;
+  }
+  await prisma.assistant.update({ where: { id: assistantId }, data: { perClassSalary: value } });
+  revalidatePath("/users");
+  return { ok: true };
+}
+
 export type InviteLink = { email: string; url: string; emailed: boolean };
 export type InviteState =
   | { ok: true; links: InviteLink[] }

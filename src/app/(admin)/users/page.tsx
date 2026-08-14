@@ -1,11 +1,13 @@
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
-import { currentOperationId } from "@/lib/operation";
+import { currentOperationId, resolveConfigFor } from "@/lib/operation";
 import { InviteAssistant } from "./invite-assistant";
+import { AssistantSalary } from "./assistant-salary";
 
 export default async function UsersPage() {
   await requireRole("admin");
   const operationId = await currentOperationId();
+  const cfg = await resolveConfigFor(operationId);
 
   const assistants = await prisma.assistant.findMany({
     where: { operationId },
@@ -36,6 +38,7 @@ export default async function UsersPage() {
                   <th>Name</th>
                   <th>Email</th>
                   <th>Status</th>
+                  <th>Rate / class</th>
                 </tr>
               </thead>
               <tbody>
@@ -53,6 +56,14 @@ export default async function UsersPage() {
                         ) : (
                           <span className="badge-success">Active</span>
                         )}
+                      </td>
+                      <td>
+                        <AssistantSalary
+                          assistantId={a.id}
+                          value={a.perClassSalary == null ? null : Number(a.perClassSalary)}
+                          defaultRate={cfg.perClassSalary}
+                          currency={cfg.currency}
+                        />
                       </td>
                     </tr>
                   );

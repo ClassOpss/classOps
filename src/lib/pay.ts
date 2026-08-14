@@ -29,9 +29,12 @@ export async function computePayComponents(
   const inMonth = { gte: start, lt: end };
   const assistant = await prisma.assistant.findUnique({
     where: { id: assistantId },
-    select: { operationId: true },
+    select: { operationId: true, perClassSalary: true },
   });
   const cfg = await resolveConfigFor(assistant?.operationId ?? "");
+  // Per-assistant rate (seniority) overrides the operation default when set.
+  const perClassRate =
+    assistant?.perClassSalary != null ? Number(assistant.perClassSalary) : cfg.perClassSalary;
   const [assignments, incidents, officeHours, covered, ownedCovered] = await Promise.all([
     // Distinct classes the assistant had an active assignment overlapping this month.
     prisma.classAssignment.findMany({
@@ -64,7 +67,7 @@ export async function computePayComponents(
 
   return {
     classesCovered,
-    baseSalary: classesCovered * cfg.perClassSalary * cfg.payMultiplier,
+    baseSalary: classesCovered * perClassRate * cfg.payMultiplier,
     lateDeductions,
     officeHoursBonus: officeHours * cfg.officeHourBonus,
     coverageAdjustment: (covered - ownedCovered) * cfg.coverageAdjustment,

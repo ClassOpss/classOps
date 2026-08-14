@@ -288,6 +288,8 @@ model Assistant {
   name        String
   email       String
   phone       String?
+  // Optional per-assistant per-class rate (e.g. seniority). Null = use the operation default.
+  perClassSalary Decimal? @map("per_class_salary") @db.Decimal(10, 2)
   active      Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
