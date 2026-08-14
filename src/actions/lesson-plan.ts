@@ -72,6 +72,33 @@ export async function removePlanItem(itemId: string): Promise<void> {
   revalidatePath("/lesson-plan");
 }
 
+// Reorder the whole plan to the given item order (drag-and-drop), then renumber 1..n.
+export async function reorderPlanItems(orderedIds: string[]): Promise<void> {
+  await requireRole("admin", "teacher");
+  const operationId = await currentOperationId();
+  if (orderedIds.length === 0) return;
+
+  const items = await prisma.lessonPlanItem.findMany({
+    where: { id: { in: orderedIds } },
+    select: { id: true, planId: true, plan: { select: { operationId: true } } },
+  });
+  // Guard: all items exist, belong to ONE plan in this operation, and match the set.
+  if (items.length !== orderedIds.length) return;
+  if (new Set(items.map((i) => i.planId)).size !== 1) return;
+  if (items.some((i) => i.plan.operationId !== operationId)) return;
+
+  // Offset pass first to dodge the @@unique([planId, sequence]) constraint.
+  await prisma.$transaction([
+    ...orderedIds.map((id, idx) =>
+      prisma.lessonPlanItem.update({ where: { id }, data: { sequence: idx + 1000 } }),
+    ),
+    ...orderedIds.map((id, idx) =>
+      prisma.lessonPlanItem.update({ where: { id }, data: { sequence: idx + 1 } }),
+    ),
+  ]);
+  revalidatePath("/lesson-plan");
+}
+
 // Move an item up or down, then renumber the whole plan 1..n.
 export async function movePlanItem(itemId: string, direction: "up" | "down"): Promise<void> {
   await requireRole("admin", "teacher");

@@ -83,7 +83,7 @@ export async function setAssistantEmail(
   return { ok: true };
 }
 
-export type InviteLink = { email: string; url: string; emailed: boolean };
+export type InviteLink = { email: string; url: string; emailed: boolean; emailError?: string | null };
 export type InviteState =
   | { ok: true; links: InviteLink[] }
   | { ok: false; error: string }
@@ -132,8 +132,11 @@ async function inviteOne(
   // Email the setup link (from the operation's resolved sender); fall back to the
   // copyable link if email isn't configured or the send fails.
   let emailed = false;
+  let emailError: string | null = null;
   const sender = await resolveOperationSender(operationId);
-  if (sender) {
+  if (!sender) {
+    emailError = "Email isn't configured on the server (set BREVO_API_KEY + BREVO_SENDER_EMAIL).";
+  } else {
     const { html, text } = actionEmail({
       brandName: sender.fromName,
       heading: "You've been invited as an assistant",
@@ -152,8 +155,9 @@ async function inviteOne(
       replyTo: sender.replyTo,
     });
     emailed = res.ok;
+    if (!res.ok) emailError = res.error;
   }
-  return { email, url, emailed };
+  return { email, url, emailed, emailError };
 }
 
 export async function inviteAssistantAction(

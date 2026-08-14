@@ -4,9 +4,9 @@ import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { YEAR_GROUPS } from "@/lib/constants";
 import { currentOperationId } from "@/lib/operation";
-import { movePlanItem, removePlanItem } from "@/actions/lesson-plan";
 import { deleteTopic } from "@/actions/topics";
 import { AddTopicForm, AddPlanItemForm } from "./lesson-plan-forms";
+import { PlanItems } from "./plan-items";
 
 export default async function LessonPlanPage({
   searchParams,
@@ -67,25 +67,10 @@ export default async function LessonPlanPage({
         {items.length === 0 ? (
           <p className="px-5 py-6 text-sm text-muted">No lessons yet — add topics below.</p>
         ) : (
-          <ol className="divide-y divide-border">
-            {items.map((item, idx) => (
-              <li key={item.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
-                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-softfg">
-                  {idx + 1}
-                </span>
-                <span className="flex-1">{item.topic?.title ?? "— (topic deleted)"}</span>
-                <form action={movePlanItem.bind(null, item.id, "up")}>
-                  <button type="submit" disabled={idx === 0} className="px-1 text-muted disabled:opacity-30 hover:text-fg">↑</button>
-                </form>
-                <form action={movePlanItem.bind(null, item.id, "down")}>
-                  <button type="submit" disabled={idx === items.length - 1} className="px-1 text-muted disabled:opacity-30 hover:text-fg">↓</button>
-                </form>
-                <form action={removePlanItem.bind(null, item.id)}>
-                  <button type="submit" className="font-medium text-danger hover:underline">Remove</button>
-                </form>
-              </li>
-            ))}
-          </ol>
+          <PlanItems
+            key={items.map((i) => i.id).join(",")}
+            initial={items.map((i) => ({ id: i.id, title: i.topic?.title ?? "— (topic deleted)" }))}
+          />
         )}
         <div className="border-t border-border px-5 py-4">
           <AddPlanItemForm yearGroup={yearGroup} topics={topics} />

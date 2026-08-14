@@ -11,6 +11,7 @@ function LinksPanel({ state }: { state: InviteState }) {
   if (!state) return null;
   if (!state.ok) return <p className="mt-3 text-sm text-danger">{state.error}</p>;
   const allEmailed = state.links.every((l) => l.emailed);
+  const anyError = state.links.find((l) => l.emailError)?.emailError;
   return (
     <div className="mt-4 rounded-lg border border-success/20 bg-success-soft p-4 text-sm">
       <p className="mb-2 font-medium text-success">
@@ -18,6 +19,9 @@ function LinksPanel({ state }: { state: InviteState }) {
           ? "Invite email(s) sent ✓ — link also shown below as a backup:"
           : "Invite link(s) created — send each to the assistant:"}
       </p>
+      {!allEmailed && anyError && (
+        <p className="mb-2 text-xs text-danger">Email didn&apos;t send: {anyError}</p>
+      )}
       <ul className="flex flex-col gap-2">
         {state.links.map((l) => (
           <li key={l.email} className="break-all">
