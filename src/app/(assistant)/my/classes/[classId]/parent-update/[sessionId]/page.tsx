@@ -113,6 +113,14 @@ export default async function ParentUpdatePage({
       </pre>
 
       <div className="flex flex-wrap items-center gap-3">
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(message)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-primary"
+        >
+          Send on WhatsApp
+        </a>
         <CopyMessage text={message} />
         <form action={markParentUpdateSent.bind(null, sessionId)}>
           <button type="submit" className="btn-secondary">
@@ -120,6 +128,9 @@ export default async function ParentUpdatePage({
           </button>
         </form>
       </div>
+      <p className="text-xs text-faint">
+        “Send on WhatsApp” opens WhatsApp with the message ready — pick the class group and send.
+      </p>
 
       {sentAt && (
         <div className={`rounded-lg px-3 py-2.5 text-sm ${late ? "bg-warn-soft text-warn" : "bg-success-soft text-success"}`}>
