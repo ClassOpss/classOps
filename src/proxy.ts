@@ -32,8 +32,10 @@ export default auth((req) => {
     return NextResponse.redirect(url);
   }
 
-  // Logged in -> keep them off the login/root pages.
-  if (onAuthPage || path === "/") {
+  // Logged in -> bounce only from the login + root pages. set-password / reset-password
+  // / forgot-password stay reachable so invite + reset links work even in a logged-in
+  // browser (the token is the credential there, not the session).
+  if (path === "/login" || path === "/") {
     return NextResponse.redirect(new URL(homeFor(role), nextUrl));
   }
 

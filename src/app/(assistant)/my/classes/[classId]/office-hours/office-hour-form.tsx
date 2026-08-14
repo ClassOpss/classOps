@@ -55,7 +55,7 @@ export function OfficeHourForm({
       </label>
       <div className="sm:col-span-2">
         <button type="submit" disabled={pending} className="btn-primary">
-          {pending ? "Logging…" : "Log office hour (+100 EGP)"}
+          {pending ? "Logging…" : "Log office hour"}
         </button>
         {state?.error ? <p className="mt-2 text-sm text-danger">{state.error}</p> : null}
         {state?.ok ? <p className="mt-2 text-sm text-success">Logged.</p> : null}

@@ -59,7 +59,7 @@ export default async function OfficeHoursPage({
       <div>
         <Link href={`/my/classes/${classId}`} className="link text-sm">← {klass.name}</Link>
         <h1 className="mt-1 text-lg font-semibold tracking-tight">Office hours</h1>
-        <p className="text-sm text-muted">{sessions.length} logged · +100 EGP each</p>
+        <p className="text-sm text-muted">{sessions.length} logged</p>
       </div>
 
       <section className="card p-4">
