@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { currentOperationId, resolveConfigFor } from "@/lib/operation";
 import { InviteAssistant } from "./invite-assistant";
 import { AssistantSalary } from "./assistant-salary";
+import { AssistantPhone } from "./assistant-phone";
+import { AssistantEmail } from "./assistant-email";
 
 export default async function UsersPage() {
   await requireRole("admin");
@@ -38,6 +40,7 @@ export default async function UsersPage() {
                   <th>Name</th>
                   <th>Email</th>
                   <th>Status</th>
+                  <th>WhatsApp</th>
                   <th>Rate / class</th>
                 </tr>
               </thead>
@@ -47,7 +50,7 @@ export default async function UsersPage() {
                   return (
                     <tr key={a.id}>
                       <td className="font-medium">{a.name}</td>
-                      <td className="text-muted">{a.email}</td>
+                      <td><AssistantEmail assistantId={a.id} value={a.email} /></td>
                       <td>
                         {!a.user?.active ? (
                           <span className="badge-danger">Deactivated</span>
@@ -56,6 +59,9 @@ export default async function UsersPage() {
                         ) : (
                           <span className="badge-success">Active</span>
                         )}
+                      </td>
+                      <td>
+                        <AssistantPhone assistantId={a.id} value={a.phone} />
                       </td>
                       <td>
                         <AssistantSalary

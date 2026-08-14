@@ -39,6 +39,50 @@ export async function setAssistantSalary(
   return { ok: true };
 }
 
+// Admin: set/clear an assistant's phone (for WhatsApp group invites).
+export async function setAssistantPhone(
+  assistantId: string,
+  _prev: SalaryState,
+  formData: FormData,
+): Promise<SalaryState> {
+  await requireRole("admin");
+  const operationId = await currentOperationId();
+  const assistant = await prisma.assistant.findUnique({
+    where: { id: assistantId },
+    select: { operationId: true },
+  });
+  if (!assistant || assistant.operationId !== operationId) return { error: "Not found." };
+  const phone = String(formData.get("phone") ?? "").trim() || null;
+  await prisma.assistant.update({ where: { id: assistantId }, data: { phone } });
+  revalidatePath("/users");
+  return { ok: true };
+}
+
+// Admin: fix/change an assistant's email (their login identity).
+export async function setAssistantEmail(
+  assistantId: string,
+  _prev: SalaryState,
+  formData: FormData,
+): Promise<SalaryState> {
+  await requireRole("admin");
+  const operationId = await currentOperationId();
+  const assistant = await prisma.assistant.findUnique({
+    where: { id: assistantId },
+    select: { operationId: true, userId: true },
+  });
+  if (!assistant || assistant.operationId !== operationId) return { error: "Not found." };
+
+  const email = String(formData.get("email") ?? "").toLowerCase().trim();
+  if (!emailSchema.safeParse(email).success) return { error: "Enter a valid email." };
+  const clash = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  if (clash && clash.id !== assistant.userId) return { error: "That email is already in use." };
+
+  await prisma.user.update({ where: { id: assistant.userId }, data: { email } });
+  await prisma.assistant.update({ where: { id: assistantId }, data: { email } });
+  revalidatePath("/users");
+  return { ok: true };
+}
+
 export type InviteLink = { email: string; url: string; emailed: boolean };
 export type InviteState =
   | { ok: true; links: InviteLink[] }
@@ -48,7 +92,12 @@ export type InviteState =
 // Create (or top up) an assistant account and return a setup link.
 // In v1 there's no SMTP, so the admin copies the link to the assistant (email send
 // can be slotted in later without changing this flow).
-async function inviteOne(name: string, rawEmail: string, operationId: string): Promise<InviteLink> {
+async function inviteOne(
+  name: string,
+  rawEmail: string,
+  operationId: string,
+  phone: string | null = null,
+): Promise<InviteLink> {
   const email = rawEmail.toLowerCase().trim();
   const existing = await prisma.user.findUnique({
     where: { email },
@@ -59,7 +108,9 @@ async function inviteOne(name: string, rawEmail: string, operationId: string): P
   if (existing) {
     userId = existing.id;
     if (!existing.assistant) {
-      await prisma.assistant.create({ data: { userId, name, email, operationId } });
+      await prisma.assistant.create({ data: { userId, name, email, operationId, phone } });
+    } else if (phone) {
+      await prisma.assistant.update({ where: { userId }, data: { phone } });
     }
   } else {
     const user = await prisma.user.create({
@@ -69,7 +120,7 @@ async function inviteOne(name: string, rawEmail: string, operationId: string): P
         role: "assistant",
         active: true,
         operationId,
-        assistant: { create: { name, email, operationId } },
+        assistant: { create: { name, email, operationId, phone } },
       },
     });
     userId = user.id;
@@ -112,11 +163,12 @@ export async function inviteAssistantAction(
   const admin = await requireRole("admin");
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim() || null;
 
   if (!name) return { ok: false, error: "Name is required." };
   if (!emailSchema.safeParse(email).success) return { ok: false, error: "Enter a valid email." };
 
-  const link = await inviteOne(name, email, await currentOperationId());
+  const link = await inviteOne(name, email, await currentOperationId(), phone);
   await logActivity({
     actorId: admin.id,
     actorRole: admin.role,

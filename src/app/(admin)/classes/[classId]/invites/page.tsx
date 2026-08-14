@@ -24,6 +24,10 @@ export default async function InvitesPage({ params }: { params: Promise<{ classI
         orderBy: { name: "asc" },
         select: { id: true, name: true, phone: true, parentName: true, parentPhone: true },
       },
+      assignments: {
+        where: { endDate: null },
+        select: { assistant: { select: { id: true, name: true, phone: true } } },
+      },
     },
   });
   if (!klass) notFound();
@@ -138,6 +142,38 @@ export default async function InvitesPage({ params }: { params: Promise<{ classI
           </div>
         )}
       </section>
+
+      {/* Assistants */}
+      {klass.studentGroupLink && klass.assignments.length > 0 && (
+        <section className="card overflow-hidden">
+          <div className="border-b border-border px-5 py-4">
+            <h2 className="section-title">Assistants ({klass.assignments.length})</h2>
+            <p className="mt-0.5 text-sm text-muted">Send each assistant the class WhatsApp group link.</p>
+          </div>
+          <ul className="divide-y divide-border">
+            {klass.assignments.map(({ assistant: a }) => {
+              const href = waLink(
+                a.phone,
+                `Hi ${a.name}, join the ${klass.name} class WhatsApp group: ${klass.studentGroupLink}`,
+              );
+              return (
+                <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-5 py-3 text-sm">
+                  <span className="font-medium">{a.name}</span>
+                  <span className="ml-auto">
+                    {href ? (
+                      <a href={href} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm">
+                        WhatsApp
+                      </a>
+                    ) : (
+                      <span className="text-xs text-faint">no number — add it on Users</span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <p className="text-xs text-faint">
         Bulk email/SMS sending (one click for everyone) arrives once email is connected. Auto-adding to

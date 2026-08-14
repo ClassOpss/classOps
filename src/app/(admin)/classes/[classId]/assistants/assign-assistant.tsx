@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { assignAssistant, type FormState } from "@/actions/assignments";
 
@@ -14,7 +15,12 @@ export function AssignAssistant({
   const [state, formAction, pending] = useActionState<FormState, FormData>(action, undefined);
 
   if (available.length === 0) {
-    return <p className="text-sm text-muted">No more assistants available to assign.</p>;
+    return (
+      <p className="text-sm text-muted">
+        No assistants available. Invite them on the{" "}
+        <Link href="/users" className="link">Users</Link> page first, then assign them here.
+      </p>
+    );
   }
 
   return (

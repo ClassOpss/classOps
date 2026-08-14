@@ -52,6 +52,7 @@ export function InviteAssistant() {
         <form action={singleAction} className="flex flex-col gap-3">
           <input name="name" placeholder="Full name" required className={inputCls} />
           <input name="email" type="email" placeholder="email@example.com" required className={inputCls} />
+          <input name="phone" placeholder="WhatsApp number (optional)" className={inputCls} />
           <button type="submit" disabled={singlePending} className={btnCls}>
             {singlePending ? "Inviting…" : "Invite"}
           </button>
