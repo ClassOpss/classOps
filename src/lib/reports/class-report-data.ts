@@ -16,11 +16,14 @@ const ukDate = (d: Date) =>
 
 export type ClassReportData = {
   logoDataUri: string | null;
+  brandName: string;
+  generatedAt: string;
   className: string;
   schoolName: string;
   yearGroup: string;
   assistants: string[];
   monthLabel: string;
+  summary: { sessionsDelivered: number; avgAttendance: string; classAverage: string; students: number };
   sessions: { lesson: string; date: string; topic: string; attendanceRate: string }[];
   assessments: { label: string; date: string; max: number; classAvg: string }[];
   // Student rows are identified by CODE (privacy — see student-code-privacy), ordered by code.
@@ -161,13 +164,42 @@ export async function buildClassReportData(
     submissionRate: activeStudentCount > 0 ? `${Math.round((h.submissions.length / activeStudentCount) * 100)}%` : "—",
   }));
 
+  // Summary KPIs
+  const monthSessions = allSessions.filter(
+    (x) => x.scheduledDate >= start && x.scheduledDate < end && !x.dayOff,
+  );
+  let presentSum = 0;
+  let attnSum = 0;
+  for (const x of monthSessions) {
+    attnSum += x.attendance.length;
+    presentSum += x.attendance.filter((a) => a.status === "present").length;
+  }
+  let gradeSum = 0;
+  let gradeN = 0;
+  for (const st of students) {
+    for (const g of st.grades) {
+      if (g.percentage != null) {
+        gradeSum += Number(g.percentage);
+        gradeN += 1;
+      }
+    }
+  }
+
   return {
     logoDataUri,
+    brandName: cfg.brandName,
+    generatedAt: ukDate(new Date()),
     className: klass.name,
     schoolName: klass.school.name,
     yearGroup: klass.yearGroup,
     assistants: klass.assignments.map((a) => a.assistant.name),
     monthLabel: `${MONTHS[month - 1]} ${year}`,
+    summary: {
+      sessionsDelivered: monthSessions.length,
+      avgAttendance: attnSum > 0 ? `${Math.round((presentSum / attnSum) * 100)}%` : "—",
+      classAverage: gradeN > 0 ? `${Math.round(gradeSum / gradeN)}%` : "—",
+      students: activeStudentCount,
+    },
     sessions,
     assessments,
     students: studentRows,
