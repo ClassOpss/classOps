@@ -14,6 +14,7 @@ const data: StudentReportData = {
   monthLabel: "August 2026",
   parentNotes: "Youssef has improved noticeably on algebra. Please encourage him to attempt the harder past-paper questions before the next quiz.",
   summary: { attendanceRate: "83%", average: "76%", missedHw: 1, absences: 1 },
+  trend: { averageDelta: 8, attendanceDelta: -5 },
   absences: [{ date: "24 Aug 2026", topic: "Coordinate Geometry" }],
   missedHomework: [{ description: "Exercise 3A, Q1–10", due: "10 Aug 2026" }],
   grades: [

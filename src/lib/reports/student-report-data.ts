@@ -25,6 +25,8 @@ export type StudentReportData = {
   monthLabel: string;
   parentNotes: string | null;
   summary: { attendanceRate: string; average: string; missedHw: number; absences: number };
+  // Change in percentage points vs the previous month (null = no prior data).
+  trend: { averageDelta: number | null; attendanceDelta: number | null };
   absences: { date: string; topic: string }[];
   missedHomework: { description: string; due: string }[];
   grades: { label: string; date: string; score: string; classAvg: string; standing: Standing | null }[];
@@ -131,7 +133,29 @@ export async function buildStudentReportData(
   const gradedPcts = grades
     .map((g) => (g.score.endsWith("%") ? parseInt(g.score) : null))
     .filter((x): x is number => x != null);
-  const average = gradedPcts.length ? `${Math.round(gradedPcts.reduce((s, x) => s + x, 0) / gradedPcts.length)}%` : "—";
+  const curAvg = gradedPcts.length ? gradedPcts.reduce((s, x) => s + x, 0) / gradedPcts.length : null;
+  const average = curAvg == null ? "—" : `${Math.round(curAvg)}%`;
+  const curAttRate = attendance.length ? (present / attendance.length) * 100 : null;
+
+  // Previous month, for trend deltas.
+  const pm = month === 1 ? { m: 12, y: year - 1 } : { m: month - 1, y: year };
+  const pw = monthWindow(pm.m, pm.y);
+  const [prevAtt, prevGrades] = await Promise.all([
+    prisma.attendance.findMany({
+      where: { studentId, session: { scheduledDate: { gte: pw.start, lt: pw.end } } },
+      select: { status: true },
+    }),
+    prisma.assessmentGrade.findMany({
+      where: { studentId, absent: false, percentage: { not: null }, assessment: { isDiagnostic: false, date: { gte: pw.start, lt: pw.end } } },
+      select: { percentage: true },
+    }),
+  ]);
+  const prevAttRate = prevAtt.length ? (prevAtt.filter((a) => a.status === "present").length / prevAtt.length) * 100 : null;
+  const prevAvg = prevGrades.length ? prevGrades.reduce((s, g) => s + Number(g.percentage), 0) / prevGrades.length : null;
+  const trend = {
+    averageDelta: curAvg != null && prevAvg != null ? Math.round(curAvg - prevAvg) : null,
+    attendanceDelta: curAttRate != null && prevAttRate != null ? Math.round(curAttRate - prevAttRate) : null,
+  };
 
   return {
     logoDataUri: await loadLogo(operationId, cfg.logoPath),
@@ -144,11 +168,12 @@ export async function buildStudentReportData(
     monthLabel: `${MONTHS[month - 1]} ${year}`,
     parentNotes: student.parentNotes,
     summary: {
-      attendanceRate: attendance.length ? `${Math.round((present / attendance.length) * 100)}%` : "—",
+      attendanceRate: curAttRate == null ? "—" : `${Math.round(curAttRate)}%`,
       average,
       missedHw: missedHomework.length,
       absences: absences.length,
     },
+    trend,
     absences,
     missedHomework,
     grades,

@@ -24,6 +24,7 @@ const s = StyleSheet.create({
   kpi: { flex: 1, borderWidth: 1, borderColor: LINE, borderRadius: 7, paddingVertical: 11, paddingHorizontal: 12, marginRight: 8 },
   kpiVal: { fontSize: 17, fontFamily: "Helvetica-Bold", color: BRAND },
   kpiLabel: { fontSize: 7.5, color: MUTED, marginTop: 3, textTransform: "uppercase", letterSpacing: 0.6 },
+  kpiDelta: { fontSize: 7.5, marginTop: 4, fontFamily: "Helvetica-Bold" },
   section: { marginTop: 20 },
   h2: { fontSize: 9, fontFamily: "Helvetica-Bold", color: BRAND, textTransform: "uppercase", letterSpacing: 1, marginBottom: 7 },
   thead: { flexDirection: "row", backgroundColor: SOFT, borderTopLeftRadius: 5, borderTopRightRadius: 5 },
@@ -34,6 +35,16 @@ const s = StyleSheet.create({
   notes: { borderWidth: 1, borderColor: LINE, borderRadius: 7, backgroundColor: "#fffdf6", padding: 12, fontSize: 10, lineHeight: 1.5 },
   footer: { position: "absolute", bottom: 22, left: 32, right: 32, flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: LINE, paddingTop: 8, fontSize: 7.5, color: FAINT },
 });
+
+function Delta({ d }: { d: number | null }) {
+  if (d == null || d === 0) return null;
+  const up = d > 0;
+  return (
+    <Text style={[s.kpiDelta, { color: up ? GREEN : RED }]}>
+      {up ? "+" : "-"}{Math.abs(d)} pts vs last month
+    </Text>
+  );
+}
 
 function standingStyle(st: Standing | null) {
   if (st === "above") return { color: GREEN, label: "Above average" };
@@ -61,8 +72,8 @@ export function StudentReportDoc({ data }: { data: StudentReportData }) {
           </Text>
 
           <View style={s.kpiRow}>
-            <View style={s.kpi}><Text style={s.kpiVal}>{data.summary.attendanceRate}</Text><Text style={s.kpiLabel}>Attendance</Text></View>
-            <View style={s.kpi}><Text style={s.kpiVal}>{data.summary.average}</Text><Text style={s.kpiLabel}>Average grade</Text></View>
+            <View style={s.kpi}><Text style={s.kpiVal}>{data.summary.attendanceRate}</Text><Text style={s.kpiLabel}>Attendance</Text><Delta d={data.trend.attendanceDelta} /></View>
+            <View style={s.kpi}><Text style={s.kpiVal}>{data.summary.average}</Text><Text style={s.kpiLabel}>Average grade</Text><Delta d={data.trend.averageDelta} /></View>
             <View style={s.kpi}><Text style={s.kpiVal}>{String(data.summary.absences)}</Text><Text style={s.kpiLabel}>Absences</Text></View>
             <View style={[s.kpi, { marginRight: 0 }]}><Text style={s.kpiVal}>{String(data.summary.missedHw)}</Text><Text style={s.kpiLabel}>Missed homework</Text></View>
           </View>
