@@ -35,6 +35,21 @@ export function studentInviteMessage(opts: {
   return lines.join("\n").trim();
 }
 
+// Shares a student's ClassOps code (reports/grades are referenced by code).
+export function studentCodeMessage(opts: {
+  brandName: string;
+  className: string;
+  studentName: string;
+  code: string;
+}): string {
+  return [
+    `${opts.studentName}'s code for ${opts.className} is *${opts.code}*.`,
+    "Grades and reports are shared using this code — please keep it handy.",
+    "",
+    `— ${opts.brandName}`,
+  ].join("\n");
+}
+
 // A private per-student progress report for the parent (sent 1:1 over WhatsApp).
 export function parentReportMessage(opts: {
   brandName: string;

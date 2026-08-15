@@ -266,6 +266,8 @@ model Student {
   phone       String?
   parentName  String?  @map("parent_name")
   parentPhone String?  @map("parent_phone")
+  // Free-text notes for the parent, included on the student's PDF report.
+  parentNotes String?  @map("parent_notes")
   active      Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 

@@ -107,6 +107,24 @@ export async function updateStudentContacts(
   return { ok: true };
 }
 
+// Set the free-text parent notes shown on the student's PDF report.
+export async function setParentNotes(
+  studentId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+    select: { classId: true },
+  });
+  if (!student) return { error: "Student not found." };
+  await requireClassAccess(student.classId);
+  const notes = String(formData.get("parentNotes") ?? "").trim() || null;
+  await prisma.student.update({ where: { id: studentId }, data: { parentNotes: notes } });
+  revalidatePath(`/classes/${student.classId}/parent-reports`);
+  return { ok: true };
+}
+
 // Soft-deactivate a student (kept for historical records). Admin or teacher.
 export async function deactivateStudent(studentId: string): Promise<void> {
   await requireRole("admin", "teacher");
