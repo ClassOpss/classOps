@@ -21,7 +21,7 @@ export default async function AssistantParentReportsPage({
         where: { active: true },
         orderBy: { name: "asc" },
         select: {
-          id: true, name: true, code: true, phone: true, parentName: true, parentPhone: true, parentNotes: true,
+          id: true, name: true, code: true, phone: true, parentPrefix: true, parentName: true, parentPhone: true, parentNotes: true,
           attendance: { select: { status: true } },
           grades: { where: { assessment: { isDiagnostic: false }, percentage: { not: null } }, select: { percentage: true } },
           hwSubmissions: { select: { status: true } },
@@ -35,7 +35,7 @@ export default async function AssistantParentReportsPage({
   const cfg = await resolveConfigFor(operationId);
 
   const students: PRStudent[] = klass.students.map((s) => ({
-    id: s.id, name: s.name, code: s.code, phone: s.phone, parentName: s.parentName,
+    id: s.id, name: s.name, code: s.code, phone: s.phone, parentPrefix: s.parentPrefix, parentName: s.parentName,
     parentPhone: s.parentPhone, parentNotes: s.parentNotes,
     present: s.attendance.filter((a) => a.status === "present").length,
     total: s.attendance.length,

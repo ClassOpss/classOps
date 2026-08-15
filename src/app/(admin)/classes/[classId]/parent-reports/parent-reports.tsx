@@ -9,6 +9,7 @@ export type PRStudent = {
   name: string;
   code: string;
   phone: string | null;
+  parentPrefix: string | null;
   parentName: string | null;
   parentPhone: string | null;
   parentNotes: string | null;
@@ -75,13 +76,17 @@ function Row({
   const [state, action, pending] = useActionState<FormState, FormData>(setParentNotes.bind(null, s.id), undefined);
 
   const codeToStudent = waLink(s.phone, studentCodeMessage({ studentName: s.name, code: s.code, signature }));
-  const codeToParent = waLink(s.parentPhone, parentCodeMessage({ studentName: s.name, code: s.code, signature }));
+  const codeToParent = waLink(
+    s.parentPhone,
+    parentCodeMessage({ studentName: s.name, code: s.code, signature, parentPrefix: s.parentPrefix, parentName: s.parentName }),
+  );
   const reportToParent = waLink(
     s.parentPhone,
     parentReportMessage({
       brandName,
       className,
       studentName: s.name,
+      parentPrefix: s.parentPrefix,
       parentName: s.parentName,
       attendance: { present: s.present, total: s.total },
       avgPercent: s.avg,

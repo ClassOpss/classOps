@@ -101,7 +101,7 @@ export function StudentReportDoc({ data }: { data: StudentReportData }) {
               <Text style={[s.th, { flex: 6 }]}>Lesson</Text>
             </View>
             {data.absences.length === 0 ? (
-              <Text style={s.empty}>Full attendance this month. 🎉</Text>
+              <Text style={s.empty}>Full attendance this month.</Text>
             ) : (
               data.absences.map((a, i) => (
                 <View key={i} style={s.tr} wrap={false}>
@@ -119,7 +119,7 @@ export function StudentReportDoc({ data }: { data: StudentReportData }) {
               <Text style={[s.th, { flex: 2, textAlign: "right" }]}>Was due</Text>
             </View>
             {data.missedHomework.length === 0 ? (
-              <Text style={s.empty}>No missed homework this month. 🎉</Text>
+              <Text style={s.empty}>No missed homework this month.</Text>
             ) : (
               data.missedHomework.map((h, i) => (
                 <View key={i} style={s.tr} wrap={false}>

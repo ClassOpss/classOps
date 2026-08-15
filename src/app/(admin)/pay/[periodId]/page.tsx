@@ -116,19 +116,22 @@ export default async function PayPeriodPage({
                     <span className={statusBadge[c.status] ?? "badge-neutral"}>{c.status}</span>
                   </td>
                   <td>
-                    {c.status === "pending" && (
-                      <form action={approveCalc.bind(null, c.id)}>
-                        <button type="submit" className="link">Approve</button>
-                      </form>
-                    )}
-                    {c.status === "approved" && (
-                      <form action={sendCalc.bind(null, c.id)}>
-                        <button type="submit" className="font-medium text-success hover:underline">Send</button>
-                      </form>
-                    )}
-                    {c.status === "sent" && c.sentAt && (
-                      <span className="text-xs text-faint">sent</span>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <a href={`/api/payslip/${c.id}`} target="_blank" rel="noopener noreferrer" className="link">Payslip</a>
+                      {c.status === "pending" && (
+                        <form action={approveCalc.bind(null, c.id)}>
+                          <button type="submit" className="link">Approve</button>
+                        </form>
+                      )}
+                      {c.status === "approved" && (
+                        <form action={sendCalc.bind(null, c.id)}>
+                          <button type="submit" className="font-medium text-success hover:underline">Send</button>
+                        </form>
+                      )}
+                      {c.status === "sent" && c.sentAt && (
+                        <span className="text-xs text-faint">sent</span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

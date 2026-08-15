@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { formatCairo } from "@/lib/datetime";
 import { waiveIncident, unwaiveIncident } from "@/actions/incidents";
 import { detectCoverageCandidates } from "@/lib/coverage";
+import { detectAtRiskStudents } from "@/lib/at-risk";
 import { confirmCoverage } from "@/actions/coverage";
 import { approveOfficeHour, rejectOfficeHour } from "@/actions/office-hours";
 import { currentOperationId } from "@/lib/operation";
@@ -76,6 +77,7 @@ export default async function DashboardPage() {
   const outstanding = incidents.filter((i) => !i.waived);
   const dueTotal = outstanding.reduce((sum, i) => sum + Number(i.deductionAmount), 0);
   const coverages = isAdmin ? await detectCoverageCandidates(operationId) : [];
+  const atRisk = await detectAtRiskStudents(operationId);
   const pendingOfficeHours = isAdmin
     ? await prisma.officeHourSession.findMany({
         where: { approved: false, assistant: { operationId } },
@@ -106,6 +108,33 @@ export default async function DashboardPage() {
         <StatCard label="Sessions this month (delivered / planned)" value={`${delivered} / ${planned}`} />
         {isAdmin && <StatCard label="Open late incidents" value={openIncidentCount} />}
       </div>
+
+      {atRisk.length > 0 && (
+        <section className="card overflow-hidden">
+          <div className="border-b border-border px-5 py-4">
+            <h2 className="section-title">Needs attention ({atRisk.length})</h2>
+            <p className="mt-0.5 text-sm text-muted">
+              Students below thresholds on attendance, homework, or grades.
+            </p>
+          </div>
+          <ul className="divide-y divide-border">
+            {atRisk.slice(0, 12).map((st) => (
+              <li key={st.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-5 py-3 text-sm">
+                <span className="font-medium">{st.name}</span>
+                <Link href={`/classes/${st.classId}`} className="link">{st.className}</Link>
+                <span className="ml-auto flex flex-wrap gap-1.5">
+                  {st.reasons.map((r) => (
+                    <span key={r} className="badge-danger">{r}</span>
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {atRisk.length > 12 && (
+            <p className="px-5 py-2 text-xs text-faint">+ {atRisk.length - 12} more</p>
+          )}
+        </section>
+      )}
 
       {isAdmin && pendingOfficeHours.length > 0 && (
         <section className="card overflow-hidden">

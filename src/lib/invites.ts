@@ -54,10 +54,22 @@ export function studentCodeMessage(opts: { studentName: string; code: string; si
   ].join("\n");
 }
 
+// How to address a parent: "<prefix> <name>", or a graceful fallback.
+function parentSalutation(opts: { parentPrefix?: string | null; parentName?: string | null; studentName: string }): string {
+  if (opts.parentName) return `${opts.parentPrefix ? opts.parentPrefix + " " : ""}${opts.parentName}`;
+  return `${opts.studentName}'s parent`;
+}
+
 // Code message to the PARENT.
-export function parentCodeMessage(opts: { studentName: string; code: string; signature: string }): string {
+export function parentCodeMessage(opts: {
+  studentName: string;
+  code: string;
+  signature: string;
+  parentPrefix?: string | null;
+  parentName?: string | null;
+}): string {
   return [
-    `${greeting()} Mr/Mrs ${opts.studentName}’s Parent,`,
+    `${greeting()} ${parentSalutation(opts)},`,
     `To keep grades private, we’ll be using special codes instead of names when sharing results. Your child's unique code is: ${opts.code} ✅`,
     `Please keep this code safe — you’ll need it to find your child's grades every week. Think of it as your own little secret ID 🤩`,
     `Best of luck on your child's quizzes — we believe in them!`,
@@ -70,13 +82,14 @@ export function parentReportMessage(opts: {
   brandName: string;
   className: string;
   studentName: string;
+  parentPrefix?: string | null;
   parentName?: string | null;
   periodLabel?: string | null;
   attendance: { present: number; total: number };
   avgPercent: number | null;
   hw: { onTime: number; late: number; missing: number };
 }): string {
-  const who = opts.parentName ? opts.parentName : "there";
+  const who = opts.parentName ? parentSalutation(opts) : "there";
   const att = opts.attendance;
   const attLine =
     att.total > 0

@@ -98,6 +98,7 @@ export async function updateStudentContacts(
     data: {
       email: clean("email"),
       phone: clean("phone"),
+      parentPrefix: clean("parentPrefix"),
       parentName: clean("parentName"),
       parentPhone: clean("parentPhone"),
     },

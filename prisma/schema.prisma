@@ -264,6 +264,7 @@ model Student {
   // Contact details captured at import (for Classroom invites + WhatsApp link sends).
   email       String?
   phone       String?
+  parentPrefix String? @map("parent_prefix") // title: Dr / Eng / Mr / Mrs …
   parentName  String?  @map("parent_name")
   parentPhone String?  @map("parent_phone")
   // Free-text notes for the parent, included on the student's PDF report.

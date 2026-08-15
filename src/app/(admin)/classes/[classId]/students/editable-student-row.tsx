@@ -9,9 +9,12 @@ export type StudentRow = {
   name: string;
   email: string | null;
   phone: string | null;
+  parentPrefix: string | null;
   parentName: string | null;
   parentPhone: string | null;
 };
+
+const PREFIXES = ["", "Mr", "Mrs", "Ms", "Dr", "Eng"];
 
 export function EditableStudentRow({ student, canRemove }: { student: StudentRow; canRemove: boolean }) {
   const [editing, setEditing] = useState(false);
@@ -35,7 +38,12 @@ export function EditableStudentRow({ student, canRemove }: { student: StudentRow
             <div className="grid gap-2 sm:grid-cols-2">
               <input name="email" type="email" defaultValue={student.email ?? ""} placeholder="Email" className="input !py-1.5 text-sm" />
               <input name="phone" defaultValue={student.phone ?? ""} placeholder="Student phone" className="input !py-1.5 text-sm" />
-              <input name="parentName" defaultValue={student.parentName ?? ""} placeholder="Parent name" className="input !py-1.5 text-sm" />
+              <div className="flex gap-2">
+                <select name="parentPrefix" defaultValue={student.parentPrefix ?? ""} className="input !w-24 !py-1.5 text-sm">
+                  {PREFIXES.map((p) => <option key={p} value={p}>{p || "—"}</option>)}
+                </select>
+                <input name="parentName" defaultValue={student.parentName ?? ""} placeholder="Parent name" className="input flex-1 !py-1.5 text-sm" />
+              </div>
               <input name="parentPhone" defaultValue={student.parentPhone ?? ""} placeholder="Parent phone" className="input !py-1.5 text-sm" />
             </div>
             <div className="flex items-center gap-2">
@@ -56,7 +64,7 @@ export function EditableStudentRow({ student, canRemove }: { student: StudentRow
       <td className="font-medium">{student.name}</td>
       <td className="text-muted">{student.email ?? "—"}</td>
       <td className="text-muted">
-        {student.parentName ?? "—"}
+        {student.parentName ? `${student.parentPrefix ? student.parentPrefix + " " : ""}${student.parentName}` : "—"}
         {student.parentPhone ? <span className="text-faint"> · {student.parentPhone}</span> : null}
       </td>
       <td>

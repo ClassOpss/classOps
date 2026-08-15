@@ -81,6 +81,7 @@ export default async function AssistantStudentsPage({
                       name: s.name,
                       email: s.email,
                       phone: s.phone,
+                      parentPrefix: s.parentPrefix,
                       parentName: s.parentName,
                       parentPhone: s.parentPhone,
                     }}
