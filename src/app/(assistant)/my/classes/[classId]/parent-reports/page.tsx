@@ -57,7 +57,7 @@ export default async function AssistantParentReportsPage({
       {students.length === 0 ? (
         <div className="card p-5 text-sm text-muted">No students yet.</div>
       ) : (
-        <ParentReports brandName={cfg.brandName} className={klass.name} students={students} />
+        <ParentReports brandName={cfg.brandName} signature={cfg.brandSignature} className={klass.name} students={students} />
       )}
     </div>
   );

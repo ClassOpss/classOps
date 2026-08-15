@@ -35,18 +35,33 @@ export function studentInviteMessage(opts: {
   return lines.join("\n").trim();
 }
 
-// Shares a student's ClassOps code (reports/grades are referenced by code).
-export function studentCodeMessage(opts: {
-  brandName: string;
-  className: string;
-  studentName: string;
-  code: string;
-}): string {
+// Time-of-day greeting (uses the runtime's local time — the sender's, in Cairo).
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good Morning";
+  if (h < 17) return "Good Afternoon";
+  return "Good Evening";
+}
+
+// Code message to the STUDENT (reports/grades are referenced by code, for privacy).
+export function studentCodeMessage(opts: { studentName: string; code: string; signature: string }): string {
   return [
-    `${opts.studentName}'s code for ${opts.className} is *${opts.code}*.`,
-    "Grades and reports are shared using this code — please keep it handy.",
-    "",
-    `— ${opts.brandName}`,
+    `${greeting()} ${opts.studentName},`,
+    `To keep grades private, we’ll be using special codes instead of names when sharing results. Your unique code is: ${opts.code} ✅`,
+    `Please keep this code safe — you’ll need it to find your grades every month. Think of it as your own little secret ID 🤩`,
+    `Best of luck on your quizzes — we believe in you!`,
+    `${opts.signature} 💗`,
+  ].join("\n");
+}
+
+// Code message to the PARENT.
+export function parentCodeMessage(opts: { studentName: string; code: string; signature: string }): string {
+  return [
+    `${greeting()} Mr/Mrs ${opts.studentName}’s Parent,`,
+    `To keep grades private, we’ll be using special codes instead of names when sharing results. Your child's unique code is: ${opts.code} ✅`,
+    `Please keep this code safe — you’ll need it to find your child's grades every week. Think of it as your own little secret ID 🤩`,
+    `Best of luck on your child's quizzes — we believe in them!`,
+    `${opts.signature} 💗`,
   ].join("\n");
 }
 

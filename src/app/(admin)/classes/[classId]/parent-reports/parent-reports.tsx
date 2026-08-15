@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { setParentNotes, type FormState } from "@/actions/students";
-import { waLink, studentCodeMessage, parentReportMessage } from "@/lib/invites";
+import { waLink, studentCodeMessage, parentCodeMessage, parentReportMessage } from "@/lib/invites";
 
 export type PRStudent = {
   id: string;
@@ -22,10 +22,12 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 
 export function ParentReports({
   brandName,
+  signature,
   className,
   students,
 }: {
   brandName: string;
+  signature: string;
   className: string;
   students: PRStudent[];
 }) {
@@ -47,7 +49,7 @@ export function ParentReports({
 
       <ul className="flex flex-col gap-3">
         {students.map((s) => (
-          <Row key={s.id} s={s} brandName={brandName} className={className} month={month} year={year} />
+          <Row key={s.id} s={s} brandName={brandName} signature={signature} className={className} month={month} year={year} />
         ))}
       </ul>
     </div>
@@ -57,12 +59,14 @@ export function ParentReports({
 function Row({
   s,
   brandName,
+  signature,
   className,
   month,
   year,
 }: {
   s: PRStudent;
   brandName: string;
+  signature: string;
   className: string;
   month: number;
   year: number;
@@ -70,8 +74,8 @@ function Row({
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState<FormState, FormData>(setParentNotes.bind(null, s.id), undefined);
 
-  const codeToStudent = waLink(s.phone, studentCodeMessage({ brandName, className, studentName: s.name, code: s.code }));
-  const codeToParent = waLink(s.parentPhone, studentCodeMessage({ brandName, className, studentName: s.name, code: s.code }));
+  const codeToStudent = waLink(s.phone, studentCodeMessage({ studentName: s.name, code: s.code, signature }));
+  const codeToParent = waLink(s.parentPhone, parentCodeMessage({ studentName: s.name, code: s.code, signature }));
   const reportToParent = waLink(
     s.parentPhone,
     parentReportMessage({

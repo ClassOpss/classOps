@@ -69,7 +69,7 @@ export default async function ParentReportsPage({ params }: { params: Promise<{ 
       {students.length === 0 ? (
         <div className="card p-6 text-sm text-muted">No students yet.</div>
       ) : (
-        <ParentReports brandName={cfg.brandName} className={klass.name} students={students} />
+        <ParentReports brandName={cfg.brandName} signature={cfg.brandSignature} className={klass.name} students={students} />
       )}
 
       <p className="text-xs text-faint">
