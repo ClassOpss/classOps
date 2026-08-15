@@ -95,11 +95,29 @@ export default async function DashboardPage() {
       })
     : [];
 
+  const MONTHS = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  const curMonth = now.getUTCMonth() + 1;
+  const curYear = now.getUTCFullYear();
+
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="page-title">Dashboard</h1>
-        <p className="page-subtitle">Operations overview and recent activity.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="page-title">Dashboard</h1>
+          <p className="page-subtitle">Operations overview and recent activity.</p>
+        </div>
+        <form action="/api/reports/operation" method="get" target="_blank" className="flex items-end gap-2">
+          <select name="month" defaultValue={curMonth} className="input !w-auto !py-1.5 text-sm">
+            {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+          </select>
+          <select name="year" defaultValue={curYear} className="input !w-auto !py-1.5 text-sm">
+            {[curYear - 1, curYear].map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <button type="submit" className="btn-primary btn-sm">Operation report (PDF)</button>
+        </form>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
