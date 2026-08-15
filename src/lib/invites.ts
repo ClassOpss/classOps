@@ -29,7 +29,7 @@ export function studentInviteMessage(opts: {
   studentGroupLink?: string | null;
   classroomLink?: string | null;
 }): string {
-  const lines = [`Hi ${opts.studentName}, welcome to ${opts.className}! 🎓`, ""];
+  const lines = [`Hi ${opts.studentName}, welcome to ${opts.className}! ${GRAD}`, ""];
   if (opts.studentGroupLink) lines.push(`Join the class WhatsApp group: ${opts.studentGroupLink}`);
   if (opts.classroomLink) lines.push(`Join our Google Classroom: ${opts.classroomLink}`);
   return lines.join("\n").trim();
@@ -44,13 +44,22 @@ function greeting(): string {
 }
 
 // Code message to the STUDENT (reports/grades are referenced by code, for privacy).
+// Emoji + typographic chars are written as \u escapes (ASCII source) so no build /
+// file-encoding step can corrupt them into replacement characters.
+const CHECK = "\u2705";
+const STARSTRUCK = "\u{1F929}";
+const HEART = "\u{1F497}";
+const GRAD = "\u{1F393}";
+const RSQUO = "\u2019";
+const MDASH = "\u2014";
+
 export function studentCodeMessage(opts: { studentName: string; code: string; signature: string }): string {
   return [
     `${greeting()} ${opts.studentName},`,
-    `To keep grades private, we’ll be using special codes instead of names when sharing results. Your unique code is: ${opts.code} ✅`,
-    `Please keep this code safe — you’ll need it to find your grades every month. Think of it as your own little secret ID 🤩`,
-    `Best of luck on your quizzes — we believe in you!`,
-    `${opts.signature} 💗`,
+    `To keep grades private, we${RSQUO}ll be using special codes instead of names when sharing results. Your unique code is: ${opts.code} ${CHECK}`,
+    `Please keep this code safe ${MDASH} you${RSQUO}ll need it to find your grades every month. Think of it as your own little secret ID ${STARSTRUCK}`,
+    `Best of luck on your quizzes ${MDASH} we believe in you!`,
+    `${opts.signature} ${HEART}`,
   ].join("\n");
 }
 
@@ -70,10 +79,10 @@ export function parentCodeMessage(opts: {
 }): string {
   return [
     `${greeting()} ${parentSalutation(opts)},`,
-    `To keep grades private, we’ll be using special codes instead of names when sharing results. Your child's unique code is: ${opts.code} ✅`,
-    `Please keep this code safe — you’ll need it to find your child's grades every week. Think of it as your own little secret ID 🤩`,
-    `Best of luck on your child's quizzes — we believe in them!`,
-    `${opts.signature} 💗`,
+    `To keep grades private, we${RSQUO}ll be using special codes instead of names when sharing results. Your child's unique code is: ${opts.code} ${CHECK}`,
+    `Please keep this code safe ${MDASH} you${RSQUO}ll need it to find your child's grades every week. Think of it as your own little secret ID ${STARSTRUCK}`,
+    `Best of luck on your child's quizzes ${MDASH} we believe in them!`,
+    `${opts.signature} ${HEART}`,
   ].join("\n");
 }
 
