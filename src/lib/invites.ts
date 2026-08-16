@@ -46,12 +46,12 @@ function greeting(): string {
 // Code message to the STUDENT (reports/grades are referenced by code, for privacy).
 // Emoji + typographic chars are written as \u escapes (ASCII source) so no build /
 // file-encoding step can corrupt them into replacement characters.
-const CHECK = "\u2705";
-const STARSTRUCK = "\u{1F929}";
-const HEART = "\u{1F497}";
-const GRAD = "\u{1F393}";
-const RSQUO = "\u2019";
-const MDASH = "\u2014";
+const CHECK = String.fromCodePoint(0x2705);
+const STARSTRUCK = String.fromCodePoint(0x1F929);
+const HEART = String.fromCodePoint(0x1F497);
+const GRAD = String.fromCodePoint(0x1F393);
+const RSQUO = String.fromCodePoint(0x2019);
+const MDASH = String.fromCodePoint(0x2014);
 
 export function studentCodeMessage(opts: { studentName: string; code: string; signature: string }): string {
   return [
