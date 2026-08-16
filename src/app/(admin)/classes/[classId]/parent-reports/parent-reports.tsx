@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { setParentNotes, type FormState } from "@/actions/students";
-import { waLink, studentCodeMessage, parentCodeMessage, parentReportMessage } from "@/lib/invites";
+import { normalizePhone, studentCodeMessage, parentCodeMessage, parentReportMessage } from "@/lib/invites";
+import { WhatsAppSend } from "@/components/whatsapp-send";
 
 export type PRStudent = {
   id: string;
@@ -48,42 +49,11 @@ export function ParentReports({
         </select>
       </div>
 
-      {/* TEMP EMOJI DIAGNOSTIC — remove after diagnosis */}
-      <EmojiTest />
-
       <ul className="flex flex-col gap-3">
         {students.map((s) => (
           <Row key={s.id} s={s} brandName={brandName} signature={signature} className={className} month={month} year={year} />
         ))}
       </ul>
-    </div>
-  );
-}
-
-// TEMP EMOJI DIAGNOSTIC — sends each char twice (raw source literal vs fromCodePoint)
-// so we can see which method survives the build and how WhatsApp renders it. DELETE AFTER.
-function EmojiTest() {
-  const fc = String.fromCodePoint;
-  const rows: [string, string, string][] = [
-    // label,          raw literal,  fromCodePoint
-    ["1 check",        "✅",          fc(0x2705)],
-    ["2 star-struck",  "🤩",          fc(0x1f929)],
-    ["3 heart",        "💗",          fc(0x1f497)],
-    ["4 grad",         "🎓",          fc(0x1f393)],
-    ["5 rsquo",        "’",           fc(0x2019)],
-    ["6 mdash",        "—",           fc(0x2014)],
-  ];
-  const msg =
-    "EMOJI TEST — for each line say if RAW or CODE shows a box:\n" +
-    rows.map(([label, raw, code]) => `${label}  RAW:${raw}  CODE:${code}`).join("\n");
-  const link = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-  return (
-    <div className="card p-4 border-warning">
-      <p className="mb-2 text-sm font-medium">Emoji diagnostic (temporary)</p>
-      <pre className="mb-3 whitespace-pre-wrap text-sm">{msg}</pre>
-      <a href={link} target="_blank" rel="noopener noreferrer" className="btn-primary btn-sm">
-        Send test to WhatsApp
-      </a>
     </div>
   );
 }
@@ -106,24 +76,24 @@ function Row({
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState<FormState, FormData>(setParentNotes.bind(null, s.id), undefined);
 
-  const codeToStudent = waLink(s.phone, studentCodeMessage({ studentName: s.name, code: s.code, signature }));
-  const codeToParent = waLink(
-    s.parentPhone,
-    parentCodeMessage({ studentName: s.name, code: s.code, signature, parentPrefix: s.parentPrefix, parentName: s.parentName }),
-  );
-  const reportToParent = waLink(
-    s.parentPhone,
-    parentReportMessage({
-      brandName,
-      className,
-      studentName: s.name,
-      parentPrefix: s.parentPrefix,
-      parentName: s.parentName,
-      attendance: { present: s.present, total: s.total },
-      avgPercent: s.avg,
-      hw: s.hw,
-    }),
-  );
+  const codeStudentMsg = studentCodeMessage({ studentName: s.name, code: s.code, signature });
+  const codeParentMsg = parentCodeMessage({
+    studentName: s.name,
+    code: s.code,
+    signature,
+    parentPrefix: s.parentPrefix,
+    parentName: s.parentName,
+  });
+  const reportParentMsg = parentReportMessage({
+    brandName,
+    className,
+    studentName: s.name,
+    parentPrefix: s.parentPrefix,
+    parentName: s.parentName,
+    attendance: { present: s.present, total: s.total },
+    avgPercent: s.avg,
+    hw: s.hw,
+  });
   const pdfHref = `/api/reports/student/${s.id}?month=${month}&year=${year}`;
 
   return (
@@ -138,9 +108,9 @@ function Row({
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <a href={pdfHref} target="_blank" rel="noopener noreferrer" className="btn-primary btn-sm">PDF report</a>
-          {reportToParent && <a href={reportToParent} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm">Report → parent</a>}
-          {codeToStudent && <a href={codeToStudent} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm">Code → student</a>}
-          {codeToParent && <a href={codeToParent} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm">Code → parent</a>}
+          {normalizePhone(s.parentPhone) && <WhatsAppSend phone={s.parentPhone} message={reportParentMsg} label="Report → parent" />}
+          {normalizePhone(s.phone) && <WhatsAppSend phone={s.phone} message={codeStudentMsg} label="Code → student" />}
+          {normalizePhone(s.parentPhone) && <WhatsAppSend phone={s.parentPhone} message={codeParentMsg} label="Code → parent" />}
           <button type="button" onClick={() => setOpen((o) => !o)} className="link text-sm">{open ? "Hide notes" : "Notes"}</button>
         </div>
       </div>

@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { currentOperationId } from "@/lib/operation";
-import { waLink, studentInviteMessage, parentInviteMessage } from "@/lib/invites";
+import { normalizePhone, studentInviteMessage, parentInviteMessage } from "@/lib/invites";
+import { WhatsAppSend } from "@/components/whatsapp-send";
 import { ClassLinksForm } from "./class-links-form";
 
 export default async function InvitesPage({ params }: { params: Promise<{ classId: string }> }) {
@@ -94,42 +95,32 @@ export default async function InvitesPage({ params }: { params: Promise<{ classI
               </thead>
               <tbody>
                 {klass.students.map((s) => {
-                  const studentHref = waLink(
-                    s.phone,
-                    studentInviteMessage({
-                      className: klass.name,
-                      studentName: s.name,
-                      studentGroupLink: klass.studentGroupLink,
-                      classroomLink,
-                    }),
-                  );
-                  const parentHref = waLink(
-                    s.parentPhone,
-                    parentInviteMessage({
-                      className: klass.name,
-                      parentName: s.parentName,
-                      studentName: s.name,
-                      parentCommunityLink: klass.parentCommunityLink,
-                    }),
-                  );
+                  const studentMsg = studentInviteMessage({
+                    className: klass.name,
+                    studentName: s.name,
+                    studentGroupLink: klass.studentGroupLink,
+                    classroomLink,
+                  });
+                  const parentMsg = parentInviteMessage({
+                    className: klass.name,
+                    parentName: s.parentName,
+                    studentName: s.name,
+                    parentCommunityLink: klass.parentCommunityLink,
+                  });
                   return (
                     <tr key={s.id}>
                       <td className="font-medium">{s.name}</td>
                       <td>
-                        {studentHref ? (
-                          <a href={studentHref} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm">
-                            WhatsApp
-                          </a>
+                        {normalizePhone(s.phone) ? (
+                          <WhatsAppSend phone={s.phone} message={studentMsg} />
                         ) : (
                           <span className="text-xs text-faint">no phone</span>
                         )}
                       </td>
                       <td className="text-muted">{s.parentName ?? "—"}</td>
                       <td>
-                        {parentHref ? (
-                          <a href={parentHref} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm">
-                            WhatsApp
-                          </a>
+                        {normalizePhone(s.parentPhone) ? (
+                          <WhatsAppSend phone={s.parentPhone} message={parentMsg} />
                         ) : (
                           <span className="text-xs text-faint">no phone</span>
                         )}
@@ -152,18 +143,13 @@ export default async function InvitesPage({ params }: { params: Promise<{ classI
           </div>
           <ul className="divide-y divide-border">
             {klass.assignments.map(({ assistant: a }) => {
-              const href = waLink(
-                a.phone,
-                `Hi ${a.name}, join the ${klass.name} class WhatsApp group: ${klass.studentGroupLink}`,
-              );
+              const msg = `Hi ${a.name}, join the ${klass.name} class WhatsApp group: ${klass.studentGroupLink}`;
               return (
                 <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-5 py-3 text-sm">
                   <span className="font-medium">{a.name}</span>
                   <span className="ml-auto">
-                    {href ? (
-                      <a href={href} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm">
-                        WhatsApp
-                      </a>
+                    {normalizePhone(a.phone) ? (
+                      <WhatsAppSend phone={a.phone} message={msg} />
                     ) : (
                       <span className="text-xs text-faint">no number — add it on Users</span>
                     )}
