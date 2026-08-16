@@ -3,6 +3,18 @@
 // reveals a student's identity or their position/number in the roster. The prefix is just a
 // human-friendly hint of which school the code belongs to. Codes are unique per class.
 
+// Restore a leading 0 to an Egyptian mobile that lost it (spreadsheets treat the number
+// as numeric and drop the leading 0, e.g. 01001234567 -> 1001234567). Anything else is
+// left exactly as entered. Returns null for blank input.
+export function egyptPhone(raw?: string | null): string | null {
+  const t = (raw ?? "").trim();
+  if (!t) return null;
+  const digits = t.replace(/[^\d]/g, "");
+  // 10-digit Egyptian mobile missing its leading 0 (1XXXXXXXXX) -> add it back.
+  if (/^1\d{9}$/.test(digits)) return "0" + digits;
+  return t;
+}
+
 // First letter of the school name (e.g. "Citadel" -> "C"). Falls back to "S" (student).
 export function schoolPrefix(schoolName: string): string {
   const letters = schoolName.replace(/[^A-Za-z]/g, "");

@@ -77,12 +77,15 @@ export default async function MyTasksPage() {
     <div className="flex flex-col gap-5">
       <div>
         <h1 className="page-title">Tasks</h1>
-        <p className="page-subtitle">Sessions from the last 3 weeks still needing your attention.</p>
+        {todos.length > 0 && (
+          <p className="page-subtitle">Sessions from the last 3 weeks still needing your attention.</p>
+        )}
       </div>
 
       {todos.length === 0 ? (
         <div className="card px-5 py-8 text-center">
-          <p className="text-sm text-muted">🎉 All caught up — no outstanding tasks.</p>
+          <p className="text-sm font-medium text-success">All caught up</p>
+          <p className="mt-1 text-sm text-muted">No outstanding tasks right now.</p>
         </div>
       ) : (
         <ul className="flex flex-col gap-2">

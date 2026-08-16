@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireRole, requireClassAccess } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
-import { schoolPrefix, uniqueStudentCode } from "@/lib/code";
+import { schoolPrefix, uniqueStudentCode, egyptPhone } from "@/lib/code";
 import { autoAssignNewStudents } from "@/actions/assignments";
 import { assertClassInOperation } from "@/lib/operation";
 
@@ -97,10 +97,10 @@ export async function updateStudentContacts(
     where: { id: studentId },
     data: {
       email: clean("email"),
-      phone: clean("phone"),
+      phone: egyptPhone(clean("phone")),
       parentPrefix: clean("parentPrefix"),
       parentName: clean("parentName"),
-      parentPhone: clean("parentPhone"),
+      parentPhone: egyptPhone(clean("parentPhone")),
     },
   });
   revalidatePath(`/classes/${student.classId}/students`);
@@ -195,9 +195,9 @@ export async function importStudents(
       name,
       code,
       email: clean(row.email),
-      phone: clean(row.phone),
+      phone: egyptPhone(row.phone),
       parentName: clean(row.parentName),
-      parentPhone: clean(row.parentPhone),
+      parentPhone: egyptPhone(row.parentPhone),
     });
   }
 
