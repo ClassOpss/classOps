@@ -10,9 +10,17 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
     undefined,
   );
 
+  // TEMP EMOJI DIAGNOSTIC — remove after diagnosis. Puts emoji (3 ways) into the
+  // PUBLIC login client chunk so we can hexdump the Railway-built bundle bytes.
+  const _fc = String.fromCodePoint;
+  const _emojiDiag =
+    "DIAG1 litL:✅ fcL:" + _fc(0x2705) + " decL:" + decodeURIComponent("%E2%9C%85") +
+    " litH:💗 fcH:" + _fc(0x1f497) + " decH:" + decodeURIComponent("%F0%9F%92%97");
+
   return (
     <form action={formAction} className="flex w-full flex-col gap-4">
       <input type="hidden" name="callbackUrl" value={callbackUrl ?? "/"} />
+      <input type="hidden" name="_diag" data-diag={_emojiDiag} />
 
       {state?.error ? (
         <p
