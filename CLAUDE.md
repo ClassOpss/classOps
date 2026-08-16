@@ -392,7 +392,72 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     • REMAINING: Railway deploy (user-side: account, Postgres plugin, env vars, cron, one-time seed).
       Full step-by-step in DEPLOY.md (audited Docker/entrypoint/migration/cron; note: prod image has
       no tsx, so seed runs from the dev machine against the Railway DB URL).
-[ ] — update this section as modules are completed —
+[x] DEPLOYED & LIVE — https://classops-production.up.railway.app/ (Railway Docker + Postgres + cron).
+    Deploy remote is a SEPARATE GitHub repo: `deploy` -> https://github.com/ClassOpss/classOps.git
+    (a friend owns the Railway project + repo). Local `main` is merged into it and `git push deploy main`
+    triggers the Railway build. entrypoint runs migrations via `node node_modules/prisma/build/index.js
+    migrate deploy` (NOT `npx prisma` — prod image path). DO NOT reset the live admin password — it works.
+
+    Everything below was built AFTER the deploy, on top of the "FINAL" multi-tenancy work. All committed +
+    pushed to `deploy main` and browser-tested on the live site unless noted.
+
+    ── Email (real sending, replaces "copy the link") ──
+    • Brevo transactional email via REST API (lib/email.ts). Hybrid per-operation sender. Invite links,
+      password-setup, and forgot-password now actually email. GOTCHA: Brevo "Authorized IPs" restriction
+      must be FULLY OFF ("Deactivate for API keys") — Railway IPs rotate, so a whitelist 401s
+      ("unrecognised IP address"). Invite flow surfaces emailError (InviteLink.emailError) to diagnose this.
+      Env: BREVO_API_KEY, BREVO_SENDER_EMAIL, BREVO_SENDER_NAME (see Railway service vars).
+
+    ── Auth additions ──
+    • Password reset (self-serve): /forgot-password -> emailed token -> /reset-password. Generic login
+      error kept ON PURPOSE (never reveal whether email or password was wrong). Login error now renders at
+      the TOP of the form, prominent + aria-live, so it shows on mobile (was invisible on phones before).
+    • Delete-teacher (super-admin) + per-operation teacher management.
+
+    ── Multi-tenancy polish ──
+    • Editable per-operation config in Settings (actions/operation-config.ts): pay/bonus/deduction/
+      deadlines/brand/currency all editable in-app (was code-only).
+    • Per-assistant salary override: Assistant.perClassSalary (falls back to operation perClassSalary).
+    • Class.lmsType enum (google_classroom | ie_learn) — "Classroom upload" task label follows the LMS.
+    • archiveAllClasses (actions/classes.ts) — one-click new-school-year reset.
+
+    ── Assistant-facing ──
+    • Assistants can edit student phone/email + parentPrefix/parentName/parentNotes; send WhatsApp invites
+      (wa.me deep links — NEVER auto-add to groups, that's a ban risk; wa.me/?text= opens the share-picker).
+    • Permission pass: assistants can createAssessment + import students for their own classes
+      (via requireClassAccess), not just admin.
+    • Office-hour APPROVAL: OfficeHourSession.approved — pay counts only approved office hours (admin approves).
+
+    ── Reports pyramid (all @react-pdf/renderer, Helvetica core font ONLY — cannot render emoji/astral glyphs) ──
+    • Student report PDF + month-over-month TREND deltas ("+8 pts vs last month" green / "-5 pts" red).
+    • Class report PDF (pre-existing, by student code for privacy).
+    • Operation report PDF (owner executive summary) — download from the dashboard.
+    • Payslip PDF per assistant per pay period.
+    • Parent report is a DETAILED per-student PDF: which day/class absent, HW missed, each assessment grade
+      with above/at/below class-average flag, plus an assistant free-text note to the parent.
+
+    ── WhatsApp / messaging ──
+    • Student + parent CODE messages (studentCodeMessage / parentCodeMessage in lib/invites.ts): opens
+      wa.me to the student's and parent's numbers, one tap to send. Assistant + admin task.
+    • EMOJI FIX (critical, took 3 tries): raw literals AND \u{...} escapes both got corrupted to "?" by the
+      prod build/minifier. FINAL WORKING FIX = String.fromCodePoint(0xNNNN) (runtime call, no string literal
+      for the build to touch). Constants CHECK/STARSTRUCK/HEART/GRAD/RSQUO/MDASH at top of lib/invites.ts.
+      If you add an emoji anywhere in a user-facing string, use fromCodePoint — NOT a literal or \u escape.
+
+    ── Dashboard intelligence ──
+    • lib/at-risk.ts detectAtRiskStudents (attendance <75% with >=3 sessions, OR >=2 missing HW, OR avg <50%)
+      -> "Needs attention" panel on the admin dashboard.
+
+    ── Testing-round fixes (commit e26eb42) ──
+    • egyptPhone() (lib/code.ts): restore the leading 0 spreadsheets drop from Egyptian mobiles
+      (1XXXXXXXXX -> 01XXXXXXXXX) on student import + contact edit.
+    • Tasks tab: "sessions from last 3 weeks" subtitle hidden when nothing's due (clean "All caught up").
+    • Removed the assistant Activity tab + dead /my/activity route (assistants don't need it).
+
+    ── DEFERRED to v2 (next year — user decision) ──
+    Student/parent self-serve portals, in-app HW upload, dropping Google Classroom, fee/payment tracking,
+    admin activity tab, automatic daily-update sending to the class WhatsApp group. Design keeps these
+    possible but v1 ships without them.
 
 ### Notes / deviations from original assumptions
 - **Node 24 LTS** (winget); **Prisma pinned to v6** (v7 dropped `url` in schema + needs driver
