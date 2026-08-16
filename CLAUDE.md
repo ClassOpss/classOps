@@ -439,10 +439,21 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     ── WhatsApp / messaging ──
     • Student + parent CODE messages (studentCodeMessage / parentCodeMessage in lib/invites.ts): opens
       wa.me to the student's and parent's numbers, one tap to send. Assistant + admin task.
-    • EMOJI FIX (critical, took 3 tries): raw literals AND \u{...} escapes both got corrupted to "?" by the
-      prod build/minifier. FINAL WORKING FIX = String.fromCodePoint(0xNNNN) (runtime call, no string literal
-      for the build to touch). Constants CHECK/STARSTRUCK/HEART/GRAD/RSQUO/MDASH at top of lib/invites.ts.
-      If you add an emoji anywhere in a user-facing string, use fromCodePoint — NOT a literal or \u escape.
+    • EMOJI — REAL ROOT CAUSE (re-diagnosed; supersedes the old "build corrupts literals" theory):
+      the build does NOT corrupt emoji. Verified byte-for-byte on the LIVE Railway deploy — source,
+      server SSR, server runtime, AND the minified client chunk all emit correct UTF-8 (the minifier
+      keeps String.fromCodePoint as a renamed runtime call e.g. `i(9989)`; nothing is folded to a bad
+      literal; zero U+FFFD in the chunk). fromCodePoint made NO difference vs raw literals — both were
+      byte-correct. The actual culprit is WHATSAPP DESKTOP/WEB: it mangles emoji passed through a
+      wa.me `?text=` click-to-send link into box/replacement chars AND SENDS the mangled text. Phones
+      read the same link perfectly. So it's WhatsApp's desktop bug, unfixable from our link encoding.
+      FIX = src/components/whatsapp-send.tsx <WhatsAppSend phone message>: on a KNOWN desktop AND when
+      the message actually contains emoji (/\p{Extended_Pictographic}/u), it copies the message (paste
+      preserves emoji) + opens the bare chat instead of the auto-filled link; every other case (phones,
+      non-emoji messages) keeps the original one-tap wa.me link. Used by the Code/Report/invite send
+      buttons on parent-reports (admin+assistant share the component) + invites page. The fromCodePoint
+      constants in lib/invites.ts are now harmless legacy — they were never the fix; a plain emoji literal
+      would build+serve identically. class-update / quiz-announcement messages have no emoji (unaffected).
 
     ── Dashboard intelligence ──
     • lib/at-risk.ts detectAtRiskStudents (attendance <75% with >=3 sessions, OR >=2 missing HW, OR avg <50%)
