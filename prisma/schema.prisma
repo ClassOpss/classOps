@@ -422,6 +422,8 @@ model ClassSession {
   cancellationReason String?       @map("cancellation_reason")
   // free-text notes injected into the class-update WhatsApp message
   messageNotes       String?       @map("message_notes")
+  // Optional description for a class-specific (ad-hoc) lesson — planItemId is null on those.
+  notes              String?       @map("notes")
   // Daily-task ownership (spec: tasks split by schedule day). Stamped at generation.
   responsibleAssistantId String?   @map("responsible_assistant_id")
   // Set (admin-confirmed) when another assistant covered this session -> drives ±50 pay.

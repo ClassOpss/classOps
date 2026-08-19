@@ -11,6 +11,14 @@ export function formatCairo(date: Date, fmt = "d MMM yyyy, h:mm a"): string {
   return formatInTimeZone(date, CAIRO_TZ, fmt);
 }
 
+// Today's calendar date in Cairo, as a UTC-midnight Date — comparable to the
+// UTC-midnight `@db.Date` scheduledDate values. Used to tell past/"delivered"
+// sessions from future ones without dragging clock time into the comparison.
+export function cairoToday(now: Date = new Date()): Date {
+  const [y, m, d] = formatInTimeZone(now, CAIRO_TZ, "yyyy-MM-dd").split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
 function zonedInstant(scheduledDate: Date, hms: string): Date {
   const y = scheduledDate.getUTCFullYear();
   const m = pad(scheduledDate.getUTCMonth() + 1);

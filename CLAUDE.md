@@ -465,6 +465,32 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     • Tasks tab: "sessions from last 3 weeks" subtitle hidden when nothing's due (clean "All caught up").
     • Removed the assistant Activity tab + dead /my/activity route (assistants don't need it).
 
+    ── Per-class mid-term schedule editing (admin+teacher, on /classes/[id]/sessions) ──
+    The shared year-group plan generates per-class ClassSessions; after go-live you can now diverge ONE
+    class or absorb a syllabus change WITHOUT wiping logged data (unlike "Regenerate", which deletes every
+    session and is blocked once attendance exists — sessions cascade-delete attendance/homework/parent-
+    update/classroom-upload). Core concept "delivered line": a session is LOCKED once it's on/before today
+    OR carries any logged record (lib/session-timeline.isLocked; cairoToday added to lib/datetime). Edits
+    only ever rewrite the undelivered future, so nothing logged is at risk. ClassSession gained a `notes`
+    column (migration 20260816120000_session_adhoc_note) for the ad-hoc lesson description; ad-hoc rows are
+    planItemId=null (can never appear in another class). lib/session-timeline.layoutFutureDates (unit-tested,
+    scripts/test-timeline.ts) lays future dates over the class weekdays, keeping day-off dates PINNED and
+    flowing other sessions around them. Three actions in actions/sessions.ts (all keep locked sessions, then
+    renumber + reassignResponsibilities):
+      • addClassLesson — insert a class-specific lesson (topic from the year-group list + optional note) at a
+        chosen upcoming position or the end; pushes every following upcoming session back one slot ("class is
+        behind / topic needs more time").
+      • updateFutureFromPlan — re-sync the undelivered future from the (edited) year-group plan for a mid-year
+        syllabus change; PRESERVES delivered sessions, day-offs, AND class-specific lessons, rebuilding only
+        the upcoming plan sessions from the plan tail beyond deliveredPlanCount.
+      • removeClassLesson — delete an undelivered ad-hoc lesson, pulling the future forward.
+    UI: session-edit.tsx (AddClassLesson + UpdateFutureFromPlan cards) on the sessions page; rows show
+    Delivered/Upcoming + a "Class-specific" badge + Remove; setup-only Regenerate now hidden once anything is
+    logged. Browser-verified end-to-end (insert pushes back; isolation vs a sibling Y9 class; syllabus append
+    flows in as a new future lesson with delivered+ad-hoc preserved; remove pulls forward). Seed helper:
+    scripts/dev-timeline-setup.ts. Committed + pushed to `deploy main` (Railway build; the notes migration
+    auto-applies via entrypoint on container start).
+
     ── DEFERRED to v2 (next year — user decision) ──
     Student/parent self-serve portals, in-app HW upload, dropping Google Classroom, fee/payment tracking,
     admin activity tab, automatic daily-update sending to the class WhatsApp group. Design keeps these
