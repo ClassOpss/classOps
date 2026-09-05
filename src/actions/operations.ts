@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { ACTIVE_OPERATION_COOKIE, DEFAULT_OPERATION_ID } from "@/lib/operation";
-import { createSetupToken, setupUrl } from "@/lib/tokens";
+import { createSetupToken, setupUrl, INVITE_TTL_MS } from "@/lib/tokens";
 import { sendEmail, resolveOperationSender, actionEmail } from "@/lib/email";
 
 export type OperationFormState =
@@ -190,7 +190,7 @@ export async function createOperation(
     });
   }
 
-  const token = await createSetupToken(email);
+  const token = await createSetupToken(email, INVITE_TTL_MS);
   const url = setupUrl(email, token);
 
   // Email the teacher their setup link (from the new operation's brand/sender).

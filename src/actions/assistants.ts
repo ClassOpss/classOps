@@ -4,7 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
-import { createSetupToken, setupUrl } from "@/lib/tokens";
+import { createSetupToken, setupUrl, INVITE_TTL_MS } from "@/lib/tokens";
 import { logActivity } from "@/lib/activity";
 import { currentOperationId } from "@/lib/operation";
 import { sendEmail, resolveOperationSender, actionEmail } from "@/lib/email";
@@ -149,7 +149,7 @@ async function inviteOne(
     userId = user.id;
   }
 
-  const token = await createSetupToken(email);
+  const token = await createSetupToken(email, INVITE_TTL_MS);
   const url = setupUrl(email, token);
 
   // Email the setup link (from the operation's resolved sender); fall back to the

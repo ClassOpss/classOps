@@ -23,9 +23,15 @@ export async function setPassword(
   if (password.length < 8) return { error: "Password must be at least 8 characters." };
   if (password !== confirm) return { error: "Passwords do not match." };
 
-  const valid = await consumeSetupToken(email, token);
-  if (!valid) {
-    return { error: "This setup link is invalid or has expired. Ask the admin to resend it." };
+  const result = await consumeSetupToken(email, token);
+  if (result === "expired") {
+    return { error: "This link has expired. Ask the admin to resend your invite, then use the new link." };
+  }
+  if (result !== "ok") {
+    return {
+      error:
+        "This link didn't work — open the most recent invite (newest email/message) and try again, or use “Forgot password” on the login page.",
+    };
   }
 
   const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
