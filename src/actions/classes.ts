@@ -123,6 +123,10 @@ export async function setClassActive(classId: string, active: boolean): Promise<
   });
   revalidatePath("/classes");
   revalidatePath(`/classes/${classId}`);
+  // The assistant surface filters on class.active, so refresh its whole tree —
+  // otherwise /my keeps serving a stale render that references the class we just
+  // toggled, and the assistant has to log out/in to clear it.
+  revalidatePath("/my", "layout");
 }
 
 export type ArchiveState = { ok?: boolean; error?: string; archived?: number } | undefined;
@@ -168,6 +172,7 @@ export async function archiveAllClasses(_prev: ArchiveState, formData: FormData)
     metadata: { count: classIds.length },
   });
   revalidatePath("/classes");
+  revalidatePath("/my", "layout"); // clear the assistant surface (classes now inactive)
   return { ok: true, archived: classIds.length };
 }
 

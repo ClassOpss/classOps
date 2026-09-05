@@ -84,6 +84,7 @@ export async function endAssignment(assignmentId: string): Promise<void> {
     metadata: { assistantId: assignment.assistantId },
   });
   revalidatePath(`/classes/${assignment.classId}/assistants`);
+  revalidatePath("/my", "layout"); // the un-assigned assistant's class list must refresh
 }
 
 // Auto-divide active students between the class's active assistants.
