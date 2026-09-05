@@ -1,10 +1,14 @@
 import { prisma } from "@/lib/db";
 import { resolveConfigFor } from "@/lib/operation";
+import { loadVacations, vacationDaysInMonth, vacationFractionOff } from "@/lib/vacations";
 
 export type PayComponents = {
   classesCovered: number;
   baseSalary: number;
   lateDeductions: number;
+  // Base pay withheld for school vacations that month (prorated per class by its school's
+  // break: 1 week off = ¼, 2 weeks = ½, whole month = full base). Never touches bonuses.
+  vacationDeduction: number;
   officeHoursBonus: number;
   // Net coverage: +X per session I covered for a colleague, −X per session of mine a colleague covered.
   coverageAdjustment: number;
@@ -35,7 +39,7 @@ export async function computePayComponents(
   // Per-assistant rate (seniority) overrides the operation default when set.
   const perClassRate =
     assistant?.perClassSalary != null ? Number(assistant.perClassSalary) : cfg.perClassSalary;
-  const [assignments, incidents, officeHours, covered, ownedCovered] = await Promise.all([
+  const [assignments, incidents, officeHours, covered, ownedCovered, vacations] = await Promise.all([
     // Distinct classes the assistant had an active assignment overlapping this month.
     prisma.classAssignment.findMany({
       where: {
@@ -43,7 +47,7 @@ export async function computePayComponents(
         startDate: { lt: end },
         OR: [{ endDate: null }, { endDate: { gte: start } }],
       },
-      select: { classId: true },
+      select: { classId: true, class: { select: { schoolId: true } } },
     }),
     prisma.lateIncident.aggregate({
       where: { assistantId, waived: false, deadline: inMonth },
@@ -61,15 +65,28 @@ export async function computePayComponents(
         scheduledDate: inMonth,
       },
     }),
+    loadVacations(assistant?.operationId ?? ""),
   ]);
 
-  const classesCovered = new Set(assignments.map((a) => a.classId)).size;
+  // Distinct classes, each with its school (a class contributes once even with 2 assignments).
+  const classSchool = new Map<string, string>();
+  for (const a of assignments) classSchool.set(a.classId, a.class.schoolId);
+  const classesCovered = classSchool.size;
+  const perClassBase = perClassRate * cfg.payMultiplier;
   const lateDeductions = Number(incidents._sum.deductionAmount ?? 0);
+
+  // Per class: withhold a fraction of its base for its school's vacation days this month.
+  let vacationDeduction = 0;
+  for (const schoolId of classSchool.values()) {
+    const days = vacationDaysInMonth(schoolId, month, year, vacations);
+    vacationDeduction += perClassBase * vacationFractionOff(days);
+  }
 
   return {
     classesCovered,
-    baseSalary: classesCovered * perClassRate * cfg.payMultiplier,
+    baseSalary: classesCovered * perClassBase,
     lateDeductions,
+    vacationDeduction,
     officeHoursBonus: officeHours * cfg.officeHourBonus,
     coverageAdjustment: (covered - ownedCovered) * cfg.coverageAdjustment,
   };
@@ -77,6 +94,11 @@ export async function computePayComponents(
 
 export function payTotal(c: PayComponents, manualAdjustment: number): number {
   return (
-    c.baseSalary - c.lateDeductions + c.officeHoursBonus + c.coverageAdjustment + manualAdjustment
+    c.baseSalary -
+    c.lateDeductions -
+    c.vacationDeduction +
+    c.officeHoursBonus +
+    c.coverageAdjustment +
+    manualAdjustment
   );
 }

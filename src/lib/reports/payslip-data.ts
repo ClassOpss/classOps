@@ -45,6 +45,7 @@ export async function buildPayslipData(calcId: string, operationId: string): Pro
       classesCovered: true,
       baseSalary: true,
       lateDeductions: true,
+      vacationDeduction: true,
       officeHoursBonus: true,
       coverageAdjustment: true,
       manualAdjustment: true,
@@ -65,6 +66,9 @@ export async function buildPayslipData(calcId: string, operationId: string): Pro
     { label: "Coverage adjustment", amount: n(calc.coverageAdjustment) },
     { label: "Late deductions", amount: -n(calc.lateDeductions) },
   ];
+  if (n(calc.vacationDeduction) !== 0) {
+    lines.push({ label: "School vacation", amount: -n(calc.vacationDeduction) });
+  }
   if (n(calc.manualAdjustment) !== 0) {
     lines.push({ label: "Manual adjustment", amount: n(calc.manualAdjustment), note: calc.adjustmentNote ?? undefined });
   }

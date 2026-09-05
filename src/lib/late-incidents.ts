@@ -4,6 +4,15 @@ import { prisma } from "@/lib/db";
 import { CAIRO_TZ, sessionDeadline, saturdayDeadline } from "@/lib/datetime";
 import { subGroupStudentIds, activeAt } from "@/lib/roster";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
+import { loadAllVacations, isSchoolOnVacation, type VacationSpan } from "@/lib/vacations";
+
+type VacMap = Map<string, VacationSpan[]>;
+
+// Skip a session/item during its school's vacation — the school isn't running, so
+// nothing is "missed" (no fine, and the assistant's record stays clean).
+function onVacation(vacs: VacMap, operationId: string, schoolId: string, date: Date): boolean {
+  return isSchoolOnVacation(schoolId, date, vacs.get(operationId) ?? []);
+}
 
 type Queued = {
   assistantId: string;
@@ -38,7 +47,7 @@ function key(q: { assistantId: string; sessionId: string | null; type: string; d
 export type DetectResult = { created: number; checked: number };
 
 // Daily run (9pm): one incident per active assistant per missed daily session task.
-async function detectDaily(now: Date, cfgs: CfgMap): Promise<Queued[]> {
+async function detectDaily(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queued[]> {
   const today = cairoDate(now);
 
   const sessions = await prisma.classSession.findMany({
@@ -47,7 +56,7 @@ async function detectDaily(now: Date, cfgs: CfgMap): Promise<Queued[]> {
       id: true,
       responsibleAssistantId: true,
       coveredById: true,
-      class: { select: { operationId: true } },
+      class: { select: { operationId: true, schoolId: true } },
       attendance: { select: { id: true }, take: 1 },
       parentUpdate: { select: { id: true } },
       classroomUpload: { select: { id: true } },
@@ -60,6 +69,7 @@ async function detectDaily(now: Date, cfgs: CfgMap): Promise<Queued[]> {
     const assistantId = s.coveredById ?? s.responsibleAssistantId;
     if (!assistantId) continue; // unassigned day -> nobody to charge
     const operationId = s.class.operationId;
+    if (onVacation(vacs, operationId, s.class.schoolId, today)) continue; // school break -> not missed
     const deadline = sessionDeadline(today, cfgFor(cfgs, operationId));
     if (s.attendance.length === 0) queued.push({ assistantId, sessionId: s.id, type: "attendance", deadline, operationId });
     if (!s.parentUpdate) queued.push({ assistantId, sessionId: s.id, type: "parent_update", deadline, operationId });
@@ -70,7 +80,7 @@ async function detectDaily(now: Date, cfgs: CfgMap): Promise<Queued[]> {
 
 // Weekly run (Saturday 9pm): incident per assistant whose sub-group HW/grades aren't complete
 // for items due this week (Sunday–Saturday).
-async function detectWeekly(now: Date, cfgs: CfgMap): Promise<Queued[]> {
+async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queued[]> {
   const weekEnd = cairoDate(now); // Saturday
   const weekStart = new Date(weekEnd);
   weekStart.setUTCDate(weekStart.getUTCDate() - 6); // Sunday
@@ -87,6 +97,7 @@ async function detectWeekly(now: Date, cfgs: CfgMap): Promise<Queued[]> {
       class: {
         select: {
           operationId: true,
+          schoolId: true,
           assignments: { where: activeAt(now), select: { assistantId: true } },
         },
       },
@@ -94,6 +105,7 @@ async function detectWeekly(now: Date, cfgs: CfgMap): Promise<Queued[]> {
   });
   for (const hw of homeworks) {
     const operationId = hw.class.operationId;
+    if (onVacation(vacs, operationId, hw.class.schoolId, hw.deadline)) continue; // school break
     const deadline = saturdayDeadline(hw.deadline, cfgFor(cfgs, operationId));
     const submitted = new Set(hw.submissions.map((s) => s.studentId));
     for (const { assistantId } of hw.class.assignments) {
@@ -115,6 +127,7 @@ async function detectWeekly(now: Date, cfgs: CfgMap): Promise<Queued[]> {
       class: {
         select: {
           operationId: true,
+          schoolId: true,
           assignments: { where: activeAt(now), select: { assistantId: true } },
         },
       },
@@ -122,6 +135,7 @@ async function detectWeekly(now: Date, cfgs: CfgMap): Promise<Queued[]> {
   });
   for (const a of assessments) {
     const operationId = a.class.operationId;
+    if (onVacation(vacs, operationId, a.class.schoolId, a.date)) continue; // school break
     const deadline = saturdayDeadline(a.date, cfgFor(cfgs, operationId));
     const graded = new Set(a.grades.map((g) => g.studentId));
     for (const { assistantId } of a.class.assignments) {
@@ -139,7 +153,8 @@ async function detectWeekly(now: Date, cfgs: CfgMap): Promise<Queued[]> {
 // Idempotent: never creates a second incident for the same (assistant, session, type, deadline).
 export async function detectLateIncidents(now: Date, weekly: boolean): Promise<DetectResult> {
   const cfgs = await loadConfigs();
-  const queued = weekly ? await detectWeekly(now, cfgs) : await detectDaily(now, cfgs);
+  const vacs = await loadAllVacations();
+  const queued = weekly ? await detectWeekly(now, cfgs, vacs) : await detectDaily(now, cfgs, vacs);
   if (queued.length === 0) return { created: 0, checked: 0 };
 
   const deadlines = [...new Set(queued.map((q) => q.deadline.getTime()))].map((t) => new Date(t));

@@ -56,6 +56,7 @@ async function generateCalculations(periodId: string, month: number, year: numbe
         classesCovered: c.classesCovered,
         baseSalary: c.baseSalary,
         lateDeductions: c.lateDeductions,
+        vacationDeduction: c.vacationDeduction,
         officeHoursBonus: c.officeHoursBonus,
         coverageAdjustment: c.coverageAdjustment,
         total: payTotal(c, manual),
@@ -66,6 +67,7 @@ async function generateCalculations(periodId: string, month: number, year: numbe
         classesCovered: c.classesCovered,
         baseSalary: c.baseSalary,
         lateDeductions: c.lateDeductions,
+        vacationDeduction: c.vacationDeduction,
         officeHoursBonus: c.officeHoursBonus,
         coverageAdjustment: c.coverageAdjustment,
         manualAdjustment: 0,
@@ -95,6 +97,7 @@ export async function setAdjustment(calcId: string, formData: FormData): Promise
     select: {
       baseSalary: true,
       lateDeductions: true,
+      vacationDeduction: true,
       officeHoursBonus: true,
       coverageAdjustment: true,
       payPeriodId: true,
@@ -103,7 +106,8 @@ export async function setAdjustment(calcId: string, formData: FormData): Promise
   if (!calc) return;
   const total =
     Number(calc.baseSalary) -
-    Number(calc.lateDeductions) +
+    Number(calc.lateDeductions) -
+    Number(calc.vacationDeduction) +
     Number(calc.officeHoursBonus) +
     Number(calc.coverageAdjustment) +
     amount;

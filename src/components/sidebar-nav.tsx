@@ -22,6 +22,9 @@ const ICONS: Record<string, ReactNode> = {
   "/pay": (
     <path d="M3 6h18v12H3V6Zm0 4h18M7 14h2m8 0h.01" />
   ),
+  "/vacations": (
+    <path d="M8 2v3m8-3v3M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm7 8 2 2 2-3" />
+  ),
   "/users": (
     <path d="M16 19v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm13 10v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11" />
   ),

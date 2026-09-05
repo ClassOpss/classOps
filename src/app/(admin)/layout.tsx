@@ -11,6 +11,7 @@ const NAV: (NavItem & { adminOnly: boolean })[] = [
   { href: "/classes", label: "Classes", adminOnly: false },
   { href: "/insights", label: "Insights", adminOnly: false },
   { href: "/pay", label: "Pay", adminOnly: true },
+  { href: "/vacations", label: "Vacations", adminOnly: true },
   { href: "/users", label: "Users", adminOnly: true },
   { href: "/activity", label: "Activity", adminOnly: true },
   { href: "/operations", label: "Operations", adminOnly: true },

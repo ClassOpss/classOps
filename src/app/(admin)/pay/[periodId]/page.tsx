@@ -75,6 +75,7 @@ export default async function PayPeriodPage({
                 <th>Classes</th>
                 <th>Base</th>
                 <th>Deductions</th>
+                <th>Vacation</th>
                 <th>Office hrs</th>
                 <th>Coverage</th>
                 <th>Adjustment</th>
@@ -90,6 +91,9 @@ export default async function PayPeriodPage({
                   <td>{c.classesCovered}</td>
                   <td>{egp(c.baseSalary)}</td>
                   <td className="text-danger">-{egp(c.lateDeductions)}</td>
+                  <td className={Number(c.vacationDeduction) > 0 ? "text-danger" : "text-faint"}>
+                    {Number(c.vacationDeduction) > 0 ? `-${egp(c.vacationDeduction)}` : "—"}
+                  </td>
                   <td className="text-success">+{egp(c.officeHoursBonus)}</td>
                   <td className={Number(c.coverageAdjustment) < 0 ? "text-danger" : "text-success"}>
                     {Number(c.coverageAdjustment) >= 0 ? "+" : "−"}{egp(Math.abs(Number(c.coverageAdjustment)))}

@@ -130,6 +130,7 @@ model Operation {
   assistants  Assistant[]
   payPeriods  PayPeriod[]
   activity    ActivityLog[]
+  vacations   SchoolVacation[]
 
   @@map("operations")
 }
@@ -213,9 +214,33 @@ model School {
 
   operation Operation @relation(fields: [operationId], references: [id])
   classes   Class[]
+  vacations SchoolVacation[]
 
   @@index([operationId])
   @@map("schools")
+}
+
+// A school break (Easter, mid-year, …). Dates are inclusive. During a vacation window
+// the school's sessions are NOT treated as missed (no late incidents, no false coverage)
+// and each affected class's monthly base pay is prorated: min(1, vacationDays/28) is cut
+// (7 days = ¼ off, 14 = ½, 28+ = whole month = 0). Extra work (office hours, covering a
+// colleague) is added on top and never prorated. Single source of truth — deleting a
+// vacation fully reverses its effect on the next recalculation.
+model SchoolVacation {
+  id          String   @id @default(uuid())
+  operationId String   @map("operation_id")
+  schoolId    String   @map("school_id")
+  label       String
+  startDate   DateTime @map("start_date") @db.Date
+  endDate     DateTime @map("end_date") @db.Date
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  operation Operation @relation(fields: [operationId], references: [id])
+  school    School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([operationId])
+  @@index([schoolId])
+  @@map("school_vacations")
 }
 
 model Class {
@@ -657,6 +682,7 @@ model PayCalculation {
   baseSalary       Decimal       @map("base_salary") @db.Decimal(10, 2)
   lateDeductions   Decimal       @map("late_deductions") @db.Decimal(10, 2)
   officeHoursBonus Decimal       @map("office_hours_bonus") @db.Decimal(10, 2)
+  vacationDeduction Decimal      @default(0) @map("vacation_deduction") @db.Decimal(10, 2)
   coverageAdjustment Decimal     @default(0) @map("coverage_adjustment") @db.Decimal(10, 2)
   manualAdjustment Decimal       @default(0) @map("manual_adjustment") @db.Decimal(10, 2)
   adjustmentNote   String?       @map("adjustment_note")
