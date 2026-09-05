@@ -23,6 +23,10 @@ export default async function MyClassesPage() {
       assistantId: user.assistantId,
       startDate: { lte: now },
       OR: [{ endDate: null }, { endDate: { gte: now } }],
+      // Only surface classes that are still active. This filters each assignment
+      // by its own class, so deactivating one class drops only that class from
+      // the list — the assistant's other classes are unaffected.
+      class: { active: true },
     },
     include: {
       class: {

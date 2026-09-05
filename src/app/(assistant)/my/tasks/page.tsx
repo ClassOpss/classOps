@@ -31,6 +31,8 @@ export default async function MyTasksPage() {
       assistantId: user.assistantId,
       startDate: { lte: now },
       OR: [{ endDate: null }, { endDate: { gte: now } }],
+      // Skip deactivated classes (per class, so only the deactivated one drops).
+      class: { active: true },
     },
     select: { classId: true },
   });
