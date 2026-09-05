@@ -2,6 +2,7 @@ import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { currentOperationId, resolveConfigFor } from "@/lib/operation";
 import { InviteAssistant } from "./invite-assistant";
+import { AssistantName } from "./assistant-name";
 import { AssistantSalary } from "./assistant-salary";
 import { AssistantPhone } from "./assistant-phone";
 import { AssistantEmail } from "./assistant-email";
@@ -49,7 +50,7 @@ export default async function UsersPage() {
                   const pending = !a.user?.passwordHash;
                   return (
                     <tr key={a.id}>
-                      <td className="font-medium">{a.name}</td>
+                      <td><AssistantName assistantId={a.id} value={a.name} /></td>
                       <td><AssistantEmail assistantId={a.id} value={a.email} /></td>
                       <td>
                         {!a.user?.active ? (

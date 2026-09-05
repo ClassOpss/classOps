@@ -39,6 +39,29 @@ export async function setAssistantSalary(
   return { ok: true };
 }
 
+// Admin: rename an assistant (fixes bulk-invite placeholder names).
+export async function setAssistantName(
+  assistantId: string,
+  _prev: SalaryState,
+  formData: FormData,
+): Promise<SalaryState> {
+  await requireRole("admin");
+  const operationId = await currentOperationId();
+  const assistant = await prisma.assistant.findUnique({
+    where: { id: assistantId },
+    select: { operationId: true, userId: true },
+  });
+  if (!assistant || assistant.operationId !== operationId) return { error: "Not found." };
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Name is required." };
+
+  await prisma.assistant.update({ where: { id: assistantId }, data: { name } });
+  await prisma.user.update({ where: { id: assistant.userId }, data: { name } });
+  revalidatePath("/users");
+  return { ok: true };
+}
+
 // Admin: set/clear an assistant's phone (for WhatsApp group invites).
 export async function setAssistantPhone(
   assistantId: string,
