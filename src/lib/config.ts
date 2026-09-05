@@ -29,10 +29,10 @@ export const OPERATION_DEFAULTS = {
   weeklyDeadlineHour: 21, // 9pm
 
   // Pay
-  perClassSalary: 1000, // EGP per class covered per month
+  perClassSalary: 1500, // EGP per class covered per month
   officeHourBonus: 100, // EGP per office-hour session
-  lateDeduction: 100, // EGP per non-waived late incident
-  coverageAdjustment: 50, // EGP moved when one assistant covers another's session (−50 owner / +50 coverer)
+  lateDeduction: 200, // EGP per non-waived late incident
+  coverageAdjustment: 300, // EGP moved when one assistant covers another's session (−300 owner / +300 coverer)
   payMultiplier: 1, // global multiplier (spec: all multipliers 1× for now)
 } as const;
 
