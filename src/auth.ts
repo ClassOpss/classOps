@@ -14,6 +14,31 @@ const credentialsSchema = z.object({
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma),
+  callbacks: {
+    ...authConfig.callbacks,
+    // Node-runtime override of the edge jwt callback (auth.config.ts). Same sign-in
+    // enrichment, PLUS a self-heal: if an assistant's profile was linked or their
+    // account set up AFTER this token was minted (e.g. they held a 7-day session
+    // while being invited/assigned), the token would carry assistantId=null and /my
+    // would wrongly show "no assistant profile" until a manual sign-out/in. Re-resolve
+    // it from the DB on the next request instead. One query only until it's healed.
+    async jwt({ token, user }) {
+      if (user) {
+        token.uid = user.id;
+        token.role = user.role;
+        token.assistantId = user.assistantId ?? null;
+        token.operationId = user.operationId ?? null;
+      }
+      if (token.uid && token.role === "assistant" && !token.assistantId) {
+        const a = await prisma.assistant.findUnique({
+          where: { userId: token.uid as string },
+          select: { id: true },
+        });
+        if (a) token.assistantId = a.id;
+      }
+      return token;
+    },
+  },
   providers: [
     Credentials({
       credentials: {
