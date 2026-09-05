@@ -7,6 +7,7 @@ import { logActivity } from "@/lib/activity";
 import { divideAlphabetically, assignToSmallerGroup } from "@/lib/divide";
 import { reassignResponsibilities } from "@/actions/sessions";
 import { assertClassInOperation } from "@/lib/operation";
+import { ymdUtc, cairoToday } from "@/lib/datetime";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
@@ -14,7 +15,9 @@ export type FormState = { ok?: boolean; error?: string } | undefined;
 // (earliest start) — that's the one who gets the extra student on odd splits.
 async function activeAssistantIds(classId: string): Promise<string[]> {
   const rows = await prisma.classAssignment.findMany({
-    where: { classId, endDate: null },
+    // Substitutes (temporary covers) are never part of the permanent 2-assistant
+    // roster, so they don't count toward the max, the day-ownership split, or division.
+    where: { classId, endDate: null, isSubstitute: false },
     orderBy: [{ startDate: "asc" }, { createdAt: "asc" }],
     select: { assistantId: true },
   });
@@ -85,6 +88,80 @@ export async function endAssignment(assignmentId: string): Promise<void> {
   });
   revalidatePath(`/classes/${assignment.classId}/assistants`);
   revalidatePath("/my", "layout"); // the un-assigned assistant's class list must refresh
+}
+
+// Arrange a temporary cover: give `assistantId` scoped, auto-expiring access to this
+// class for the Cairo day(s) [fromDate, toDate]. Marked isSubstitute, so it never
+// affects the permanent 2-assistant roster, day ownership, or student division — the
+// coverer just gets the class in their /my list and full student/task access for the
+// window. requireClassAccess enforces the window; the existing coverage detection +
+// admin confirm still drives the ±coverage pay move.
+export async function arrangeCover(
+  classId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const admin = await requireRole("admin");
+  const assistantId = String(formData.get("assistantId") ?? "");
+  const fromDate = String(formData.get("fromDate") ?? "");
+  const toDate = String(formData.get("toDate") ?? "") || fromDate;
+  if (!assistantId) return { error: "Pick an assistant." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate)) return { error: "Pick a cover date." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(toDate) || toDate < fromDate)
+    return { error: "The end date can't be before the start date." };
+
+  const operationId = await assertClassInOperation(classId);
+  const assistant = await prisma.assistant.findUnique({
+    where: { id: assistantId },
+    select: { operationId: true },
+  });
+  if (!assistant || assistant.operationId !== operationId) return { error: "Pick an assistant." };
+
+  // A covering assistant shouldn't already be on this class's permanent roster.
+  const active = await activeAssistantIds(classId);
+  if (active.includes(assistantId)) return { error: "That assistant is already assigned to this class." };
+
+  // startDate/endDate are @db.Date (date-only) — store plain calendar dates. Access
+  // is judged against cairoToday() (see requireClassAccess), so [from, to] is inclusive.
+  await prisma.classAssignment.create({
+    data: { classId, assistantId, startDate: ymdUtc(fromDate), endDate: ymdUtc(toDate), isSubstitute: true },
+  });
+  await logActivity({
+    actorId: admin.id,
+    actorRole: admin.role,
+    action: "arranged_cover",
+    entityType: "class",
+    entityId: classId,
+    classId,
+    metadata: { assistantId, fromDate, toDate },
+  });
+  revalidatePath(`/classes/${classId}/assistants`);
+  revalidatePath("/my", "layout");
+  return { ok: true };
+}
+
+// End a cover early (expire its access window now).
+export async function endCover(assignmentId: string): Promise<void> {
+  const admin = await requireRole("admin");
+  // Expire immediately: set the end date to yesterday so today's date-based access
+  // check (endDate >= cairoToday) fails right away.
+  const yesterday = new Date(cairoToday().getTime() - 86_400_000);
+  const a = await prisma.classAssignment.update({
+    where: { id: assignmentId },
+    data: { endDate: yesterday },
+    select: { classId: true, assistantId: true },
+  });
+  await logActivity({
+    actorId: admin.id,
+    actorRole: admin.role,
+    action: "ended_cover",
+    entityType: "class",
+    entityId: a.classId,
+    classId: a.classId,
+    metadata: { assistantId: a.assistantId },
+  });
+  revalidatePath(`/classes/${a.classId}/assistants`);
+  revalidatePath("/my", "layout");
 }
 
 // Auto-divide active students between the class's active assistants.

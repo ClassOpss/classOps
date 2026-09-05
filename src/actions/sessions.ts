@@ -17,7 +17,8 @@ export type FormState = { ok?: boolean; error?: string } | undefined;
 // Active assistants assigned to a class, in a stable order (so day-ownership is deterministic).
 async function classAssistantIds(classId: string, now: Date): Promise<string[]> {
   const assigns = await prisma.classAssignment.findMany({
-    where: { classId, ...activeAt(now) },
+    // Only the permanent roster owns day responsibilities — never temporary covers.
+    where: { classId, isSubstitute: false, ...activeAt(now) },
     orderBy: [{ startDate: "asc" }, { assistant: { name: "asc" } }],
     select: { assistantId: true },
   });

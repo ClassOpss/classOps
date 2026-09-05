@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { scheduleLabel } from "@/lib/schedule";
+import { formatCairo, cairoToday } from "@/lib/datetime";
 
 export default async function MyClassesPage() {
   const user = await requireRole("assistant", "admin");
@@ -17,12 +18,12 @@ export default async function MyClassesPage() {
     );
   }
 
-  const now = new Date();
+  const today = cairoToday(); // @db.Date assignment window — compare by calendar date
   const assignments = await prisma.classAssignment.findMany({
     where: {
       assistantId: user.assistantId,
-      startDate: { lte: now },
-      OR: [{ endDate: null }, { endDate: { gte: now } }],
+      startDate: { lte: today },
+      OR: [{ endDate: null }, { endDate: { gte: today } }],
       // Only surface classes that are still active. This filters each assignment
       // by its own class, so deactivating one class drops only that class from
       // the list — the assistant's other classes are unaffected.
@@ -41,7 +42,9 @@ export default async function MyClassesPage() {
     },
   });
 
-  const classes = assignments.map((a) => a.class).sort((a, b) => a.name.localeCompare(b.name));
+  const classes = assignments
+    .map((a) => ({ ...a.class, isCover: a.isSubstitute, coverUntil: a.endDate }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className="flex flex-col gap-4">
@@ -57,7 +60,14 @@ export default async function MyClassesPage() {
                 className="card flex items-center justify-between p-4 transition-colors hover:border-border-strong"
               >
                 <div>
-                  <p className="font-semibold">{c.name}</p>
+                  <p className="flex items-center gap-2 font-semibold">
+                    {c.name}
+                    {c.isCover && (
+                      <span className="badge-warn text-[0.65rem]">
+                        Cover{c.coverUntil ? ` · until ${formatCairo(c.coverUntil, "d MMM")}` : ""}
+                      </span>
+                    )}
+                  </p>
                   <p className="mt-0.5 text-sm text-muted">
                     {c.school.name} · {scheduleLabel(c.schedule as object)} · {c._count.students} students
                   </p>

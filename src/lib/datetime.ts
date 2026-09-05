@@ -19,6 +19,13 @@ export function cairoToday(now: Date = new Date()): Date {
   return new Date(Date.UTC(y, m - 1, d));
 }
 
+// A yyyy-mm-dd calendar date as a UTC-midnight Date — the shape @db.Date columns
+// store, and comparable to cairoToday(). Used for date-only assignment windows.
+export function ymdUtc(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
 function zonedInstant(scheduledDate: Date, hms: string): Date {
   const y = scheduledDate.getUTCFullYear();
   const m = pad(scheduledDate.getUTCMonth() + 1);

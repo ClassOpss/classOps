@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
-import { endAssignment, autoDivideStudents } from "@/actions/assignments";
+import { endAssignment, autoDivideStudents, endCover } from "@/actions/assignments";
 import { currentOperationId } from "@/lib/operation";
+import { formatCairo, cairoToday } from "@/lib/datetime";
 import { AssignAssistant } from "./assign-assistant";
+import { ArrangeCover } from "./arrange-cover";
 
 export default async function AssistantsPage({
   params,
@@ -28,9 +30,11 @@ export default async function AssistantsPage({
     );
   }
 
-  const [assignments, allAssistants, subs, studentCount] = await Promise.all([
+  const now = new Date();
+  const [assignments, allAssistants, subs, studentCount, covers] = await Promise.all([
     prisma.classAssignment.findMany({
-      where: { classId, endDate: null },
+      // Permanent roster only — temporary covers (isSubstitute) are listed separately.
+      where: { classId, endDate: null, isSubstitute: false },
       orderBy: [{ startDate: "asc" }, { createdAt: "asc" }],
       include: { assistant: { select: { id: true, name: true } } },
     }),
@@ -40,8 +44,15 @@ export default async function AssistantsPage({
       include: { student: { select: { id: true, name: true, code: true } } },
     }),
     prisma.student.count({ where: { classId, active: true } }),
+    prisma.classAssignment.findMany({
+      // Active or upcoming covers (@db.Date window compared by calendar date).
+      where: { classId, isSubstitute: true, endDate: { gte: cairoToday() } },
+      orderBy: { startDate: "asc" },
+      include: { assistant: { select: { id: true, name: true } } },
+    }),
   ]);
 
+  const today = formatCairo(now, "yyyy-MM-dd");
   const activeIds = new Set(assignments.map((a) => a.assistantId));
   const available = allAssistants.filter((a) => !activeIds.has(a.id));
   const divided = subs.length > 0;
@@ -90,6 +101,36 @@ export default async function AssistantsPage({
         <section className="card p-5">
           <h2 className="section-title mb-3">Assign an assistant</h2>
           <AssignAssistant classId={classId} available={available} />
+        </section>
+      )}
+
+      {isAdmin && (
+        <section className="card p-5">
+          <h2 className="section-title mb-1">Cover</h2>
+          <p className="mb-3 text-sm text-muted">
+            Give another assistant temporary access to this class for a day (or a short
+            range) — they’ll see it in their list and can log its tasks. Access expires on
+            its own. Confirm the cover on the dashboard afterwards to move the ±cover pay.
+          </p>
+          {covers.length > 0 && (
+            <ul className="mb-4 flex flex-col gap-2">
+              {covers.map((c) => (
+                <li key={c.id} className="flex items-center gap-3 text-sm">
+                  <span className="font-medium">{c.assistant.name}</span>
+                  <span className="text-xs text-faint">
+                    {formatCairo(c.startDate, "d MMM")}
+                    {c.endDate && formatCairo(c.endDate, "d MMM") !== formatCairo(c.startDate, "d MMM")
+                      ? ` – ${formatCairo(c.endDate, "d MMM")}`
+                      : ""}
+                  </span>
+                  <form action={endCover.bind(null, c.id)} className="ml-auto">
+                    <button type="submit" className="font-medium text-danger hover:underline">End</button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+          <ArrangeCover classId={classId} available={available} today={today} />
         </section>
       )}
 

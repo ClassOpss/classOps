@@ -6,7 +6,9 @@ import { buildClassUpdateMessage } from "@/lib/whatsapp/class-update";
 import { sessionStart, sessionDeadline, isLate, formatCairo } from "@/lib/datetime";
 import { scheduleTimeForDate } from "@/lib/schedule";
 import { resolveConfig } from "@/lib/operation";
+import { waLink } from "@/lib/invites";
 import { CopyMessage } from "./copy-message";
+import { SendToGroup } from "./send-to-group";
 
 const longDate = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -21,7 +23,7 @@ export default async function ParentUpdatePage({
   params: Promise<{ classId: string; sessionId: string }>;
 }) {
   const { classId, sessionId } = await params;
-  await requireClassAccess(classId);
+  const user = await requireClassAccess(classId);
 
   const session = await prisma.classSession.findUnique({
     where: { id: sessionId },
@@ -31,9 +33,18 @@ export default async function ParentUpdatePage({
       scheduledDate: true,
       dayOff: true,
       messageNotes: true,
+      responsibleAssistantId: true,
+      responsibleAssistant: { select: { name: true, phone: true } },
       topic: { select: { title: true } },
       homework: { select: { description: true, deadline: true, noHomework: true } },
-      class: { select: { name: true, schedule: true, school: { select: { name: true } } } },
+      class: {
+        select: {
+          name: true,
+          schedule: true,
+          studentGroupLink: true,
+          school: { select: { name: true } },
+        },
+      },
       parentUpdate: { select: { sentAt: true } },
     },
   });
@@ -92,6 +103,17 @@ export default async function ParentUpdatePage({
   const sentAt = session.parentUpdate?.sentAt ?? null;
   const late = sentAt ? isLate(sentAt, sessionDeadline(session.scheduledDate, cfg)) : false;
 
+  // Messaging rule: if this is YOUR session, "Send" opens the recipient picker so you
+  // post to the parents' group. If you're COVERING (you're not the responsible
+  // assistant), it opens a chat to the responsible assistant instead, so they post it
+  // to their class group. Falls back to the picker if their number is missing.
+  const isCover =
+    !!session.responsibleAssistantId && user.assistantId !== session.responsibleAssistantId;
+  const coverLink = isCover ? waLink(session.responsibleAssistant?.phone, message) : null;
+  const groupLink = session.class.studentGroupLink; // owner posts here directly when set
+  const groupHref = `https://wa.me/?text=${encodeURIComponent(message)}`;
+  const responsibleName = session.responsibleAssistant?.name ?? "the responsible assistant";
+
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -113,14 +135,17 @@ export default async function ParentUpdatePage({
       </pre>
 
       <div className="flex flex-wrap items-center gap-3">
-        <a
-          href={`https://wa.me/?text=${encodeURIComponent(message)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-primary"
-        >
-          Send on WhatsApp
-        </a>
+        {coverLink ? (
+          <a href={coverLink} target="_blank" rel="noopener noreferrer" className="btn-primary">
+            Send to {responsibleName}
+          </a>
+        ) : groupLink ? (
+          <SendToGroup message={message} groupLink={groupLink} />
+        ) : (
+          <a href={groupHref} target="_blank" rel="noopener noreferrer" className="btn-primary">
+            Send on WhatsApp
+          </a>
+        )}
         <CopyMessage text={message} />
         <form action={markParentUpdateSent.bind(null, sessionId)}>
           <button type="submit" className="btn-secondary">
@@ -129,7 +154,11 @@ export default async function ParentUpdatePage({
         </form>
       </div>
       <p className="text-xs text-faint">
-        “Send on WhatsApp” opens WhatsApp with the message ready — pick the class group and send.
+        {coverLink
+          ? `You’re covering this session — “Send” opens a chat to ${responsibleName}, who posts it to the class group.`
+          : groupLink
+            ? "“Copy & open group” copies the message and opens the class WhatsApp group — just paste and send."
+            : "“Send on WhatsApp” opens WhatsApp with the message ready — pick the class group and send."}
       </p>
 
       {sentAt && (

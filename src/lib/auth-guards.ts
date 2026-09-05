@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { homeFor } from "@/lib/routes";
 import { currentOperationId } from "@/lib/operation";
+import { cairoToday } from "@/lib/datetime";
 
 export type SessionUser = {
   id: string;
@@ -49,13 +50,15 @@ export async function requireClassAccess(classId: string): Promise<SessionUser> 
 
   if (!user.assistantId) redirect("/my");
 
-  const now = new Date();
+  // startDate/endDate are @db.Date — compare against today's Cairo calendar date so a
+  // cover bounded to [from, to] is valid for the whole of each of those days.
+  const today = cairoToday();
   const assignment = await prisma.classAssignment.findFirst({
     where: {
       classId,
       assistantId: user.assistantId,
-      startDate: { lte: now },
-      OR: [{ endDate: null }, { endDate: { gte: now } }],
+      startDate: { lte: today },
+      OR: [{ endDate: null }, { endDate: { gte: today } }],
     },
     select: { id: true },
   });
@@ -81,6 +84,22 @@ export async function getVisibleStudentIds(
   if (user.role !== "assistant" || !user.assistantId) return allIds;
 
   const now = new Date();
+  const today = cairoToday(); // @db.Date assignment window (see requireClassAccess)
+
+  // A temporary cover (substitute) stands in for the whole class during its window —
+  // it has no sub-group, so give it the full active roster rather than an empty set.
+  const covering = await prisma.classAssignment.findFirst({
+    where: {
+      classId,
+      assistantId: user.assistantId,
+      isSubstitute: true,
+      startDate: { lte: today },
+      OR: [{ endDate: null }, { endDate: { gte: today } }],
+    },
+    select: { id: true },
+  });
+  if (covering) return allIds;
+
   const subAssignments = await prisma.studentAssistantAssignment.findMany({
     where: {
       classId,
