@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { createTopic, type FormState as TopicState } from "@/actions/topics";
 import { addPlanItem, type FormState as PlanState } from "@/actions/lesson-plan";
+import { yearGroupLabel } from "@/lib/constants";
 
 const inputCls = "input";
 const btnCls = "btn-primary";
@@ -14,7 +15,7 @@ export function AddTopicForm({ yearGroup }: { yearGroup: string }) {
     <form action={formAction} className="flex flex-wrap items-end gap-2">
       <div className="flex-1">
         <label className="label">Topic title</label>
-        <input name="title" required placeholder={`New ${yearGroup} topic`} className={inputCls} />
+        <input name="title" required placeholder={`New ${yearGroupLabel(yearGroup)} topic`} className={inputCls} />
       </div>
       <div>
         <label className="label">Chapter (optional)</label>

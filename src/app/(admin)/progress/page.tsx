@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { YearGroup } from "@prisma/client";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
-import { YEAR_GROUPS } from "@/lib/constants";
+import { YEAR_GROUPS, yearGroupLabel } from "@/lib/constants";
 import { currentOperationId } from "@/lib/operation";
 
 export default async function ProgressPage() {
@@ -56,7 +56,7 @@ export default async function ProgressPage() {
         return (
           <section key={yg} className="card overflow-hidden">
             <div className="border-b border-border px-5 py-3">
-              <h2 className="section-title">{yg}</h2>
+              <h2 className="section-title">{yearGroupLabel(yg)}</h2>
             </div>
             <table className="table">
               <thead>

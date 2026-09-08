@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { setClassActive } from "@/actions/classes";
 import { scheduleSlots, scheduleLabel } from "@/lib/schedule";
+import { yearGroupLabel } from "@/lib/constants";
 import { currentOperationId } from "@/lib/operation";
 import { EditClassForm, type ClassDefaults } from "./edit-class-form";
 
@@ -65,7 +66,7 @@ export default async function ClassOverviewPage({
           </span>
         </div>
         <p className="page-subtitle">
-          {klass.school.name} · {klass.yearGroup} · {scheduleLabel(klass.schedule as object)} ·{" "}
+          {klass.school.name} · {yearGroupLabel(klass.yearGroup)} · {scheduleLabel(klass.schedule as object)} ·{" "}
           {klass._count.students} students
         </p>
       </div>

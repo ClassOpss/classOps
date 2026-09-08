@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { YearGroup } from "@prisma/client";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
-import { YEAR_GROUPS } from "@/lib/constants";
+import { YEAR_GROUPS, yearGroupLabel } from "@/lib/constants";
 import { currentOperationId } from "@/lib/operation";
 import { deleteTopic } from "@/actions/topics";
 import { AddTopicForm, AddPlanItemForm } from "./lesson-plan-forms";
@@ -55,14 +55,14 @@ export default async function LessonPlanPage({
                 : "text-muted hover:bg-card-muted hover:text-fg"
             }`}
           >
-            {g}
+            {yearGroupLabel(g)}
           </Link>
         ))}
       </nav>
 
       <section className="card overflow-hidden">
         <div className="border-b border-border px-5 py-4">
-          <h2 className="section-title">{yearGroup} plan ({items.length} lessons)</h2>
+          <h2 className="section-title">{yearGroupLabel(yearGroup)} plan ({items.length} lessons)</h2>
         </div>
         {items.length === 0 ? (
           <p className="px-5 py-6 text-sm text-muted">No lessons yet — add topics below.</p>
@@ -79,7 +79,7 @@ export default async function LessonPlanPage({
 
       <section className="card overflow-hidden">
         <div className="border-b border-border px-5 py-4">
-          <h2 className="section-title">{yearGroup} topics ({topics.length})</h2>
+          <h2 className="section-title">{yearGroupLabel(yearGroup)} topics ({topics.length})</h2>
         </div>
         {topics.length > 0 && (
           <ul className="divide-y divide-border">

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { schoolPrefix, uniqueStudentCode } from "@/lib/code";
+import { yearGroupLabel } from "@/lib/constants";
 import { currentOperationId } from "@/lib/operation";
 import { ImportStudents } from "./import-students";
 import { AddStudentForm } from "./add-student-form";
@@ -44,7 +45,7 @@ export default async function StudentsPage({
         <div>
           <Link href={`/classes/${classId}`} className="link text-sm">← {klass.name}</Link>
           <h1 className="page-title mt-1">Students ({klass.students.length})</h1>
-          <p className="page-subtitle">{klass.school.name} · {klass.yearGroup}</p>
+          <p className="page-subtitle">{klass.school.name} · {yearGroupLabel(klass.yearGroup)}</p>
         </div>
         <Link href={`/classes/${classId}/invites`} className="btn-secondary btn-sm">
           Onboarding &amp; invites →

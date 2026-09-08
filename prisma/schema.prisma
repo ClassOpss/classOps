@@ -30,6 +30,7 @@ enum YearGroup {
   Y10
   S1
   shared
+  Y9_Summits
 }
 
 enum LmsType {

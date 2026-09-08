@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { scheduleLabel } from "@/lib/schedule";
+import { yearGroupLabel } from "@/lib/constants";
 import { currentOperationId } from "@/lib/operation";
 import { NewSchoolForm, NewClassForm } from "./class-forms";
 import { NewYear } from "./new-year";
@@ -73,7 +74,7 @@ export default async function ClassesPage() {
                       <Link href={`/classes/${c.id}`} className="link">{c.name}</Link>
                     </td>
                     <td className="text-muted">{c.school.name}</td>
-                    <td>{c.yearGroup}</td>
+                    <td>{yearGroupLabel(c.yearGroup)}</td>
                     <td className="text-muted">{scheduleLabel(c.schedule as object)}</td>
                     <td>{c._count.students}</td>
                     <td>

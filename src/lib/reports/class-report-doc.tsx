@@ -1,5 +1,6 @@
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { ClassReportData } from "./class-report-data";
+import { yearGroupLabel } from "@/lib/constants";
 
 const BRAND = "#4f46e5";
 const INK = "#0f1729";
@@ -136,7 +137,7 @@ export function ClassReportDoc({ data }: { data: ClassReportData }) {
         <View style={s.body}>
           <Text style={s.title}>{data.className}</Text>
           <Text style={s.meta}>
-            {data.schoolName}  ·  {data.yearGroup}  ·  {data.monthLabel}
+            {data.schoolName}  ·  {yearGroupLabel(data.yearGroup)}  ·  {data.monthLabel}
           </Text>
           <Text style={s.meta}>
             Assistant{data.assistants.length === 1 ? "" : "s"}: {data.assistants.join(", ") || "—"}

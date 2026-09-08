@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { updateClass, type FormState } from "@/actions/classes";
-import { DAYS } from "@/lib/constants";
+import { DAYS, YEAR_GROUPS, yearGroupLabel } from "@/lib/constants";
 
 const inputCls = "input";
 
@@ -40,9 +40,9 @@ export function EditClassForm({
       <label className="block">
         <span className="label">Year group</span>
         <select name="yearGroup" required className={inputCls} defaultValue={defaults.yearGroup}>
-          <option value="Y9">Y9</option>
-          <option value="Y10">Y10</option>
-          <option value="S1">S1</option>
+          {YEAR_GROUPS.map((g) => (
+            <option key={g} value={g}>{yearGroupLabel(g)}</option>
+          ))}
         </select>
       </label>
       <label className="block sm:col-span-2">

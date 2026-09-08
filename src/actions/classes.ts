@@ -5,14 +5,14 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
-import { DAYS } from "@/lib/constants";
+import { DAYS, YEAR_GROUPS } from "@/lib/constants";
 import { currentOperationId, assertClassInOperation } from "@/lib/operation";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
 const classSchema = z.object({
   schoolId: z.string().min(1, "Pick a school."),
-  yearGroup: z.enum(["Y9", "Y10", "S1"]),
+  yearGroup: z.enum(YEAR_GROUPS),
   name: z.string().min(1, "Name is required.").max(100),
   lmsType: z.enum(["google_classroom", "ie_learn"]).default("google_classroom"),
   // One slot per selected weekday, each with its own start time.
