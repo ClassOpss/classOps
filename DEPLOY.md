@@ -102,6 +102,23 @@ Railway cron runs a **command in a container**, not an HTTP call — so either:
 
 **Option B — external scheduler** (cron-job.org, GitHub Actions, Upstash QStash): same two requests.
 
+### Deadline reminder emails (2h before)
+
+A **second** endpoint emails each assistant the tasks they still owe ~2 hours before the
+deadline: `POST /api/cron/reminders` (same `Bearer CRON_SECRET`). Schedule it **hourly** —
+**no DST adjustment needed**, because the app computes Cairo time itself and only emails an
+operation during the single hour that is 2h before *its* deadline hour (default 9pm → 7pm Cairo):
+```sh
+# Every hour, on the hour (UTC): 0 * * * *
+curl -fsS -X POST https://<app-url>/api/cron/reminders \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+Most hourly runs are no-ops (`{"operations":0,...}`). Requires Brevo email configured
+(`BREVO_API_KEY` + `BREVO_SENDER_EMAIL`). Test without emailing anyone via
+`-d '{"force":true,"dryRun":true}'` (`Content-Type: application/json`) — reports how many
+assistants *would* be notified. Skips sessions that haven't started yet (you can't log
+attendance for a class that hasn't happened) and schools on vacation.
+
 **Timezone note:** Railway cron is **UTC**. Cairo is UTC+2 (winter) / UTC+3 (summer, DST).
 9pm Cairo = `18:00` UTC in summer, `19:00` UTC in winter. Pick the offset for the active season,
 or schedule at both and rely on the endpoint's idempotency (it never double-charges the same

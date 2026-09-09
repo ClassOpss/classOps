@@ -459,6 +459,22 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     • lib/at-risk.ts detectAtRiskStudents (attendance <75% with >=3 sessions, OR >=2 missing HW, OR avg <50%)
       -> "Needs attention" panel on the admin dashboard.
 
+    ── Deadline reminder emails (2h before) ──
+    • lib/reminders.ts sendDeadlineReminders(now,{force,dryRun}) + POST /api/cron/reminders (Bearer
+      CRON_SECRET). Emails each active assistant ONE summary of the daily (attendance/parent-update/
+      classroom-upload) and weekly (HW-correction/grade-entry) tasks they still owe, ~2h before the
+      deadline. Channel = Brevo email (per-operation sender via resolveOperationSender; WhatsApp stays
+      deep-link/human-tap only, no auto-send). Cron is scheduled HOURLY — the job self-gates on Cairo
+      time (activeWindows: an op is emailed only in the hour == dailyDeadlineHour-2, and on
+      weeklyDeadlineWeekday at weeklyDeadlineHour-2), so NO DST adjustment needed (unlike the fixed-hour
+      late-incident cron). REMINDER_LEAD_HOURS=2 constant. Reuses late-incidents' gather semantics
+      (owner = coveredById ?? responsibleAssistantId; sub-group completeness; vacation skip) but ADDS a
+      not-started skip (now < sessionStart -> can't log attendance yet, no nudge). dryRun reports "would
+      send" recipients without emailing (test flag on the route too). Verified against dev DB: window
+      opens ONLY 19:00–19:59 Cairo for the 9pm op; a seeded unlogged owed session produced candidates:1/
+      sent:1 (dry-run) then cleaned up. DEPLOY.md §6 documents the hourly cron. NOT yet browser-tested on
+      the live site; needs the Railway hourly cron job added.
+
     ── Testing-round fixes (commit e26eb42) ──
     • egyptPhone() (lib/code.ts): restore the leading 0 spreadsheets drop from Egyptian mobiles
       (1XXXXXXXXX -> 01XXXXXXXXX) on student import + contact edit.
