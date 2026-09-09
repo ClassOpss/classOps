@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireRole } from "@/lib/auth-guards";
+import { requireRole, requireUser } from "@/lib/auth-guards";
 import { createSetupToken, setupUrl, INVITE_TTL_MS } from "@/lib/tokens";
 import { logActivity } from "@/lib/activity";
 import { currentOperationId } from "@/lib/operation";
@@ -243,4 +243,33 @@ export async function bulkInviteAction(
   });
   revalidatePath("/users");
   return { ok: true, links };
+}
+
+export type TemplateState = { ok?: boolean; error?: string } | undefined;
+
+// An assistant saves their OWN invite message templates. Writes only to the
+// logged-in assistant's row (by session assistantId), so it can never affect
+// another assistant. Blank field = clear it (fall back to the shared default).
+export async function saveInviteTemplates(
+  _prev: TemplateState,
+  formData: FormData,
+): Promise<TemplateState> {
+  const user = await requireUser();
+  if (!user.assistantId) return { error: "This account has no assistant profile." };
+
+  const clean = (k: string) => {
+    const v = String(formData.get(k) ?? "").trim();
+    return v.length ? v : null;
+  };
+
+  await prisma.assistant.update({
+    where: { id: user.assistantId },
+    data: {
+      studentInviteTemplate: clean("studentInviteTemplate"),
+      parentInviteTemplate: clean("parentInviteTemplate"),
+    },
+  });
+
+  revalidatePath("/my", "layout");
+  return { ok: true };
 }

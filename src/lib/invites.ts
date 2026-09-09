@@ -23,6 +23,46 @@ export function waLink(phone: string | null | undefined, text: string): string |
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
 }
 
+// ── Per-assistant custom invite templates ──────────────────────────────────
+// An assistant can save their own student/parent invite messages using these
+// {placeholders}. Rendering just substitutes known tokens; unknown text is kept
+// verbatim (so they can hardcode their name, signature, emoji, etc.).
+export const INVITE_PLACEHOLDERS = [
+  "{studentName}",
+  "{className}",
+  "{parentName}",
+  "{parentSalutation}",
+  "{assistantName}",
+  "{link}",
+  "{signature}",
+] as const;
+
+export type InviteVars = {
+  studentName: string;
+  className: string;
+  parentName?: string | null;
+  parentPrefix?: string | null;
+  assistantName?: string | null;
+  link?: string | null; // student group link, or parent community link
+  signature?: string | null;
+};
+
+export function renderInviteTemplate(template: string, vars: InviteVars): string {
+  const salutation = vars.parentName
+    ? `${vars.parentPrefix ? vars.parentPrefix + " " : ""}${vars.parentName}`
+    : `${vars.studentName}'s parent`;
+  const map: Record<string, string> = {
+    "{studentName}": vars.studentName,
+    "{className}": vars.className,
+    "{parentName}": vars.parentName ?? "there",
+    "{parentSalutation}": salutation,
+    "{assistantName}": vars.assistantName ?? "",
+    "{link}": vars.link ?? "",
+    "{signature}": vars.signature ?? "",
+  };
+  return template.replace(/\{studentName\}|\{className\}|\{parentName\}|\{parentSalutation\}|\{assistantName\}|\{link\}|\{signature\}/g, (m) => map[m] ?? m);
+}
+
 export function studentInviteMessage(opts: {
   className: string;
   studentName: string;

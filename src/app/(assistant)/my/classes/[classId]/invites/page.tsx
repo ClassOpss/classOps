@@ -1,35 +1,47 @@
 import Link from "next/link";
 import { requireClassAccess } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
-import { normalizePhone, studentInviteMessage, parentInviteMessage } from "@/lib/invites";
+import { normalizePhone, studentInviteMessage, parentInviteMessage, renderInviteTemplate } from "@/lib/invites";
+import { resolveConfig } from "@/lib/operation";
 import { WhatsAppSend } from "@/components/whatsapp-send";
+import { InviteTemplatesForm } from "./invite-templates-form";
 
 // Assistant-facing invites: send each student/parent their class WhatsApp group +
 // Classroom join links with one tap (no auto-adding — no ban risk). The links
-// themselves are class config set by the admin (read-only here).
+// themselves are class config set by the admin (read-only here). Each assistant
+// can personalise their own invite wording (never affects other assistants).
 export default async function AssistantInvitesPage({
   params,
 }: {
   params: Promise<{ classId: string }>;
 }) {
   const { classId } = await params;
-  await requireClassAccess(classId);
+  const user = await requireClassAccess(classId);
 
-  const klass = await prisma.class.findUnique({
-    where: { id: classId },
-    select: {
-      name: true,
-      lmsType: true,
-      googleClassroomLink: true,
-      studentGroupLink: true,
-      parentCommunityLink: true,
-      students: {
-        where: { active: true },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true, phone: true, parentName: true, parentPhone: true },
+  const [klass, assistant, cfg] = await Promise.all([
+    prisma.class.findUnique({
+      where: { id: classId },
+      select: {
+        name: true,
+        lmsType: true,
+        googleClassroomLink: true,
+        studentGroupLink: true,
+        parentCommunityLink: true,
+        students: {
+          where: { active: true },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true, phone: true, parentPrefix: true, parentName: true, parentPhone: true },
+        },
       },
-    },
-  });
+    }),
+    user.assistantId
+      ? prisma.assistant.findUnique({
+          where: { id: user.assistantId },
+          select: { name: true, studentInviteTemplate: true, parentInviteTemplate: true },
+        })
+      : null,
+    resolveConfig(),
+  ]);
   if (!klass) {
     return (
       <div>
@@ -117,18 +129,36 @@ export default async function AssistantInvitesPage({
               </thead>
               <tbody>
                 {klass.students.map((s) => {
-                  const studentMsg = studentInviteMessage({
-                    className: klass.name,
-                    studentName: s.name,
-                    studentGroupLink: klass.studentGroupLink,
-                    classroomLink,
-                  });
-                  const parentMsg = parentInviteMessage({
-                    className: klass.name,
-                    parentName: s.parentName,
-                    studentName: s.name,
-                    parentCommunityLink: klass.parentCommunityLink,
-                  });
+                  const studentMsg = assistant?.studentInviteTemplate
+                    ? renderInviteTemplate(assistant.studentInviteTemplate, {
+                        studentName: s.name,
+                        className: klass.name,
+                        assistantName: assistant.name,
+                        link: klass.studentGroupLink,
+                        signature: cfg.brandSignature,
+                      })
+                    : studentInviteMessage({
+                        className: klass.name,
+                        studentName: s.name,
+                        studentGroupLink: klass.studentGroupLink,
+                        classroomLink,
+                      });
+                  const parentMsg = assistant?.parentInviteTemplate
+                    ? renderInviteTemplate(assistant.parentInviteTemplate, {
+                        studentName: s.name,
+                        className: klass.name,
+                        parentName: s.parentName,
+                        parentPrefix: s.parentPrefix,
+                        assistantName: assistant.name,
+                        link: klass.parentCommunityLink,
+                        signature: cfg.brandSignature,
+                      })
+                    : parentInviteMessage({
+                        className: klass.name,
+                        parentName: s.parentName,
+                        studentName: s.name,
+                        parentCommunityLink: klass.parentCommunityLink,
+                      });
                   return (
                     <tr key={s.id}>
                       <td className="font-medium">{s.name}</td>
@@ -155,6 +185,21 @@ export default async function AssistantInvitesPage({
           </div>
         )}
       </section>
+
+      {/* Personalise (per-assistant) */}
+      <details className="card p-4">
+        <summary className="cursor-pointer text-sm font-medium">
+          Personalise my invite messages
+        </summary>
+        <div className="mt-4">
+          <InviteTemplatesForm
+            defaults={{
+              studentInviteTemplate: assistant?.studentInviteTemplate ?? "",
+              parentInviteTemplate: assistant?.parentInviteTemplate ?? "",
+            }}
+          />
+        </div>
+      </details>
 
       <p className="text-xs text-faint">
         Auto-adding to WhatsApp groups isn&apos;t offered on purpose — it violates WhatsApp&apos;s
