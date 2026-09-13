@@ -44,7 +44,6 @@ export default async function AssistantClassPage({
 
   const sessions = (await prisma.classSession.findMany({
     where: { classId },
-    orderBy: { scheduledDate: "desc" },
     select: {
       id: true,
       scheduledDate: true,
@@ -59,6 +58,25 @@ export default async function AssistantClassPage({
   const schedule = klass.schedule as object;
   const now = new Date();
   const myId = user.assistantId;
+
+  // Rank so the session that needs action is first — no scrolling to the bottom.
+  //   0 = needs attendance logged (loggable, not yet logged): most recent on top
+  //   1 = upcoming (hasn't started yet): soonest next on top
+  //   2 = already logged (history): most recent on top
+  //   3 = day off: most recent on top
+  const rank = (s: SessionRow) => {
+    const t = s.scheduledDate.getTime();
+    if (s.dayOff) return [3, -t] as const;
+    const upcoming = now < sessionStart(s.scheduledDate, scheduleTimeForDate(schedule, s.scheduledDate));
+    if (upcoming) return [1, t] as const;
+    if (s._count.attendance === 0) return [0, -t] as const;
+    return [2, -t] as const;
+  };
+  sessions.sort((a, b) => {
+    const [ra, sa] = rank(a);
+    const [rb, sb] = rank(b);
+    return ra !== rb ? ra - rb : sa - sb;
+  });
 
   // Mine = sessions I own (or cover), plus any unowned ones so they're never hidden.
   // Others = owned by the other assistant — shown collapsed under "cover a session".
