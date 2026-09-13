@@ -41,7 +41,7 @@ export default async function ParentUpdatePage({
         select: {
           name: true,
           schedule: true,
-          studentGroupLink: true,
+          parentCommunityLink: true,
           school: { select: { name: true } },
         },
       },
@@ -104,13 +104,13 @@ export default async function ParentUpdatePage({
   const late = sentAt ? isLate(sentAt, sessionDeadline(session.scheduledDate, cfg)) : false;
 
   // Messaging rule: if this is YOUR session, "Send" opens the recipient picker so you
-  // post to the parents' group. If you're COVERING (you're not the responsible
+  // post to the parents' community group. If you're COVERING (you're not the responsible
   // assistant), it opens a chat to the responsible assistant instead, so they post it
-  // to their class group. Falls back to the picker if their number is missing.
+  // to their parents community. Falls back to the picker if their number is missing.
   const isCover =
     !!session.responsibleAssistantId && user.assistantId !== session.responsibleAssistantId;
   const coverLink = isCover ? waLink(session.responsibleAssistant?.phone, message) : null;
-  const groupLink = session.class.studentGroupLink; // owner posts here directly when set
+  const groupLink = session.class.parentCommunityLink; // owner posts here directly when set
   const groupHref = `https://wa.me/?text=${encodeURIComponent(message)}`;
   const responsibleName = session.responsibleAssistant?.name ?? "the responsible assistant";
 
@@ -155,10 +155,10 @@ export default async function ParentUpdatePage({
       </div>
       <p className="text-xs text-faint">
         {coverLink
-          ? `You’re covering this session — “Send” opens a chat to ${responsibleName}, who posts it to the class group.`
+          ? `You’re covering this session — “Send” opens a chat to ${responsibleName}, who posts it to the parents community.`
           : groupLink
-            ? "“Copy & open group” copies the message and opens the class WhatsApp group — just paste and send."
-            : "“Send on WhatsApp” opens WhatsApp with the message ready — pick the class group and send."}
+            ? "“Copy & open group” copies the message and opens the parents community group — just paste and send."
+            : "“Send on WhatsApp” opens WhatsApp with the message ready — pick the parents community and send."}
       </p>
 
       {sentAt && (
