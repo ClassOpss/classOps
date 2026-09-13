@@ -5,6 +5,7 @@ import { CAIRO_TZ, sessionDeadline, saturdayDeadline } from "@/lib/datetime";
 import { subGroupStudentIds, activeAt } from "@/lib/roster";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
 import { loadAllVacations, isSchoolOnVacation, type VacationSpan } from "@/lib/vacations";
+import { hasLms } from "@/lib/lms";
 
 type VacMap = Map<string, VacationSpan[]>;
 
@@ -56,7 +57,7 @@ async function detectDaily(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queue
       id: true,
       responsibleAssistantId: true,
       coveredById: true,
-      class: { select: { operationId: true, schoolId: true } },
+      class: { select: { operationId: true, schoolId: true, lmsType: true } },
       attendance: { select: { id: true }, take: 1 },
       parentUpdate: { select: { id: true } },
       classroomUpload: { select: { id: true } },
@@ -73,7 +74,9 @@ async function detectDaily(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queue
     const deadline = sessionDeadline(today, cfgFor(cfgs, operationId));
     if (s.attendance.length === 0) queued.push({ assistantId, sessionId: s.id, type: "attendance", deadline, operationId });
     if (!s.parentUpdate) queued.push({ assistantId, sessionId: s.id, type: "parent_update", deadline, operationId });
-    if (!s.classroomUpload) queued.push({ assistantId, sessionId: s.id, type: "classroom_upload", deadline, operationId });
+    // Classes with no LMS have nothing to upload — never charge a late for it.
+    if (hasLms(s.class.lmsType) && !s.classroomUpload)
+      queued.push({ assistantId, sessionId: s.id, type: "classroom_upload", deadline, operationId });
   }
   return queued;
 }

@@ -74,6 +74,7 @@ export function NewClassForm({ schools }: { schools: { id: string; name: string 
         <select name="lmsType" required className={inputCls} defaultValue="google_classroom">
           <option value="google_classroom">Google Classroom</option>
           <option value="ie_learn">IE Learn (no Classroom invites)</option>
+          <option value="none">No LMS (no upload task)</option>
         </select>
       </label>
       <fieldset className="sm:col-span-2">

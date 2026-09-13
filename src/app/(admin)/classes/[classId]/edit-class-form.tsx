@@ -54,6 +54,7 @@ export function EditClassForm({
         <select name="lmsType" required className={inputCls} defaultValue={defaults.lmsType}>
           <option value="google_classroom">Google Classroom</option>
           <option value="ie_learn">IE Learn (no Classroom invites)</option>
+          <option value="none">No LMS (no upload task)</option>
         </select>
       </label>
       <fieldset className="sm:col-span-2">

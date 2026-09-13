@@ -6,6 +6,7 @@ import { markClassroomUploaded } from "@/actions/classroom-upload";
 import { sessionStart, sessionDeadline, isLate, formatCairo } from "@/lib/datetime";
 import { scheduleTimeForDate } from "@/lib/schedule";
 import { resolveConfig } from "@/lib/operation";
+import { lmsLabel, hasLms } from "@/lib/lms";
 import { LessonDetailsForm } from "./lesson-details-form";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -36,7 +37,7 @@ export default async function AttendancePage({
       topic: { select: { title: true } },
       homework: { select: { description: true, deadline: true, noHomework: true } },
       classroomUpload: { select: { uploadedAt: true, notes: true } },
-      class: { select: { schedule: true, yearGroup: true } },
+      class: { select: { schedule: true, yearGroup: true, lmsType: true } },
     },
   });
   if (!session || session.classId !== classId) {
@@ -170,21 +171,23 @@ export default async function AttendancePage({
         <LessonDetailsForm sessionId={sessionId} topics={topics} current={lessonDetails} />
       </section>
 
-      <section className="card p-4">
-        <h2 className="section-title mb-2">Google Classroom</h2>
-        {uploadedAt && (
-          <div className={`mb-2 rounded-lg px-3 py-2.5 text-sm ${uploadLate ? "bg-warn-soft text-warn" : "bg-success-soft text-success"}`}>
-            Marked uploaded at {formatCairo(uploadedAt)} — {uploadLate ? "Late (after the 9pm deadline)" : "On time"}
-            {session.classroomUpload?.notes ? ` · ${session.classroomUpload.notes}` : ""}
-          </div>
-        )}
-        <form action={markClassroomUploaded.bind(null, sessionId)} className="flex flex-wrap items-end gap-2">
-          <input name="notes" placeholder="what you uploaded (optional)" className="input flex-1" />
-          <button type="submit" className="btn-secondary">
-            {uploadedAt ? "Update" : "Mark uploaded ✓"}
-          </button>
-        </form>
-      </section>
+      {hasLms(session.class.lmsType) && (
+        <section className="card p-4">
+          <h2 className="section-title mb-2">{lmsLabel(session.class.lmsType)}</h2>
+          {uploadedAt && (
+            <div className={`mb-2 rounded-lg px-3 py-2.5 text-sm ${uploadLate ? "bg-warn-soft text-warn" : "bg-success-soft text-success"}`}>
+              Marked uploaded at {formatCairo(uploadedAt)} — {uploadLate ? "Late (after the 9pm deadline)" : "On time"}
+              {session.classroomUpload?.notes ? ` · ${session.classroomUpload.notes}` : ""}
+            </div>
+          )}
+          <form action={markClassroomUploaded.bind(null, sessionId)} className="flex flex-wrap items-end gap-2">
+            <input name="notes" placeholder="what you uploaded (optional)" className="input flex-1" />
+            <button type="submit" className="btn-secondary">
+              {uploadedAt ? "Update" : "Mark uploaded ✓"}
+            </button>
+          </form>
+        </section>
+      )}
     </div>
   );
 }

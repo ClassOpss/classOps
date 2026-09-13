@@ -1,6 +1,5 @@
 import "server-only";
 import { formatInTimeZone } from "date-fns-tz";
-import type { LmsType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { CAIRO_TZ, sessionDeadline, saturdayDeadline, sessionStart, formatCairo } from "@/lib/datetime";
 import { subGroupStudentIds, activeAt } from "@/lib/roster";
@@ -8,6 +7,7 @@ import { scheduleTimeForDate, type ClassSchedule } from "@/lib/schedule";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
 import { loadAllVacations, isSchoolOnVacation, type VacationSpan } from "@/lib/vacations";
 import { sendEmail, resolveOperationSender } from "@/lib/email";
+import { lmsLabel, hasLms } from "@/lib/lms";
 
 // How far ahead of a deadline the reminder fires. The cron runs hourly and each
 // operation is nudged only in the single hour that sits this many hours before its
@@ -37,10 +37,6 @@ type PendingTask = {
 };
 
 type Bucket = { operationId: string; tasks: PendingTask[] };
-
-function lmsLabel(lms: LmsType): string {
-  return lms === "ie_learn" ? "IE Learn" : "Google Classroom";
-}
 
 // Daily session tasks (attendance / parent update / classroom upload) due tonight, for
 // the operations whose reminder window is currently open. Skips sessions that haven't
@@ -82,7 +78,8 @@ async function gatherDaily(
     const bucket = buckets.get(assistantId) ?? { operationId, tasks: [] };
     if (s.attendance.length === 0) bucket.tasks.push({ label: `Log attendance — ${cls}`, deadline });
     if (!s.parentUpdate) bucket.tasks.push({ label: `Send parent update — ${cls}`, deadline });
-    if (!s.classroomUpload)
+    // No LMS -> no upload task -> nothing to remind about.
+    if (hasLms(s.class.lmsType) && !s.classroomUpload)
       bucket.tasks.push({ label: `Upload to ${lmsLabel(s.class.lmsType)} — ${cls}`, deadline });
     buckets.set(assistantId, bucket);
   }

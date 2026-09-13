@@ -14,7 +14,7 @@ const classSchema = z.object({
   schoolId: z.string().min(1, "Pick a school."),
   yearGroup: z.enum(YEAR_GROUPS),
   name: z.string().min(1, "Name is required.").max(100),
-  lmsType: z.enum(["google_classroom", "ie_learn"]).default("google_classroom"),
+  lmsType: z.enum(["google_classroom", "ie_learn", "none"]).default("google_classroom"),
   // One slot per selected weekday, each with its own start time.
   slots: z
     .array(

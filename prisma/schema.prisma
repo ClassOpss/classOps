@@ -36,6 +36,7 @@ enum YearGroup {
 enum LmsType {
   google_classroom
   ie_learn
+  none
 }
 
 enum SessionStatus {

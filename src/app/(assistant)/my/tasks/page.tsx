@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireRole, requireUser } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
+import { hasLms } from "@/lib/lms";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   weekday: "short",
@@ -58,7 +59,7 @@ export default async function MyTasksPage() {
             id: true,
             classId: true,
             scheduledDate: true,
-            class: { select: { name: true } },
+            class: { select: { name: true, lmsType: true } },
             attendance: { select: { id: true }, take: 1 },
             parentUpdate: { select: { id: true } },
             classroomUpload: { select: { id: true } },
@@ -70,7 +71,7 @@ export default async function MyTasksPage() {
       const missing: string[] = [];
       if (s.attendance.length === 0) missing.push("Attendance");
       if (!s.parentUpdate) missing.push("Parent update");
-      if (!s.classroomUpload) missing.push("Classroom");
+      if (hasLms(s.class.lmsType) && !s.classroomUpload) missing.push("Classroom");
       return { s, missing };
     })
     .filter((t) => t.missing.length > 0);
