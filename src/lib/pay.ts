@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { resolveConfigFor } from "@/lib/operation";
 import { loadVacations, vacationDaysInMonth, vacationFractionOff } from "@/lib/vacations";
+import { effectiveDeductionTotal } from "@/lib/incident-deductions";
 
 export type PayComponents = {
   classesCovered: number;
@@ -49,9 +50,11 @@ export async function computePayComponents(
       },
       select: { classId: true, class: { select: { schoolId: true } } },
     }),
-    prisma.lateIncident.aggregate({
+    // Non-waived incidents whose deadline falls this month. Daily tasks are capped per
+    // session-day (see effectiveDeductionTotal); weekly tasks charge per incident.
+    prisma.lateIncident.findMany({
       where: { assistantId, waived: false, deadline: inMonth },
-      _sum: { deductionAmount: true },
+      select: { sessionId: true, type: true, deductionAmount: true },
     }),
     // Only admin-approved office hours count toward the bonus.
     prisma.officeHourSession.count({ where: { assistantId, date: inMonth, approved: true } }),
@@ -73,7 +76,15 @@ export async function computePayComponents(
   for (const a of assignments) classSchool.set(a.classId, a.class.schoolId);
   const classesCovered = classSchool.size;
   const perClassBase = perClassRate * cfg.payMultiplier;
-  const lateDeductions = Number(incidents._sum.deductionAmount ?? 0);
+  const lateDeductions = effectiveDeductionTotal(
+    incidents.map((i) => ({
+      assistantId,
+      sessionId: i.sessionId,
+      type: i.type,
+      deductionAmount: Number(i.deductionAmount),
+      waived: false,
+    })),
+  );
 
   // Per class: withhold a fraction of its base for its school's vacation days this month.
   let vacationDeduction = 0;

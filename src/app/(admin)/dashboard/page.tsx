@@ -8,6 +8,7 @@ import { detectAtRiskStudents } from "@/lib/at-risk";
 import { confirmCoverage } from "@/actions/coverage";
 import { approveOfficeHour, rejectOfficeHour } from "@/actions/office-hours";
 import { currentOperationId } from "@/lib/operation";
+import { effectiveDeductionTotal, perIncidentCharge } from "@/lib/incident-deductions";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -75,7 +76,17 @@ export default async function DashboardPage() {
       })
     : [];
   const outstanding = incidents.filter((i) => !i.waived);
-  const dueTotal = outstanding.reduce((sum, i) => sum + Number(i.deductionAmount), 0);
+  // Daily tasks are capped at one charge per assistant+session-day; weekly charge per incident.
+  const deductible = incidents.map((i) => ({
+    id: i.id,
+    assistantId: i.assistantId,
+    sessionId: i.sessionId,
+    type: i.type,
+    deductionAmount: Number(i.deductionAmount),
+    waived: i.waived,
+  }));
+  const dueTotal = effectiveDeductionTotal(deductible);
+  const rowCharge = perIncidentCharge(deductible);
   const coverages = isAdmin ? await detectCoverageCandidates(operationId) : [];
   const atRisk = await detectAtRiskStudents(operationId);
   const pendingOfficeHours = isAdmin
@@ -239,8 +250,12 @@ export default async function DashboardPage() {
                   <span className="text-faint">{formatCairo(i.deadline, "d MMM, h:mm a")}</span>
                   {i.waived ? (
                     <span className="badge-neutral">Waived{i.waiveReason ? ` · ${i.waiveReason}` : ""}</span>
+                  ) : (rowCharge.get(i.id) ?? 0) > 0 ? (
+                    <span className="badge-danger">−{rowCharge.get(i.id)} EGP</span>
                   ) : (
-                    <span className="badge-danger">−{Number(i.deductionAmount)} EGP</span>
+                    <span className="badge-neutral" title="Missing one daily task already charges the whole day">
+                      included in daily cap
+                    </span>
                   )}
                   <span className="ml-auto">
                     {i.waived ? (
