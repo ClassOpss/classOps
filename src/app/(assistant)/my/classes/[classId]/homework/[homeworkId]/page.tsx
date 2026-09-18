@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
-import { submitHomeworkSubmissions } from "@/actions/homework";
+import { submitHomeworkSubmissions, updateHomeworkDeadline } from "@/actions/homework";
 import { saturdayDeadline, isLate, formatCairo } from "@/lib/datetime";
 import { resolveConfig } from "@/lib/operation";
 
@@ -81,6 +81,20 @@ export default async function HomeworkEntryPage({
         <p className="text-sm text-muted">
           Due {dateFmt.format(homework.deadline)} · enter by {formatCairo(correctionDeadline, "EEE d MMM, h:mm a")}
         </p>
+        <form
+          action={updateHomeworkDeadline.bind(null, homeworkId)}
+          className="mt-2 flex flex-wrap items-center gap-2"
+        >
+          <label className="text-sm text-muted" htmlFor="deadline">Change due date</label>
+          <input
+            type="date"
+            id="deadline"
+            name="deadline"
+            defaultValue={deadlineValue}
+            className="input w-auto !py-1.5"
+          />
+          <button type="submit" className="btn-secondary !py-1.5">Update</button>
+        </form>
       </div>
 
       {complete ? (

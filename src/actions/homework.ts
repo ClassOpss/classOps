@@ -6,6 +6,56 @@ import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { hwStatus } from "@/lib/homework";
 
+// Assistant edits a homework's due date after it's been set. Recomputes the stored
+// status of already-submitted rows so on-time/late badges stay consistent with the
+// new deadline; "missing" rows are left as-is. Correction lateness is unaffected —
+// it's judged on the assistant's first-entry loggedAt, not the deadline.
+export async function updateHomeworkDeadline(
+  homeworkId: string,
+  formData: FormData,
+): Promise<void> {
+  const homework = await prisma.homeworkAssignment.findUnique({
+    where: { id: homeworkId },
+    select: { id: true, classId: true, noHomework: true },
+  });
+  if (!homework || homework.noHomework) return;
+
+  const user = await requireClassAccess(homework.classId);
+
+  const dateStr = String(formData.get("deadline") ?? "").trim();
+  if (!dateStr) return;
+  const deadline = new Date(dateStr);
+  if (Number.isNaN(deadline.getTime())) return;
+
+  const now = new Date();
+  const submitted = await prisma.homeworkSubmission.findMany({
+    where: { homeworkId, submissionDate: { not: null } },
+    select: { id: true, submissionDate: true },
+  });
+
+  await prisma.$transaction([
+    prisma.homeworkAssignment.update({ where: { id: homeworkId }, data: { deadline } }),
+    ...submitted.map((s) =>
+      prisma.homeworkSubmission.update({
+        where: { id: s.id },
+        data: { status: hwStatus(s.submissionDate, deadline, now) ?? "on_time" },
+      }),
+    ),
+  ]);
+
+  await logActivity({
+    actorId: user.id,
+    actorRole: user.role,
+    action: "updated_hw_deadline",
+    entityType: "homework_assignment",
+    entityId: homeworkId,
+    classId: homework.classId,
+  });
+
+  revalidatePath(`/my/classes/${homework.classId}/homework/${homeworkId}`);
+  revalidatePath(`/my/classes/${homework.classId}/homework`);
+}
+
 // Assistant logs HW submission data for their sub-group (spec 5.7). Status is auto-computed;
 // "pending" rows (not submitted, deadline not passed, no notes) are skipped.
 export async function submitHomeworkSubmissions(
