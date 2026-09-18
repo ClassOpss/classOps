@@ -2,11 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireRole } from "@/lib/auth-guards";
+import { requireRole, requireClassAccess } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { weeklySlotDates } from "@/lib/sessions";
 import { layoutFutureDates, nextSlotAfter, isLocked } from "@/lib/session-timeline";
-import { cairoToday } from "@/lib/datetime";
+import { cairoToday, ymdUtc } from "@/lib/datetime";
 import { scheduleDays } from "@/lib/schedule";
 import { assignResponsibilities } from "@/lib/responsibility";
 import { activeAt } from "@/lib/roster";
@@ -328,6 +328,88 @@ export async function addClassLesson(
     classId,
     metadata: { topicId, position },
   });
+  revalidatePath(`/classes/${classId}/sessions`);
+  return { ok: true };
+}
+
+// Add a session for a PAST, unscheduled day — e.g. a makeup/extra class that already
+// happened on a day the schedule didn't cover — so its attendance/homework can be logged.
+// Unlike addClassLesson (which inserts into the future and shifts later dates), the date is
+// fixed by the user and no other session moves. Assistants of the class may do this.
+export async function addPastSession(
+  classId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const user = await requireClassAccess(classId);
+
+  const klass = await prisma.class.findUnique({
+    where: { id: classId },
+    select: { id: true, operationId: true, yearGroup: true },
+  });
+  if (!klass) return { error: "Class not found." };
+
+  const dateStr = String(formData.get("date") ?? "").trim();
+  if (!dateStr) return { error: "Pick the date the session happened." };
+  const scheduledDate = ymdUtc(dateStr);
+  if (Number.isNaN(scheduledDate.getTime())) return { error: "That date isn't valid." };
+  if (scheduledDate.getTime() > cairoToday().getTime()) {
+    return { error: "This is for a session that already happened — pick today or a past date." };
+  }
+
+  // A typed custom topic (not in the plan) wins; otherwise validate the plan-topic choice.
+  const customTopic = String(formData.get("customTopic") ?? "").trim() || null;
+  let topicId: string | null = null;
+  if (!customTopic) {
+    topicId = String(formData.get("topicId") ?? "").trim() || null;
+    if (!topicId) return { error: "Pick a topic, or type one that isn't in the plan." };
+    const topic = await prisma.topic.findFirst({
+      where: { id: topicId, operationId: klass.operationId, yearGroup: klass.yearGroup },
+      select: { id: true },
+    });
+    if (!topic) return { error: "That topic isn't in this class's year group." };
+  }
+
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+
+  await prisma.classSession.create({
+    data: {
+      classId,
+      planItemId: null, // ad-hoc — can never appear in another class
+      scheduledDate,
+      topicId,
+      customTopic,
+      notes,
+      lessonNumber: 0, // renumbered below
+      // Owner = the assistant recording it (they ran the makeup class); null if an
+      // admin/teacher adds it. Set directly rather than re-stamping the whole class, so a
+      // one-off makeup day doesn't reshuffle every session's day-ownership.
+      responsibleAssistantId: user.assistantId ?? null,
+    },
+  });
+
+  // Keep stored lessonNumber monotonic by date so the inserted past session sits in sequence
+  // (display recomputes anyway). Dates and other sessions' ownership are left untouched.
+  const all = await prisma.classSession.findMany({
+    where: { classId },
+    orderBy: { scheduledDate: "asc" },
+    select: { id: true },
+  });
+  await prisma.$transaction(
+    all.map((s, i) => prisma.classSession.update({ where: { id: s.id }, data: { lessonNumber: i + 1 } })),
+  );
+
+  await logActivity({
+    actorId: user.id,
+    actorRole: user.role,
+    action: "added_past_session",
+    entityType: "class",
+    entityId: classId,
+    classId,
+    metadata: { date: dateStr, topicId, custom: !!customTopic },
+  });
+
+  revalidatePath(`/my/classes/${classId}`);
   revalidatePath(`/classes/${classId}/sessions`);
   return { ok: true };
 }

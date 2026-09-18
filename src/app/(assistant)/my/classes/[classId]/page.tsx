@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { requireClassAccess } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
-import { sessionStart } from "@/lib/datetime";
+import { sessionStart, cairoToday } from "@/lib/datetime";
 import { scheduleTimeForDate } from "@/lib/schedule";
+import { AddPastSessionForm } from "./add-past-session-form";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   weekday: "short",
@@ -32,7 +33,7 @@ export default async function AssistantClassPage({
 
   const klass = await prisma.class.findUnique({
     where: { id: classId },
-    select: { id: true, name: true, schedule: true, school: { select: { name: true } } },
+    select: { id: true, name: true, schedule: true, operationId: true, yearGroup: true, school: { select: { name: true } } },
   });
   if (!klass) {
     return (
@@ -42,6 +43,12 @@ export default async function AssistantClassPage({
       </div>
     );
   }
+
+  const topics = await prisma.topic.findMany({
+    where: { operationId: klass.operationId, yearGroup: klass.yearGroup },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, title: true },
+  });
 
   const sessions = (await prisma.classSession.findMany({
     where: { classId },
@@ -158,6 +165,12 @@ export default async function AssistantClassPage({
           </ul>
         </details>
       )}
+
+      <AddPastSessionForm
+        classId={classId}
+        topics={topics}
+        today={cairoToday().toISOString().slice(0, 10)}
+      />
     </div>
   );
 }
