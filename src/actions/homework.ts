@@ -6,6 +6,58 @@ import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { hwStatus } from "@/lib/homework";
 
+// Assistant adds a standalone/extra homework not tied to a lesson (spec: extra HW).
+// sessionId stays null so it doesn't clash with a session's own auto-homework.
+export async function addHomework(classId: string, formData: FormData): Promise<void> {
+  const user = await requireClassAccess(classId);
+
+  const description = String(formData.get("description") ?? "").trim();
+  const dateStr = String(formData.get("deadline") ?? "").trim();
+  if (!description || !dateStr) return;
+  const deadline = new Date(dateStr);
+  if (Number.isNaN(deadline.getTime())) return;
+
+  const hw = await prisma.homeworkAssignment.create({
+    data: { sessionId: null, classId, description, deadline, noHomework: false },
+    select: { id: true },
+  });
+
+  await logActivity({
+    actorId: user.id,
+    actorRole: user.role,
+    action: "added_homework",
+    entityType: "homework_assignment",
+    entityId: hw.id,
+    classId,
+  });
+
+  revalidatePath(`/my/classes/${classId}/homework`);
+}
+
+// Delete a standalone (non-session) homework — only ones added via addHomework, never
+// a session's auto-homework (those are managed from lesson details).
+export async function deleteHomework(homeworkId: string): Promise<void> {
+  const hw = await prisma.homeworkAssignment.findUnique({
+    where: { id: homeworkId },
+    select: { id: true, classId: true, sessionId: true },
+  });
+  if (!hw || hw.sessionId) return; // guard: never delete a session-linked HW here
+
+  const user = await requireClassAccess(hw.classId);
+  await prisma.homeworkAssignment.delete({ where: { id: homeworkId } });
+
+  await logActivity({
+    actorId: user.id,
+    actorRole: user.role,
+    action: "deleted_homework",
+    entityType: "homework_assignment",
+    entityId: homeworkId,
+    classId: hw.classId,
+  });
+
+  revalidatePath(`/my/classes/${hw.classId}/homework`);
+}
+
 // Assistant edits a homework's due date after it's been set. Recomputes the stored
 // status of already-submitted rows so on-time/late badges stay consistent with the
 // new deadline; "missing" rows are left as-is. Correction lateness is unaffected —

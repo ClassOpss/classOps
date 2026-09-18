@@ -35,7 +35,9 @@ export async function saveLessonDetails(
 
   const user = await requireClassAccess(session.classId);
 
-  const topicId = String(formData.get("topicId") ?? "").trim() || null;
+  const customTopic = String(formData.get("customTopic") ?? "").trim() || null;
+  // A typed custom topic (not in the plan) wins over the dropdown; they're mutually exclusive.
+  const topicId = customTopic ? null : (String(formData.get("topicId") ?? "").trim() || null);
   const notes = String(formData.get("notes") ?? "").trim() || null;
   const noHomework = formData.get("noHomework") === "on";
   const description = String(formData.get("homework") ?? "").trim();
@@ -43,7 +45,7 @@ export async function saveLessonDetails(
 
   await prisma.classSession.update({
     where: { id: sessionId },
-    data: { topicId, messageNotes: notes },
+    data: { topicId, customTopic, messageNotes: notes },
   });
 
   if (noHomework) {

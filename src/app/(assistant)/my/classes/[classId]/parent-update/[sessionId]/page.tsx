@@ -35,6 +35,7 @@ export default async function ParentUpdatePage({
       messageNotes: true,
       responsibleAssistantId: true,
       responsibleAssistant: { select: { name: true, phone: true } },
+      customTopic: true,
       topic: { select: { title: true } },
       homework: { select: { description: true, deadline: true, noHomework: true } },
       class: {
@@ -90,7 +91,7 @@ export default async function ParentUpdatePage({
       dateLabel: longDate.format(session.scheduledDate),
       className: session.class.name,
       schoolName: session.class.school.name,
-      topic: session.topic?.title,
+      topic: session.customTopic ?? session.topic?.title,
       attendanceLogged: attendance.length > 0,
       absentNames,
       newHomework: hw && !hw.noHomework ? hw.description : null,

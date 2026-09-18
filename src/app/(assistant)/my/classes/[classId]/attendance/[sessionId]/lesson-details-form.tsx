@@ -7,6 +7,7 @@ const inputCls = "input";
 
 export type LessonDetails = {
   topicId: string;
+  customTopic: string;
   homework: string;
   deadline: string; // yyyy-mm-dd
   noHomework: boolean;
@@ -31,6 +32,7 @@ export function LessonDetailsForm({
   // chosen value, and the effect below re-syncs to the persisted server value
   // whenever it changes (e.g. a server-computed homework deadline).
   const [topicId, setTopicId] = useState(current.topicId);
+  const [customTopic, setCustomTopic] = useState(current.customTopic);
   const [homework, setHomework] = useState(current.homework);
   const [deadline, setDeadline] = useState(current.deadline);
   const [noHomework, setNoHomework] = useState(current.noHomework);
@@ -38,11 +40,12 @@ export function LessonDetailsForm({
 
   useEffect(() => {
     setTopicId(current.topicId);
+    setCustomTopic(current.customTopic);
     setHomework(current.homework);
     setDeadline(current.deadline);
     setNoHomework(current.noHomework);
     setNotes(current.notes);
-  }, [current.topicId, current.homework, current.deadline, current.noHomework, current.notes]);
+  }, [current.topicId, current.customTopic, current.homework, current.deadline, current.noHomework, current.notes]);
 
   return (
     <form action={formAction} className="flex flex-col gap-3">
@@ -51,7 +54,8 @@ export function LessonDetailsForm({
         <select
           name="topicId"
           value={topicId}
-          onChange={(e) => setTopicId(e.target.value)}
+          onChange={(e) => { setTopicId(e.target.value); if (e.target.value) setCustomTopic(""); }}
+          disabled={customTopic.trim() !== ""}
           className={inputCls}
         >
           <option value="">—</option>
@@ -59,6 +63,17 @@ export function LessonDetailsForm({
             <option key={t.id} value={t.id}>{t.title}</option>
           ))}
         </select>
+      </label>
+
+      <label className="block">
+        <span className="label">Or type a topic not in the plan</span>
+        <input
+          name="customTopic"
+          value={customTopic}
+          onChange={(e) => { setCustomTopic(e.target.value); if (e.target.value.trim()) setTopicId(""); }}
+          placeholder="e.g. Revision — mixed past-paper questions"
+          className={inputCls}
+        />
       </label>
 
       <label className="block">

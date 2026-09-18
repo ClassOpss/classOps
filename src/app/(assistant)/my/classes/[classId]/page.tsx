@@ -17,6 +17,7 @@ type SessionRow = {
   dayOff: boolean;
   responsibleAssistantId: string | null;
   coveredById: string | null;
+  customTopic: string | null;
   topic: { title: string } | null;
   _count: { attendance: number };
 };
@@ -50,6 +51,7 @@ export default async function AssistantClassPage({
       dayOff: true,
       responsibleAssistantId: true,
       coveredById: true,
+      customTopic: true,
       topic: { select: { title: true } },
       _count: { select: { attendance: true } },
     },
@@ -96,7 +98,7 @@ export default async function AssistantClassPage({
         <div>
           <p className="font-semibold">{dateFmt.format(s.scheduledDate)}</p>
           <p className="text-sm text-muted">
-            {s.dayOff ? "Day off" : (s.topic?.title ?? "—")}
+            {s.dayOff ? "Day off" : (s.customTopic ?? s.topic?.title ?? "—")}
           </p>
         </div>
         <span className={badgeCls}>{status}</span>

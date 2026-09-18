@@ -18,6 +18,7 @@ function onVacation(vacs: VacMap, operationId: string, schoolId: string, date: D
 type Queued = {
   assistantId: string;
   sessionId: string | null;
+  homeworkId: string | null;
   type: IncidentType;
   deadline: Date;
   operationId: string;
@@ -41,8 +42,14 @@ function cairoDate(now: Date): Date {
   return new Date(`${formatInTimeZone(now, CAIRO_TZ, "yyyy-MM-dd")}T00:00:00.000Z`);
 }
 
-function key(q: { assistantId: string; sessionId: string | null; type: string; deadline: Date }): string {
-  return `${q.assistantId}|${q.sessionId ?? ""}|${q.type}|${q.deadline.getTime()}`;
+function key(q: {
+  assistantId: string;
+  sessionId: string | null;
+  homeworkId?: string | null;
+  type: string;
+  deadline: Date;
+}): string {
+  return `${q.assistantId}|${q.sessionId ?? ""}|${q.homeworkId ?? ""}|${q.type}|${q.deadline.getTime()}`;
 }
 
 export type DetectResult = { created: number; checked: number };
@@ -72,11 +79,11 @@ async function detectDaily(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queue
     const operationId = s.class.operationId;
     if (onVacation(vacs, operationId, s.class.schoolId, today)) continue; // school break -> not missed
     const deadline = sessionDeadline(today, cfgFor(cfgs, operationId));
-    if (s.attendance.length === 0) queued.push({ assistantId, sessionId: s.id, type: "attendance", deadline, operationId });
-    if (!s.parentUpdate) queued.push({ assistantId, sessionId: s.id, type: "parent_update", deadline, operationId });
+    if (s.attendance.length === 0) queued.push({ assistantId, sessionId: s.id, homeworkId: null, type: "attendance", deadline, operationId });
+    if (!s.parentUpdate) queued.push({ assistantId, sessionId: s.id, homeworkId: null, type: "parent_update", deadline, operationId });
     // Classes with no LMS have nothing to upload — never charge a late for it.
     if (hasLms(s.class.lmsType) && !s.classroomUpload)
-      queued.push({ assistantId, sessionId: s.id, type: "classroom_upload", deadline, operationId });
+      queued.push({ assistantId, sessionId: s.id, homeworkId: null, type: "classroom_upload", deadline, operationId });
   }
   return queued;
 }
@@ -93,6 +100,7 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
   const homeworks = await prisma.homeworkAssignment.findMany({
     where: { noHomework: false, deadline: { gte: weekStart, lte: weekEnd } },
     select: {
+      id: true,
       classId: true,
       sessionId: true,
       deadline: true,
@@ -116,7 +124,16 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
       if (subIds.length === 0) continue;
       const reviewed = subIds.filter((id) => submitted.has(id)).length;
       if (reviewed < subIds.length) {
-        queued.push({ assistantId, sessionId: hw.sessionId, type: "hw_correction", deadline, operationId });
+        // Session-linked HW dedupes by sessionId (unchanged); standalone HW (no session)
+        // dedupes by its own id so multiple in a week stay distinct + idempotent.
+        queued.push({
+          assistantId,
+          sessionId: hw.sessionId,
+          homeworkId: hw.sessionId ? null : hw.id,
+          type: "hw_correction",
+          deadline,
+          operationId,
+        });
       }
     }
   }
@@ -146,7 +163,7 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
       if (subIds.length === 0) continue;
       const done = subIds.filter((id) => graded.has(id)).length;
       if (done < subIds.length) {
-        queued.push({ assistantId, sessionId: null, type: "grade_entry", deadline, operationId });
+        queued.push({ assistantId, sessionId: null, homeworkId: null, type: "grade_entry", deadline, operationId });
       }
     }
   }
@@ -163,7 +180,7 @@ export async function detectLateIncidents(now: Date, weekly: boolean): Promise<D
   const deadlines = [...new Set(queued.map((q) => q.deadline.getTime()))].map((t) => new Date(t));
   const existing = await prisma.lateIncident.findMany({
     where: { deadline: { in: deadlines } },
-    select: { assistantId: true, sessionId: true, type: true, deadline: true },
+    select: { assistantId: true, sessionId: true, homeworkId: true, type: true, deadline: true },
   });
   const seen = new Set(existing.map(key));
 
@@ -180,6 +197,7 @@ export async function detectLateIncidents(now: Date, weekly: boolean): Promise<D
       data: fresh.map((q) => ({
         assistantId: q.assistantId,
         sessionId: q.sessionId,
+        homeworkId: q.homeworkId,
         type: q.type,
         deadline: q.deadline,
         deductionAmount: cfgFor(cfgs, q.operationId).lateDeduction,

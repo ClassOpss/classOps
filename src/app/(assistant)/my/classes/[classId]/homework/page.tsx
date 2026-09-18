@@ -3,6 +3,7 @@ import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { saturdayDeadline, formatCairo } from "@/lib/datetime";
 import { resolveConfig } from "@/lib/operation";
+import { addHomework, deleteHomework } from "@/actions/homework";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -25,7 +26,7 @@ export default async function HomeworkListPage({
     prisma.homeworkAssignment.findMany({
       where: { classId, noHomework: false },
       orderBy: { deadline: "desc" },
-      select: { id: true, description: true, deadline: true },
+      select: { id: true, description: true, deadline: true, sessionId: true },
     }),
   ]);
   const total = visibleIds.length;
@@ -45,6 +46,24 @@ export default async function HomeworkListPage({
         <h1 className="mt-1 text-lg font-semibold tracking-tight">Homework</h1>
       </div>
 
+      <details className="card p-3.5">
+        <summary className="cursor-pointer text-sm font-semibold">Add extra homework</summary>
+        <p className="mt-1 text-sm text-muted">
+          For homework not tied to a lesson. Homework from a lesson is added on its attendance page.
+        </p>
+        <form action={addHomework.bind(null, classId)} className="mt-3 flex flex-col gap-3">
+          <label className="block">
+            <span className="label">Description</span>
+            <input name="description" required placeholder="e.g. Exercise 4B, Q1–10" className="input" />
+          </label>
+          <label className="block">
+            <span className="label">Due date</span>
+            <input type="date" name="deadline" required className="input w-auto" />
+          </label>
+          <button type="submit" className="btn-primary self-start">Add homework</button>
+        </form>
+      </details>
+
       {homeworks.length === 0 ? (
         <p className="card px-4 py-6 text-center text-sm text-muted">
           No homework assigned yet. Homework is added from a session&apos;s lesson details.
@@ -55,13 +74,16 @@ export default async function HomeworkListPage({
             const reviewed = reviewedBy.get(hw.id) ?? 0;
             const complete = total > 0 && reviewed === total;
             return (
-              <li key={hw.id}>
+              <li key={hw.id} className="card p-3.5">
                 <Link
                   href={`/my/classes/${classId}/homework/${hw.id}`}
-                  className="card block p-3.5 transition-colors hover:border-border-strong"
+                  className="block transition-colors hover:opacity-80"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <p className="font-semibold">{hw.description ?? "Homework"}</p>
+                    <p className="font-semibold">
+                      {hw.description ?? "Homework"}
+                      {!hw.sessionId && <span className="badge-neutral ml-2 align-middle">Extra</span>}
+                    </p>
                     <span className={complete ? "badge-success" : "badge-warn"}>
                       {complete ? "Complete" : `${reviewed}/${total} reviewed`}
                     </span>
@@ -70,6 +92,11 @@ export default async function HomeworkListPage({
                     Due {dateFmt.format(hw.deadline)} · enter by {formatCairo(saturdayDeadline(hw.deadline, cfg), "EEE d MMM, h:mm a")}
                   </p>
                 </Link>
+                {!hw.sessionId && (
+                  <form action={deleteHomework.bind(null, hw.id)} className="mt-2">
+                    <button type="submit" className="link text-xs text-danger">Remove</button>
+                  </form>
+                )}
               </li>
             );
           })}

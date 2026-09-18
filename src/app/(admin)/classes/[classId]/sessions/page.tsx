@@ -56,6 +56,7 @@ export default async function SessionsPage({
       cancellationReason: true,
       planItemId: true,
       notes: true,
+      customTopic: true,
       topic: { select: { title: true } },
       _count: { select: { attendance: true } },
       parentUpdate: { select: { id: true } },
@@ -85,7 +86,7 @@ export default async function SessionsPage({
     .filter((s) => !s.locked)
     .map((s) => ({
       id: s.id,
-      label: `${dateFmt.format(s.scheduledDate)} · ${s.dayOff ? "Day off" : s.topic?.title ?? "—"}`,
+      label: `${dateFmt.format(s.scheduledDate)} · ${s.dayOff ? "Day off" : s.customTopic ?? s.topic?.title ?? "—"}`,
     }));
 
   return (
@@ -131,7 +132,7 @@ export default async function SessionsPage({
                       ) : (
                         <span className="flex flex-col">
                           <span className="flex items-center gap-2">
-                            {s.topic?.title ?? "—"}
+                            {s.customTopic ?? s.topic?.title ?? "—"}
                             {s.isAdhoc && <span className="badge-brand">Class-specific</span>}
                           </span>
                           {s.notes ? <span className="text-xs text-muted">{s.notes}</span> : null}

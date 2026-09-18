@@ -82,6 +82,7 @@ export async function buildClassReportData(
       select: {
         scheduledDate: true,
         dayOff: true,
+        customTopic: true,
         topic: { select: { title: true } },
         attendance: { select: { status: true } },
       },
@@ -126,7 +127,7 @@ export async function buildClassReportData(
       return {
         lesson: s.dayOff ? "—" : String(lessonNo ?? "—"),
         date: ukDate(s.scheduledDate),
-        topic: s.dayOff ? "Day off" : (s.topic?.title ?? "—"),
+        topic: s.dayOff ? "Day off" : (s.customTopic ?? s.topic?.title ?? "—"),
         attendanceRate: total > 0 ? `${Math.round((present / total) * 100)}%` : "—",
       };
     });

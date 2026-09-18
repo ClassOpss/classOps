@@ -448,6 +448,9 @@ model ClassSession {
   lessonNumber       Int           @map("lesson_number") // stored sequence position; display number computed (excludes day-offs)
   scheduledDate      DateTime      @map("scheduled_date") @db.Date
   topicId            String?       @map("topic_id")
+  // Free-text topic typed by an assistant when the lesson isn't in the year-group plan.
+  // Takes precedence over topicId for display; analytics stay plan-topic based.
+  customTopic        String?       @map("custom_topic")
   status             SessionStatus @default(scheduled)
   dayOff             Boolean       @default(false) @map("day_off")
   cancellationReason String?       @map("cancellation_reason")
@@ -484,16 +487,19 @@ model ClassSession {
 
 model HomeworkAssignment {
   id          String   @id @default(uuid())
-  sessionId   String   @unique @map("session_id")
+  // Null for a standalone/extra homework not tied to a lesson (added by an assistant).
+  // Postgres UNIQUE permits many NULLs, so session-linked HW stays one-per-session.
+  sessionId   String?  @unique @map("session_id")
   classId     String   @map("class_id")
   description String?
   deadline    DateTime @db.Date
   noHomework  Boolean  @default(false) @map("no_homework")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  session     ClassSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session     ClassSession?        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   class       Class                @relation(fields: [classId], references: [id], onDelete: Cascade)
   submissions HomeworkSubmission[]
+  incidents   LateIncident[]
 
   @@index([classId])
   @@map("homework_assignments")
@@ -648,6 +654,9 @@ model LateIncident {
   id              String       @id @default(uuid())
   assistantId     String       @map("assistant_id")
   sessionId       String?      @map("session_id")
+  // Set on hw_correction incidents for standalone HW (no session) so each is distinct
+  // and idempotent on re-runs. Null for session-linked HW (deduped by sessionId) + others.
+  homeworkId      String?      @map("homework_id")
   type            IncidentType
   deadline        DateTime     @db.Timestamptz(6)
   actualTime      DateTime?    @map("actual_time") @db.Timestamptz(6)
@@ -656,8 +665,9 @@ model LateIncident {
   waiveReason     String?      @map("waive_reason")
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  assistant Assistant     @relation(fields: [assistantId], references: [id])
-  session   ClassSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  assistant Assistant           @relation(fields: [assistantId], references: [id])
+  session   ClassSession?       @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  homework  HomeworkAssignment? @relation(fields: [homeworkId], references: [id], onDelete: SetNull)
 
   @@index([assistantId])
   @@index([sessionId])

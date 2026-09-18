@@ -33,6 +33,7 @@ export default async function AttendancePage({
       scheduledDate: true,
       dayOff: true,
       topicId: true,
+      customTopic: true,
       messageNotes: true,
       topic: { select: { title: true } },
       homework: { select: { description: true, deadline: true, noHomework: true } },
@@ -68,6 +69,7 @@ export default async function AttendancePage({
 
   const lessonDetails = {
     topicId: session.topicId ?? "",
+    customTopic: session.customTopic ?? "",
     homework: session.homework?.description ?? "",
     deadline: session.homework?.deadline ? session.homework.deadline.toISOString().slice(0, 10) : "",
     noHomework: session.homework?.noHomework ?? false,
@@ -91,7 +93,7 @@ export default async function AttendancePage({
           <Link href={`/my/classes/${classId}`} className="link text-sm">← Back</Link>
           <h1 className="mt-1 text-lg font-semibold tracking-tight">Attendance</h1>
           <p className="text-sm text-muted">
-            {dateFmt.format(session.scheduledDate)} · {session.topic?.title ?? "—"}
+            {dateFmt.format(session.scheduledDate)} · {session.customTopic ?? session.topic?.title ?? "—"}
           </p>
         </div>
         <p className="card px-4 py-5 text-sm text-muted">
@@ -109,7 +111,7 @@ export default async function AttendancePage({
         <Link href={`/my/classes/${classId}`} className="link text-sm">← Back</Link>
         <h1 className="mt-1 text-lg font-semibold tracking-tight">Attendance</h1>
         <p className="text-sm text-muted">
-          {dateFmt.format(session.scheduledDate)} · {session.topic?.title ?? "—"}
+          {dateFmt.format(session.scheduledDate)} · {session.customTopic ?? session.topic?.title ?? "—"}
         </p>
         <p className="text-xs text-faint">
           Deadline: {formatCairo(deadline, "d MMM, h:mm a")}

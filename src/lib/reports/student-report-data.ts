@@ -69,13 +69,13 @@ export async function buildStudentReportData(
   // Attendance in the month.
   const attendance = await prisma.attendance.findMany({
     where: { studentId, session: { scheduledDate: { gte: start, lt: end } } },
-    select: { status: true, session: { select: { scheduledDate: true, topic: { select: { title: true } } } } },
+    select: { status: true, session: { select: { scheduledDate: true, customTopic: true, topic: { select: { title: true } } } } },
   });
   const present = attendance.filter((a) => a.status === "present").length;
   const absences = attendance
     .filter((a) => a.status === "absent")
     .sort((a, b) => a.session.scheduledDate.getTime() - b.session.scheduledDate.getTime())
-    .map((a) => ({ date: ukDate(a.session.scheduledDate), topic: a.session.topic?.title ?? "—" }));
+    .map((a) => ({ date: ukDate(a.session.scheduledDate), topic: a.session.customTopic ?? a.session.topic?.title ?? "—" }));
 
   // Missed homework in the month (deadline in month, status missing OR no submission row).
   const homeworks = await prisma.homeworkAssignment.findMany({
