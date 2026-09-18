@@ -85,3 +85,11 @@ export function saturdayDeadline(
 export function isLate(loggedAt: Date, deadline: Date): boolean {
   return loggedAt.getTime() > deadline.getTime();
 }
+
+// Lateness only applies to a session that existed BEFORE its deadline. A makeup session
+// added retroactively (created after its own deadline had already passed) can never be
+// "late" — the deadline was gone before the session even existed. Normal sessions are
+// generated well ahead of time, so this is true for them.
+export function latenessApplies(sessionCreatedAt: Date, deadline: Date): boolean {
+  return sessionCreatedAt.getTime() <= deadline.getTime();
+}

@@ -3,7 +3,7 @@ import { requireClassAccess } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { markParentUpdateSent } from "@/actions/parent-update";
 import { buildClassUpdateMessage } from "@/lib/whatsapp/class-update";
-import { sessionStart, sessionDeadline, isLate, formatCairo } from "@/lib/datetime";
+import { sessionStart, sessionDeadline, isLate, latenessApplies, formatCairo } from "@/lib/datetime";
 import { scheduleTimeForDate } from "@/lib/schedule";
 import { resolveConfig } from "@/lib/operation";
 import { waLink } from "@/lib/invites";
@@ -31,6 +31,7 @@ export default async function ParentUpdatePage({
       id: true,
       classId: true,
       scheduledDate: true,
+      createdAt: true,
       dayOff: true,
       messageNotes: true,
       responsibleAssistantId: true,
@@ -102,7 +103,9 @@ export default async function ParentUpdatePage({
   );
 
   const sentAt = session.parentUpdate?.sentAt ?? null;
-  const late = sentAt ? isLate(sentAt, sessionDeadline(session.scheduledDate, cfg)) : false;
+  const puDeadline = sessionDeadline(session.scheduledDate, cfg);
+  // A retroactively-added makeup session (created after its deadline) is never "late".
+  const late = sentAt && latenessApplies(session.createdAt, puDeadline) ? isLate(sentAt, puDeadline) : false;
 
   // Messaging rule: if this is YOUR session, "Send" opens the recipient picker so you
   // post to the parents' community group. If you're COVERING (you're not the responsible

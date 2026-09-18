@@ -1,7 +1,7 @@
 import { formatInTimeZone } from "date-fns-tz";
 import type { IncidentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { CAIRO_TZ, sessionDeadline, saturdayDeadline } from "@/lib/datetime";
+import { CAIRO_TZ, sessionDeadline, saturdayDeadline, latenessApplies } from "@/lib/datetime";
 import { subGroupStudentIds, activeAt } from "@/lib/roster";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
 import { loadAllVacations, isSchoolOnVacation, type VacationSpan } from "@/lib/vacations";
@@ -62,6 +62,7 @@ async function detectDaily(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queue
     where: { scheduledDate: today, dayOff: false },
     select: {
       id: true,
+      createdAt: true,
       responsibleAssistantId: true,
       coveredById: true,
       class: { select: { operationId: true, schoolId: true, lmsType: true } },
@@ -79,6 +80,8 @@ async function detectDaily(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queue
     const operationId = s.class.operationId;
     if (onVacation(vacs, operationId, s.class.schoolId, today)) continue; // school break -> not missed
     const deadline = sessionDeadline(today, cfgFor(cfgs, operationId));
+    // A makeup session added after its deadline had already passed can't be "missed".
+    if (!latenessApplies(s.createdAt, deadline)) continue;
     if (s.attendance.length === 0) queued.push({ assistantId, sessionId: s.id, homeworkId: null, type: "attendance", deadline, operationId });
     if (!s.parentUpdate) queued.push({ assistantId, sessionId: s.id, homeworkId: null, type: "parent_update", deadline, operationId });
     // Classes with no LMS have nothing to upload — never charge a late for it.

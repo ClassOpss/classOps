@@ -3,7 +3,7 @@ import { requireClassAccess } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { submitAttendance } from "@/actions/attendance";
 import { markClassroomUploaded } from "@/actions/classroom-upload";
-import { sessionStart, sessionDeadline, isLate, formatCairo } from "@/lib/datetime";
+import { sessionStart, sessionDeadline, isLate, latenessApplies, formatCairo } from "@/lib/datetime";
 import { scheduleTimeForDate } from "@/lib/schedule";
 import { resolveConfig } from "@/lib/operation";
 import { lmsLabel, hasLms } from "@/lib/lms";
@@ -31,6 +31,7 @@ export default async function AttendancePage({
       id: true,
       classId: true,
       scheduledDate: true,
+      createdAt: true,
       dayOff: true,
       topicId: true,
       customTopic: true,
@@ -79,9 +80,11 @@ export default async function AttendancePage({
   const statusByStudent = new Map(existing.map((a) => [a.studentId, a.status]));
   const loggedAt = existing[0]?.loggedAt ?? null;
   const deadline = sessionDeadline(session.scheduledDate, await resolveConfig());
-  const late = loggedAt ? isLate(loggedAt, deadline) : false;
+  // A retroactively-added makeup session (created after its deadline) is never "late".
+  const lateApplies = latenessApplies(session.createdAt, deadline);
+  const late = loggedAt && lateApplies ? isLate(loggedAt, deadline) : false;
   const uploadedAt = session.classroomUpload?.uploadedAt ?? null;
-  const uploadLate = uploadedAt ? isLate(uploadedAt, deadline) : false;
+  const uploadLate = uploadedAt && lateApplies ? isLate(uploadedAt, deadline) : false;
   const start = sessionStart(session.scheduledDate, scheduleTimeForDate(session.class.schedule as object, session.scheduledDate));
   const notStarted = !session.dayOff && new Date() < start;
 
