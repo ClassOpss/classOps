@@ -12,7 +12,7 @@ import {
   QUIZ_CADENCE_DAYS,
 } from "@/lib/quiz";
 import { buildBiweeklyQuizAnnouncement } from "@/lib/whatsapp/quiz-announcement";
-import { saveQuizPrep, markQuizAnnounced } from "@/actions/quiz-prep";
+import { saveQuizPrep, markQuizAnnounced, setQuizCoverage } from "@/actions/quiz-prep";
 import { CopyMessage } from "@/components/copy-message";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -124,13 +124,10 @@ export default async function QuizPrepPage({ params }: { params: Promise<{ class
           return (
             <li key={s} className="card flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-semibold">
-                    Quiz — {dateFmt.format(actual)}
-                    {moved && <span className="ml-2 badge-neutral">moved</span>}
-                  </p>
-                  <p className="text-xs text-faint">Covers: {row?.coverage?.trim() || "— (set by teacher)"}</p>
-                </div>
+                <p className="font-semibold">
+                  Quiz — {dateFmt.format(actual)}
+                  {moved && <span className="ml-2 badge-neutral">moved</span>}
+                </p>
               </div>
 
               {/* Announcement */}
@@ -139,7 +136,20 @@ export default async function QuizPrepPage({ params }: { params: Promise<{ class
                   <p className="text-sm font-medium">1 · Announcement</p>
                   {annBadge}
                 </div>
-                <pre className="mt-2 whitespace-pre-wrap rounded-lg border border-border bg-card-muted p-3 text-xs">{message}</pre>
+                <form action={setQuizCoverage.bind(null, classId, s)} className="mt-2 flex items-end gap-2">
+                  <label className="block flex-1">
+                    <span className="label">Topics covered</span>
+                    <input
+                      name="coverage"
+                      defaultValue={row?.coverage ?? ""}
+                      placeholder="e.g. Right angled triangle"
+                      className="input"
+                    />
+                  </label>
+                  <button type="submit" className="btn-secondary btn-sm">Save</button>
+                </form>
+                <p className="mt-2 text-xs text-faint">Message preview (updates after you save the topics):</p>
+                <pre className="mt-1 whitespace-pre-wrap rounded-lg border border-border bg-card-muted p-3 text-xs">{message}</pre>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <CopyMessage message={message} />
                   {!announced && (

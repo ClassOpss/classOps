@@ -156,7 +156,8 @@ export async function setQuizDate(
   revalidatePath("/my/tasks");
 }
 
-// Admin/teacher: set what the quiz covers (feeds the announcement message).
+// Set what the quiz covers (feeds the announcement message). Any assigned assistant can
+// fill this in — they send the announcement — as well as admin/teacher.
 export async function setQuizCoverage(
   classId: string,
   scheduledDateStr: string,
@@ -164,7 +165,6 @@ export async function setQuizCoverage(
 ): Promise<void> {
   const cyc = await resolveCycle(classId, scheduledDateStr);
   if (!cyc) return;
-  if (cyc.user.role !== "admin" && cyc.user.role !== "teacher") return;
   const { scheduledDate } = cyc;
 
   const coverage = String(formData.get("coverage") ?? "").trim() || null;
