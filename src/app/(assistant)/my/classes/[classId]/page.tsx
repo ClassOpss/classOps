@@ -139,7 +139,7 @@ export default async function AssistantClassPage({
           { href: `/my/classes/${classId}/assessments`, label: "Assessments" },
           { href: `/my/classes/${classId}/office-hours`, label: "Office hours" },
           { href: `/my/classes/${classId}/parent-reports`, label: "Parent reports" },
-          ...(klass.quizStartDate ? [{ href: `/my/classes/${classId}/quiz-prep`, label: "Quiz prep" }] : []),
+          ...(klass.quizStartDate ? [{ href: `/my/classes/${classId}/quiz-prep`, label: "Quiz tasks" }] : []),
         ].map((l) => (
           <Link key={l.href} href={l.href} className="card px-2 py-3 text-center text-sm font-medium text-fg transition-colors hover:border-border-strong">
             {l.label}

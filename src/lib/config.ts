@@ -27,6 +27,8 @@ export const OPERATION_DEFAULTS = {
   dailyDeadlineHour: 21, // 9pm on the session day — attendance / parent update / classroom upload
   weeklyDeadlineWeekday: 6, // Saturday (0=Sun … 6=Sat) — HW correction / grade entry
   weeklyDeadlineHour: 21, // 9pm
+  quizPrepLeadDays: 3, // create quiz + send to print, this many days before each biweekly quiz
+  quizAnnounceLeadDays: 7, // send the announcement message this many days before
 
   // Pay
   perClassSalary: 1500, // EGP per class covered per month
@@ -44,6 +46,8 @@ export type OperationConfig = {
   dailyDeadlineHour: number;
   weeklyDeadlineWeekday: number;
   weeklyDeadlineHour: number;
+  quizPrepLeadDays: number;
+  quizAnnounceLeadDays: number;
   perClassSalary: number;
   officeHourBonus: number;
   lateDeduction: number;
@@ -61,6 +65,8 @@ export function operationConfig(op: Operation): OperationConfig {
     dailyDeadlineHour: op.dailyDeadlineHour,
     weeklyDeadlineWeekday: op.weeklyDeadlineWeekday,
     weeklyDeadlineHour: op.weeklyDeadlineHour,
+    quizPrepLeadDays: op.quizPrepLeadDays,
+    quizAnnounceLeadDays: op.quizAnnounceLeadDays,
     perClassSalary: Number(op.perClassSalary),
     officeHourBonus: Number(op.officeHourBonus),
     lateDeduction: Number(op.lateDeduction),

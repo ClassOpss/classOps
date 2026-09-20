@@ -1,6 +1,5 @@
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { APP_LOCALE, OPERATION_DEFAULTS } from "@/lib/config";
-import { prepDeadlineDate } from "@/lib/quiz";
 
 // All timestamps are stored UTC; display + day-boundary math use the shared app
 // timezone (the one config value that is NOT per-operation — see config.ts).
@@ -83,13 +82,23 @@ export function saturdayDeadline(
   return zonedInstant(base, `${pad(weeklyDeadlineHour)}:00:00`);
 }
 
-// Quiz-prep deadline: the daily deadline hour (default 9pm), 3 days before the quiz date.
-// Reuses the daily deadline hour so its reminder window lines up with the daily nudge.
-export function quizPrepDeadline(
-  quizDate: Date,
-  cfg: DailyDeadlineCfg = OPERATION_DEFAULTS,
-): Date {
-  return sessionDeadline(prepDeadlineDate(quizDate), cfg);
+// Quiz task deadlines: the daily deadline hour (default 9pm), a configurable number of days
+// before the quiz's ACTUAL date. Reusing the daily hour lines their reminder up with the
+// daily nudge. Prep = create quiz + send to print; announce = send the announcement message.
+type QuizDeadlineCfg = DailyDeadlineCfg & { quizPrepLeadDays: number; quizAnnounceLeadDays: number };
+
+function minusDays(date: Date, n: number): Date {
+  const r = new Date(date);
+  r.setUTCDate(r.getUTCDate() - n);
+  return r;
+}
+
+export function quizPrepDeadline(quizDate: Date, cfg: QuizDeadlineCfg = OPERATION_DEFAULTS): Date {
+  return sessionDeadline(minusDays(quizDate, cfg.quizPrepLeadDays), cfg);
+}
+
+export function quizAnnounceDeadline(quizDate: Date, cfg: QuizDeadlineCfg = OPERATION_DEFAULTS): Date {
+  return sessionDeadline(minusDays(quizDate, cfg.quizAnnounceLeadDays), cfg);
 }
 
 export function isLate(loggedAt: Date, deadline: Date): boolean {

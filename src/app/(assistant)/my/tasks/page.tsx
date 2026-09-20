@@ -3,8 +3,8 @@ import { requireRole, requireUser } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { hasLms } from "@/lib/lms";
 import { resolveConfig } from "@/lib/operation";
-import { cairoToday, quizPrepDeadline, formatCairo } from "@/lib/datetime";
-import { quizDatesBetween, addDays } from "@/lib/quiz";
+import { cairoToday, quizPrepDeadline, quizAnnounceDeadline, formatCairo } from "@/lib/datetime";
+import { scheduledQuizDatesBetween, effectiveQuizDate, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   weekday: "short",
@@ -86,31 +86,42 @@ export default async function MyTasksPage() {
       ? []
       : await prisma.class.findMany({
           where: { id: { in: classIds }, quizStartDate: { not: null } },
-          select: { id: true, name: true, quizDay: true, quizStartDate: true },
+          select: {
+            id: true,
+            name: true,
+            quizStartDate: true,
+            quizPreps: {
+              select: { scheduledDate: true, quizDate: true, quizCreated: true, sentToPrint: true, announcedAt: true },
+            },
+          },
         });
   const cfg = await resolveConfig();
   const today = cairoToday(now);
   const soon = now.getTime() + 7 * 86_400_000;
   const recent = now.getTime() - 21 * 86_400_000;
 
-  const quizTodos: { classId: string; className: string; quizDate: Date; deadline: Date; overdue: boolean }[] = [];
+  const quizTodos: { classId: string; className: string; kind: string; quizDate: Date; deadline: Date; overdue: boolean }[] = [];
   for (const c of quizClasses) {
     if (!c.quizStartDate) continue;
-    const dates = quizDatesBetween(c.quizStartDate, addDays(today, -24), addDays(today, 10));
-    if (dates.length === 0) continue;
-    const preps = await prisma.quizPrep.findMany({
-      where: { classId: c.id, quizDate: { in: dates } },
-      select: { quizDate: true, quizCreated: true, sentToPrint: true },
-    });
-    const done = new Set(
-      preps.filter((p) => p.quizCreated && p.sentToPrint).map((p) => p.quizDate.getTime()),
+    const scheduled = scheduledQuizDatesBetween(
+      c.quizStartDate,
+      addDays(today, -24),
+      addDays(today, cfg.quizAnnounceLeadDays + 10),
     );
-    for (const d of dates) {
-      if (done.has(d.getTime())) continue;
-      const deadline = quizPrepDeadline(d, cfg);
+    const bySched = new Map(c.quizPreps.map((r) => [r.scheduledDate.getTime(), r]));
+    const near = (deadline: Date) => {
       const t = deadline.getTime();
-      if (t > soon || t < recent) continue; // only near-term / recently-overdue cycles
-      quizTodos.push({ classId: c.id, className: c.name, quizDate: d, deadline, overdue: now.getTime() > t });
+      return t <= soon && t >= recent;
+    };
+    for (const sched of scheduled) {
+      const row = bySched.get(sched.getTime());
+      const actual = effectiveQuizDate(sched, row);
+      const annDl = quizAnnounceDeadline(actual, cfg);
+      if (!quizAnnounced(row) && near(annDl))
+        quizTodos.push({ classId: c.id, className: c.name, kind: "Announcement", quizDate: actual, deadline: annDl, overdue: now.getTime() > annDl.getTime() });
+      const prepDl = quizPrepDeadline(actual, cfg);
+      if (!quizPrepComplete(row) && near(prepDl))
+        quizTodos.push({ classId: c.id, className: c.name, kind: "Prep", quizDate: actual, deadline: prepDl, overdue: now.getTime() > prepDl.getTime() });
     }
   }
   quizTodos.sort((a, b) => a.deadline.getTime() - b.deadline.getTime());
@@ -156,10 +167,10 @@ export default async function MyTasksPage() {
 
           {quizTodos.length > 0 && (
             <div className="flex flex-col gap-2">
-              <h2 className="section-title mt-2">Quiz prep</h2>
+              <h2 className="section-title mt-2">Quiz tasks</h2>
               <ul className="flex flex-col gap-2">
                 {quizTodos.map((q) => (
-                  <li key={`${q.classId}-${q.quizDate.getTime()}`}>
+                  <li key={`${q.classId}-${q.quizDate.getTime()}-${q.kind}`}>
                     <Link
                       href={`/my/classes/${q.classId}/quiz-prep`}
                       className="card flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:border-border-strong"
@@ -167,11 +178,11 @@ export default async function MyTasksPage() {
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{q.className}</p>
                         <p className="text-xs text-faint">
-                          Quiz {dateFmt.format(q.quizDate)} · prep by {formatCairo(q.deadline, "d MMM, h:mm a")}
+                          Quiz {dateFmt.format(q.quizDate)} · {q.kind.toLowerCase()} by {formatCairo(q.deadline, "d MMM, h:mm a")}
                         </p>
                       </div>
                       <span className={q.overdue ? "badge-danger" : "badge-warn"}>
-                        {q.overdue ? "Overdue" : "Quiz prep"}
+                        {q.overdue ? "Overdue" : q.kind}
                       </span>
                     </Link>
                   </li>

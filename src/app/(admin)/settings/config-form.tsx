@@ -10,6 +10,8 @@ export type ConfigDefaults = {
   dailyDeadlineHour: number;
   weeklyDeadlineWeekday: number;
   weeklyDeadlineHour: number;
+  quizPrepLeadDays: number;
+  quizAnnounceLeadDays: number;
   perClassSalary: number;
   officeHourBonus: number;
   lateDeduction: number;
@@ -72,6 +74,14 @@ export function ConfigForm({ defaults }: { defaults: ConfigDefaults }) {
             </select>
           </label>
           <Num name="weeklyDeadlineHour" label="Weekly deadline hour (0–23)" value={defaults.weeklyDeadlineHour} />
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend className="label">Quiz lead times (days before each quiz)</legend>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Num name="quizAnnounceLeadDays" label="Announcement lead (days)" value={defaults.quizAnnounceLeadDays} />
+          <Num name="quizPrepLeadDays" label="Prep lead (create + print, days)" value={defaults.quizPrepLeadDays} />
         </div>
       </fieldset>
 

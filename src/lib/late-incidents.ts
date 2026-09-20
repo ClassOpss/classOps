@@ -1,8 +1,8 @@
 import { formatInTimeZone } from "date-fns-tz";
 import type { IncidentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { CAIRO_TZ, sessionDeadline, saturdayDeadline, quizPrepDeadline, latenessApplies } from "@/lib/datetime";
-import { quizForPrepDeadlineDay } from "@/lib/quiz";
+import { CAIRO_TZ, sessionDeadline, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, latenessApplies } from "@/lib/datetime";
+import { scheduledQuizDatesBetween, effectiveQuizDate, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
 import { subGroupStudentIds, activeAt } from "@/lib/roster";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
 import { loadAllVacations, isSchoolOnVacation, type VacationSpan } from "@/lib/vacations";
@@ -94,10 +94,12 @@ async function detectDaily(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queue
   return queued;
 }
 
-// Daily run: quiz-prep task (create quiz + send to print) is due 3 days before each class's
-// biweekly quiz, at the daily deadline hour. The task is SHARED, so a class whose prep isn't
-// complete on time charges EVERY active assigned assistant. Incidents dedupe by quizPrepId.
-async function detectQuizPrep(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queued[]> {
+// Daily run: the biweekly quiz's SHARED sub-tasks — announcement (quizAnnounceLeadDays
+// before) and prep = create + send to print (quizPrepLeadDays before) — each due at the
+// daily deadline hour before the quiz's ACTUAL date. A cycle whose sub-task isn't done on
+// time charges EVERY active assigned assistant (capped to one deduction per cycle in pay).
+// Incidents dedupe by (assistant, quizPrepId, type, deadline).
+async function detectQuiz(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queued[]> {
   const today = cairoDate(now);
 
   const classes = await prisma.class.findMany({
@@ -109,55 +111,59 @@ async function detectQuizPrep(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Qu
       operationId: true,
       schoolId: true,
       assignments: { where: activeAt(now), select: { assistantId: true } },
+      quizPreps: {
+        select: { id: true, scheduledDate: true, quizDate: true, quizCreated: true, sentToPrint: true, completedAt: true, announcedAt: true },
+      },
     },
   });
 
   const queued: Queued[] = [];
   for (const c of classes) {
-    if (!c.quizStartDate) continue;
-    // Only fire on the exact prep-deadline day for one of this class's quiz cycles.
-    const quizDate = quizForPrepDeadlineDay(c.quizStartDate, today);
-    if (!quizDate) continue;
-    if (c.assignments.length === 0) continue; // nobody assigned -> nobody to charge
-    if (onVacation(vacs, c.operationId, c.schoolId, quizDate)) continue; // no quiz that week
+    if (!c.quizStartDate || c.assignments.length === 0) continue;
+    const cfg = cfgFor(cfgs, c.operationId);
+    const maxLead = Math.max(cfg.quizPrepLeadDays, cfg.quizAnnounceLeadDays);
+    // Enumerate scheduled cycles whose deadlines could land today, wide enough to absorb
+    // one-off date moves. Overrides live on the row (quizDate); others use the scheduled date.
+    const scheduled = scheduledQuizDatesBetween(c.quizStartDate, addDays(today, -21), addDays(today, maxLead + 21));
+    const rowBySched = new Map(c.quizPreps.map((r) => [r.scheduledDate.getTime(), r]));
 
-    const deadline = quizPrepDeadline(quizDate, cfgFor(cfgs, c.operationId));
-    // A class created after the prep deadline can't have "missed" it.
-    if (!latenessApplies(c.createdAt, deadline)) continue;
+    for (const sched of scheduled) {
+      const row = rowBySched.get(sched.getTime());
+      const actual = effectiveQuizDate(sched, row);
+      if (onVacation(vacs, c.operationId, c.schoolId, actual)) continue; // no quiz that week
 
-    const prep = await prisma.quizPrep.findUnique({
-      where: { classId_quizDate: { classId: c.id, quizDate } },
-      select: { id: true, quizCreated: true, sentToPrint: true, completedAt: true },
-    });
-    const doneOnTime =
-      !!prep &&
-      prep.quizCreated &&
-      prep.sentToPrint &&
-      prep.completedAt != null &&
-      prep.completedAt.getTime() <= deadline.getTime();
-    if (doneOnTime) continue;
+      // Need a QuizPrep id to key incidents; create a placeholder once, lazily.
+      let quizPrepId = row?.id ?? null;
+      const ensureId = async (): Promise<string> => {
+        if (quizPrepId) return quizPrepId;
+        const created = await prisma.quizPrep.upsert({
+          where: { classId_scheduledDate: { classId: c.id, scheduledDate: sched } },
+          update: {},
+          create: { classId: c.id, scheduledDate: sched, quizDate: actual },
+          select: { id: true },
+        });
+        quizPrepId = created.id;
+        return quizPrepId;
+      };
 
-    // Need a QuizPrep id to key the incident (idempotent on re-runs). Create a placeholder
-    // when the assistants never opened it — it also shows in admin as "not prepared".
-    let quizPrepId = prep?.id ?? null;
-    if (!quizPrepId) {
-      const created = await prisma.quizPrep.create({
-        data: { classId: c.id, quizDate },
-        select: { id: true },
-      });
-      quizPrepId = created.id;
-    }
+      // Queue the sub-task if today is its (Cairo) deadline day and it isn't done on time.
+      const consider = async (type: "quiz_prep" | "quiz_announcement", lead: number, deadline: Date, doneOnTime: boolean) => {
+        if (addDays(actual, -lead).getTime() !== today.getTime()) return;
+        if (!latenessApplies(c.createdAt, deadline)) return; // class created after the deadline
+        if (doneOnTime) return;
+        const id = await ensureId();
+        for (const { assistantId } of c.assignments) {
+          queued.push({ assistantId, sessionId: null, homeworkId: null, quizPrepId: id, type, deadline, operationId: c.operationId });
+        }
+      };
 
-    for (const { assistantId } of c.assignments) {
-      queued.push({
-        assistantId,
-        sessionId: null,
-        homeworkId: null,
-        quizPrepId,
-        type: "quiz_prep",
-        deadline,
-        operationId: c.operationId,
-      });
+      const prepDl = quizPrepDeadline(actual, cfg);
+      const prepOk = quizPrepComplete(row) && row!.completedAt != null && row!.completedAt.getTime() <= prepDl.getTime();
+      await consider("quiz_prep", cfg.quizPrepLeadDays, prepDl, prepOk);
+
+      const annDl = quizAnnounceDeadline(actual, cfg);
+      const annOk = quizAnnounced(row) && row!.announcedAt!.getTime() <= annDl.getTime();
+      await consider("quiz_announcement", cfg.quizAnnounceLeadDays, annDl, annOk);
     }
   }
   return queued;
@@ -251,7 +257,7 @@ export async function detectLateIncidents(now: Date, weekly: boolean): Promise<D
   const vacs = await loadAllVacations();
   const queued = weekly
     ? await detectWeekly(now, cfgs, vacs)
-    : [...(await detectDaily(now, cfgs, vacs)), ...(await detectQuizPrep(now, cfgs, vacs))];
+    : [...(await detectDaily(now, cfgs, vacs)), ...(await detectQuiz(now, cfgs, vacs))];
   if (queued.length === 0) return { created: 0, checked: 0 };
 
   const deadlines = [...new Set(queued.map((q) => q.deadline.getTime()))].map((t) => new Date(t));

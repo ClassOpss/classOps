@@ -1,18 +1,22 @@
-// Biweekly quiz-prep task cadence. A class opts in by setting `quizStartDate` (the date
-// of its FIRST quiz); every subsequent quiz recurs +14 days. `quizDay` on the class is the
-// weekday label (kept in sync with quizStartDate's weekday) — informational for display.
+// Biweekly quiz cadence + per-cycle model. A class opts in by setting `quizStartDate`
+// (the date of its FIRST quiz); cycles recur every 14 days. Each cycle is identified by its
+// SCHEDULED date (quizStartDate + 14·n) — a stable key that never changes. The ACTUAL quiz
+// date defaults to the scheduled date but admin/teacher can override it for a one-off move,
+// which shifts only that cycle's deadlines (later cycles stay on the cadence).
 //
-// For each quiz date the responsible assistant(s) must, 3 days before, (1) create the quiz
-// and (2) send it for printing. That prep DEADLINE = quizDate − 3 days at the operation's
-// daily deadline hour (see lib/datetime.quizPrepDeadline). Completion is tracked in QuizPrep.
+// Each cycle carries three shared sub-tasks with their own deadlines before the actual date:
+//   • announcement — send the WhatsApp announcement (quizAnnounceLeadDays before, default 7)
+//   • prep         — create the quiz + send it to print (quizPrepLeadDays before, default 3)
 //
-// This module is dependency-light on purpose (only lib/constants) so both server actions
-// and lib/datetime can import it without a cycle.
+// This module is dependency-light (only lib/constants) so server actions, datetime and
+// components can all import it without a cycle. Deadline *times* live in lib/datetime.
 
 import { DAYS } from "@/lib/constants";
 
 export const QUIZ_CADENCE_DAYS = 14; // biweekly
-export const QUIZ_PREP_LEAD_DAYS = 3; // prep due this many days before the quiz
+// Fallbacks for UI copy when an operation config isn't in hand; real deadlines read config.
+export const DEFAULT_QUIZ_PREP_LEAD_DAYS = 3;
+export const DEFAULT_QUIZ_ANNOUNCE_LEAD_DAYS = 7;
 
 const MS_PER_DAY = 86_400_000;
 
@@ -23,7 +27,6 @@ export function addDays(d: Date, n: number): Date {
   return r;
 }
 
-// Whole-day difference between two UTC-midnight dates (b − a).
 function dayDiff(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / MS_PER_DAY);
 }
@@ -33,38 +36,26 @@ export function weekdayName(d: Date): string {
   return DAYS[d.getUTCDay()];
 }
 
-// Is a class opted into the biweekly quiz task?
 export function quizEnabled(c: { quizStartDate: Date | null }): boolean {
   return c.quizStartDate != null;
 }
 
-// Is `date` (UTC-midnight) one of this class's biweekly quiz dates?
+// Is `date` (UTC-midnight) one of this class's SCHEDULED (cadence) quiz dates?
 export function isQuizDate(quizStartDate: Date, date: Date): boolean {
   const diff = dayDiff(quizStartDate, date);
   return diff >= 0 && diff % QUIZ_CADENCE_DAYS === 0;
 }
 
-// The prep-deadline calendar day (UTC-midnight) for a given quiz date.
-export function prepDeadlineDate(quizDate: Date): Date {
-  return addDays(quizDate, -QUIZ_PREP_LEAD_DAYS);
-}
-
-// If `today` is the prep-deadline day for one of this class's quiz cycles, return that
-// quiz date; else null. today == quizDate − lead  ⇒  quizDate == today + lead.
-export function quizForPrepDeadlineDay(quizStartDate: Date, today: Date): Date | null {
-  const quizDate = addDays(today, QUIZ_PREP_LEAD_DAYS);
-  return isQuizDate(quizStartDate, quizDate) ? quizDate : null;
-}
-
-// The next quiz date on/after `from` (UTC-midnight).
+// The next SCHEDULED quiz date on/after `from` (UTC-midnight).
 export function nextQuizDate(quizStartDate: Date, from: Date): Date {
   if (from <= quizStartDate) return quizStartDate;
   const cycles = Math.ceil(dayDiff(quizStartDate, from) / QUIZ_CADENCE_DAYS);
   return addDays(quizStartDate, cycles * QUIZ_CADENCE_DAYS);
 }
 
-// All quiz dates falling in [from, to] inclusive (UTC-midnight). Used to list prep tasks.
-export function quizDatesBetween(quizStartDate: Date, from: Date, to: Date): Date[] {
+// All SCHEDULED quiz dates in [from, to] inclusive (UTC-midnight). Callers resolve each to
+// its effective (possibly-overridden) date via the stored QuizPrep row.
+export function scheduledQuizDatesBetween(quizStartDate: Date, from: Date, to: Date): Date[] {
   const out: Date[] = [];
   if (to < quizStartDate) return out;
   let d = nextQuizDate(quizStartDate, from);
@@ -75,7 +66,20 @@ export function quizDatesBetween(quizStartDate: Date, from: Date, to: Date): Dat
   return out;
 }
 
-// A QuizPrep record (or its absence) is "complete" only when BOTH steps are ticked.
+// The actual quiz date for a cycle: the stored override if present, else the scheduled date.
+export function effectiveQuizDate(
+  scheduledDate: Date,
+  row: { quizDate: Date } | null | undefined,
+): Date {
+  return row?.quizDate ?? scheduledDate;
+}
+
+// Prep is done only when BOTH steps are ticked.
 export function quizPrepComplete(p: { quizCreated: boolean; sentToPrint: boolean } | null | undefined): boolean {
   return !!p && p.quizCreated && p.sentToPrint;
+}
+
+// The announcement is done once it's been marked sent.
+export function quizAnnounced(p: { announcedAt: Date | null } | null | undefined): boolean {
+  return !!p && p.announcedAt != null;
 }

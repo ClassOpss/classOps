@@ -1,5 +1,6 @@
 // Message B — Quiz Announcement (spec 5.13). Triggered by teacher/admin from an assessment.
 import { OPERATION_DEFAULTS } from "@/lib/config";
+import { weekdayName } from "@/lib/quiz";
 
 export type QuizAnnouncementData = {
   dateLabel: string;
@@ -50,4 +51,21 @@ export function buildQuizAnnouncement(
   lines.push("Best of luck to everyone!");
   lines.push(`*${signature}*`);
   return lines.join("\n");
+}
+
+// "Monday – 19/1/2026" for a UTC-midnight @db.Date quiz date.
+export function quizDateLabel(date: Date): string {
+  return `${weekdayName(date)} – ${date.getUTCDate()}/${date.getUTCMonth() + 1}/${date.getUTCFullYear()}`;
+}
+
+// The biweekly-quiz announcement message built from a cycle's actual date + coverage text.
+export function buildBiweeklyQuizAnnouncement(opts: {
+  date: Date;
+  coverage?: string | null;
+  signature?: string;
+}): string {
+  return buildQuizAnnouncement(
+    { dateLabel: quizDateLabel(opts.date), topics: topicsFromNotes(opts.coverage) },
+    opts.signature ?? OPERATION_DEFAULTS.brandSignature,
+  );
 }

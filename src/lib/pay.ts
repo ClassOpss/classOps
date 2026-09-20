@@ -54,7 +54,7 @@ export async function computePayComponents(
     // session-day (see effectiveDeductionTotal); weekly tasks charge per incident.
     prisma.lateIncident.findMany({
       where: { assistantId, waived: false, deadline: inMonth },
-      select: { sessionId: true, type: true, deductionAmount: true },
+      select: { sessionId: true, quizPrepId: true, type: true, deductionAmount: true },
     }),
     // Only admin-approved office hours count toward the bonus.
     prisma.officeHourSession.count({ where: { assistantId, date: inMonth, approved: true } }),
@@ -80,6 +80,7 @@ export async function computePayComponents(
     incidents.map((i) => ({
       assistantId,
       sessionId: i.sessionId,
+      quizPrepId: i.quizPrepId,
       type: i.type,
       deductionAmount: Number(i.deductionAmount),
       waived: false,

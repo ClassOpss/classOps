@@ -84,6 +84,7 @@ export default async function ClassOverviewPage({
           { href: `/classes/${classId}/students`, label: "Manage students" },
           { href: `/classes/${classId}/assistants`, label: "Assistants & sub-groups" },
           { href: `/classes/${classId}/sessions`, label: "Sessions & day-offs" },
+          ...(klass.quizStartDate ? [{ href: `/classes/${classId}/quizzes`, label: "Quizzes & dates" }] : []),
           { href: `/classes/${classId}/assessments`, label: "Assessments" },
           { href: `/classes/${classId}/invites`, label: "Onboarding & invites" },
           { href: `/classes/${classId}/parent-reports`, label: "Parent reports" },

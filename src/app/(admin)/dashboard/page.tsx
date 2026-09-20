@@ -23,6 +23,7 @@ const INCIDENT_LABEL: Record<string, string> = {
   hw_correction: "HW correction",
   grade_entry: "Grade entry",
   quiz_prep: "Quiz prep",
+  quiz_announcement: "Quiz announcement",
 };
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
@@ -83,6 +84,7 @@ export default async function DashboardPage() {
     id: i.id,
     assistantId: i.assistantId,
     sessionId: i.sessionId,
+    quizPrepId: i.quizPrepId,
     type: i.type,
     deductionAmount: Number(i.deductionAmount),
     waived: i.waived,
@@ -258,8 +260,8 @@ export default async function DashboardPage() {
                   ) : (rowCharge.get(i.id) ?? 0) > 0 ? (
                     <span className="badge-danger">−{rowCharge.get(i.id)} EGP</span>
                   ) : (
-                    <span className="badge-neutral" title="Missing one daily task already charges the whole day">
-                      included in daily cap
+                    <span className="badge-neutral" title="Grouped tasks (a session-day, or one quiz) are charged once">
+                      included in cap
                     </span>
                   )}
                   <span className="ml-auto">

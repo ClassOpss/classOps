@@ -70,6 +70,7 @@ enum IncidentType {
   hw_correction
   grade_entry
   quiz_prep
+  quiz_announcement
 }
 
 enum PayPeriodStatus {
@@ -115,6 +116,9 @@ model Operation {
   dailyDeadlineHour     Int @default(21) @map("daily_deadline_hour")
   weeklyDeadlineWeekday Int @default(6) @map("weekly_deadline_weekday")
   weeklyDeadlineHour    Int @default(21) @map("weekly_deadline_hour")
+  // Quiz task lead times (days before each biweekly quiz), at the daily deadline hour.
+  quizPrepLeadDays      Int @default(3) @map("quiz_prep_lead_days") // create quiz + send to print
+  quizAnnounceLeadDays  Int @default(7) @map("quiz_announce_lead_days") // send the announcement message
 
   // Pay
   perClassSalary     Decimal @default(1000) @map("per_class_salary") @db.Decimal(10, 2)
@@ -631,21 +635,33 @@ model AssessmentGrade {
 // Biweekly quiz prep (create the quiz + send it for printing)
 // ----------------------------------------------------------------------------
 
-// One record per class per biweekly quiz cycle. quizDate is the quiz day itself;
-// the prep DEADLINE is 3 days before, at the operation's daily deadline hour (see
-// lib/quiz.ts). The task is SHARED — any assigned assistant can tick either step —
-// and is "done" only when BOTH quizCreated and sentToPrint are true. completedAt is
-// stamped once (when the second step is ticked) and never moved, so lateness is
-// judged on the FIRST time the task became complete (edit-stable, like HW corrections).
+// One record per class per biweekly quiz cycle. A cycle is identified by its
+// scheduledDate (the cadence date = quizStartDate + 14·n) — stable even if the quiz
+// gets moved. quizDate is the ACTUAL date (defaults to scheduledDate; admin/teacher can
+// override it for a one-off change, which shifts this cycle's deadlines only).
+//
+// Three SHARED sub-tasks, each with its own deadline before the (actual) quiz date:
+//   • announcement — send the WhatsApp announcement, quizAnnounceLeadDays before (default 7)
+//   • prep         — create the quiz + send it for printing, quizPrepLeadDays before (default 3)
+// Any assigned assistant can complete them. Prep is "done" only when BOTH quizCreated and
+// sentToPrint are true; completedAt/announcedAt are stamped once and never moved, so
+// lateness is judged on the first completion (edit-stable, like HW corrections). All quiz
+// incidents for a cycle share this row's id and are capped at ONE deduction (see pay).
 model QuizPrep {
   id            String    @id @default(uuid())
   classId       String    @map("class_id")
-  quizDate      DateTime  @map("quiz_date") @db.Date
+  scheduledDate DateTime  @map("scheduled_date") @db.Date // cadence date (stable identity)
+  quizDate      DateTime  @map("quiz_date") @db.Date // actual date (editable; default = scheduled)
+  // Free-text of what the quiz covers — feeds the announcement message ("It will cover: …").
+  coverage      String?
+  // Prep sub-task (create quiz + send to print)
   quizCreated   Boolean   @default(false) @map("quiz_created")
   sentToPrint   Boolean   @default(false) @map("sent_to_print")
   quizCreatedAt DateTime? @map("quiz_created_at") @db.Timestamptz(6)
   sentToPrintAt DateTime? @map("sent_to_print_at") @db.Timestamptz(6)
   completedAt   DateTime? @map("completed_at") @db.Timestamptz(6)
+  // Announcement sub-task (send the WhatsApp announcement message)
+  announcedAt   DateTime? @map("announced_at") @db.Timestamptz(6)
   loggedById    String?   @map("logged_by")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -653,7 +669,7 @@ model QuizPrep {
   loggedBy  Assistant?     @relation(fields: [loggedById], references: [id])
   incidents LateIncident[]
 
-  @@unique([classId, quizDate])
+  @@unique([classId, scheduledDate])
   @@index([classId])
   @@map("quiz_preps")
 }

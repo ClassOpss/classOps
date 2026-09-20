@@ -104,6 +104,8 @@ export default async function SettingsPage() {
                 dailyDeadlineHour: op.dailyDeadlineHour,
                 weeklyDeadlineWeekday: op.weeklyDeadlineWeekday,
                 weeklyDeadlineHour: op.weeklyDeadlineHour,
+                quizPrepLeadDays: op.quizPrepLeadDays,
+                quizAnnounceLeadDays: op.quizAnnounceLeadDays,
                 perClassSalary: Number(op.perClassSalary),
                 officeHourBonus: Number(op.officeHourBonus),
                 lateDeduction: Number(op.lateDeduction),

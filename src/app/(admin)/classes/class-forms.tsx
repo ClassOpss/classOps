@@ -4,7 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { createSchool, type FormState } from "@/actions/schools";
 import { createClass } from "@/actions/classes";
 import { DAYS, YEAR_GROUPS, yearGroupLabel } from "@/lib/constants";
-import { QUIZ_CADENCE_DAYS, QUIZ_PREP_LEAD_DAYS } from "@/lib/quiz";
+import { QUIZ_CADENCE_DAYS } from "@/lib/quiz";
 
 const inputCls = "input";
 const btnCls = "btn-primary";
@@ -104,8 +104,8 @@ export function NewClassForm({ schools }: { schools: { id: string; name: string 
       <fieldset className="sm:col-span-2">
         <legend className="label">Biweekly quiz (optional)</legend>
         <p className="field-hint mb-2 mt-0">
-          Quiz weekday + the first quiz date. Quizzes recur every {QUIZ_CADENCE_DAYS} days; the assistant
-          creates the quiz and sends it for printing {QUIZ_PREP_LEAD_DAYS} days before each one. Leave blank for none.
+          Quiz weekday + the first quiz date. Quizzes recur every {QUIZ_CADENCE_DAYS} days; assistants send the
+          announcement, create the quiz, and send it to print before each one (lead times in Settings). Leave blank for none.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">

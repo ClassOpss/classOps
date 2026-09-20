@@ -1,8 +1,8 @@
 import "server-only";
 import { formatInTimeZone } from "date-fns-tz";
 import { prisma } from "@/lib/db";
-import { CAIRO_TZ, sessionDeadline, saturdayDeadline, quizPrepDeadline, sessionStart, formatCairo } from "@/lib/datetime";
-import { quizForPrepDeadlineDay } from "@/lib/quiz";
+import { CAIRO_TZ, sessionDeadline, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, sessionStart, formatCairo } from "@/lib/datetime";
+import { scheduledQuizDatesBetween, effectiveQuizDate, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
 import { subGroupStudentIds, activeAt } from "@/lib/roster";
 import { scheduleTimeForDate, type ClassSchedule } from "@/lib/schedule";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
@@ -86,9 +86,9 @@ async function gatherDaily(
   }
 }
 
-// Quiz-prep tasks due 3 days before a biweekly quiz, at the daily deadline hour — so the
-// nudge lands in the same daily reminder window. Shared task: remind every assigned assistant.
-async function gatherQuizPrep(
+// Quiz sub-tasks (announcement + prep) due today at the daily deadline hour — so the nudge
+// lands in the same daily reminder window. Shared task: remind every assigned assistant.
+async function gatherQuiz(
   now: Date,
   today: Date,
   ops: Set<string>,
@@ -106,27 +106,34 @@ async function gatherQuizPrep(
       operationId: true,
       schoolId: true,
       assignments: { where: activeAt(now), select: { assistantId: true } },
+      quizPreps: { select: { scheduledDate: true, quizDate: true, quizCreated: true, sentToPrint: true, announcedAt: true } },
     },
   });
 
   for (const c of classes) {
-    if (!c.quizStartDate) continue;
-    const quizDate = quizForPrepDeadlineDay(c.quizStartDate, today);
-    if (!quizDate) continue; // today isn't a prep-deadline day for this class
-    if (c.assignments.length === 0) continue;
-    if (onVacation(vacs, c.operationId, c.schoolId, quizDate)) continue;
+    if (!c.quizStartDate || c.assignments.length === 0) continue;
+    const cfg = cfgFor(cfgs, c.operationId);
+    const maxLead = Math.max(cfg.quizPrepLeadDays, cfg.quizAnnounceLeadDays);
+    const scheduled = scheduledQuizDatesBetween(c.quizStartDate, addDays(today, -21), addDays(today, maxLead + 21));
+    const rowBySched = new Map(c.quizPreps.map((r) => [r.scheduledDate.getTime(), r]));
 
-    const prep = await prisma.quizPrep.findUnique({
-      where: { classId_quizDate: { classId: c.id, quizDate } },
-      select: { quizCreated: true, sentToPrint: true },
-    });
-    if (prep?.quizCreated && prep.sentToPrint) continue; // already done -> no nudge
+    for (const sched of scheduled) {
+      const row = rowBySched.get(sched.getTime());
+      const actual = effectiveQuizDate(sched, row);
+      if (onVacation(vacs, c.operationId, c.schoolId, actual)) continue;
 
-    const deadline = quizPrepDeadline(quizDate, cfgFor(cfgs, c.operationId));
-    for (const { assistantId } of c.assignments) {
-      const bucket = buckets.get(assistantId) ?? { operationId: c.operationId, tasks: [] };
-      bucket.tasks.push({ label: `Prepare quiz (create + send to print) — ${c.name}`, deadline });
-      buckets.set(assistantId, bucket);
+      const push = (label: string, deadline: Date) => {
+        for (const { assistantId } of c.assignments) {
+          const bucket = buckets.get(assistantId) ?? { operationId: c.operationId, tasks: [] };
+          bucket.tasks.push({ label: `${label} — ${c.name}`, deadline });
+          buckets.set(assistantId, bucket);
+        }
+      };
+
+      if (addDays(actual, -cfg.quizAnnounceLeadDays).getTime() === today.getTime() && !quizAnnounced(row))
+        push("Send quiz announcement", quizAnnounceDeadline(actual, cfg));
+      if (addDays(actual, -cfg.quizPrepLeadDays).getTime() === today.getTime() && !quizPrepComplete(row))
+        push("Prepare quiz (create + send to print)", quizPrepDeadline(actual, cfg));
     }
   }
 }
@@ -302,7 +309,7 @@ export async function sendDeadlineReminders(
   const vacs = await loadAllVacations();
   const buckets = new Map<string, Bucket>();
   await gatherDaily(now, today, daily, cfgs, vacs, buckets);
-  await gatherQuizPrep(now, today, daily, cfgs, vacs, buckets);
+  await gatherQuiz(now, today, daily, cfgs, vacs, buckets);
   await gatherWeekly(now, weekly, cfgs, vacs, buckets);
   if (buckets.size === 0) return { operations: openOps.size, candidates: 0, sent: 0, failed: 0 };
 

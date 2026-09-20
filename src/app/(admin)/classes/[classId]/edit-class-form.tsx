@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { updateClass, type FormState } from "@/actions/classes";
 import { DAYS, YEAR_GROUPS, yearGroupLabel } from "@/lib/constants";
-import { QUIZ_CADENCE_DAYS, QUIZ_PREP_LEAD_DAYS } from "@/lib/quiz";
+import { QUIZ_CADENCE_DAYS } from "@/lib/quiz";
 
 const inputCls = "input";
 
@@ -87,7 +87,8 @@ export function EditClassForm({
         <legend className="label">Biweekly quiz (optional)</legend>
         <p className="field-hint mb-2 mt-0">
           Set the quiz weekday and the date of the first quiz. Quizzes recur every {QUIZ_CADENCE_DAYS} days;
-          the assistant must create the quiz and send it for printing {QUIZ_PREP_LEAD_DAYS} days before each one.
+          the assistant sends the announcement, then creates the quiz and sends it for printing (lead times are
+          set per operation in Settings). Move or edit individual quizzes on the class&apos;s Quizzes page.
           Leave both blank for no quiz task.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
