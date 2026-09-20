@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { DAYS, YEAR_GROUPS } from "@/lib/constants";
+import { ymdUtc } from "@/lib/datetime";
+import { weekdayName } from "@/lib/quiz";
 import { currentOperationId, assertClassInOperation } from "@/lib/operation";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
@@ -25,7 +27,33 @@ const classSchema = z.object({
     )
     .min(1, "Pick at least one day."),
   planStartDate: z.string().optional(),
+  // Biweekly quiz: set both, or neither. The first-quiz date must land on the quiz day.
+  quizDay: z.enum(DAYS).optional(),
+  quizStartDate: z.string().optional(),
   notes: z.string().optional(),
+}).superRefine((d, ctx) => {
+  const hasDay = !!d.quizDay;
+  const hasDate = !!d.quizStartDate;
+  if (hasDay !== hasDate) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Set both a quiz day and a first-quiz date, or leave both blank.",
+      path: ["quizStartDate"],
+    });
+    return;
+  }
+  if (hasDay && hasDate) {
+    const dt = ymdUtc(d.quizStartDate!);
+    if (Number.isNaN(dt.getTime())) {
+      ctx.addIssue({ code: "custom", message: "Invalid first-quiz date.", path: ["quizStartDate"] });
+    } else if (weekdayName(dt) !== d.quizDay) {
+      ctx.addIssue({
+        code: "custom",
+        message: `The first-quiz date is a ${weekdayName(dt)}, but the quiz day is ${d.quizDay}.`,
+        path: ["quizStartDate"],
+      });
+    }
+  }
 });
 
 function parseForm(formData: FormData) {
@@ -41,6 +69,8 @@ function parseForm(formData: FormData) {
     lmsType: String(formData.get("lmsType") ?? "google_classroom"),
     slots,
     planStartDate: String(formData.get("planStartDate") ?? "").trim() || undefined,
+    quizDay: String(formData.get("quizDay") ?? "").trim() || undefined,
+    quizStartDate: String(formData.get("quizStartDate") ?? "").trim() || undefined,
     notes: String(formData.get("notes") ?? "").trim() || undefined,
   });
 }
@@ -60,6 +90,8 @@ export async function createClass(_prev: FormState, formData: FormData): Promise
       lmsType: d.lmsType,
       schedule: { slots: d.slots },
       planStartDate: d.planStartDate ? new Date(d.planStartDate) : null,
+      quizDay: d.quizDay ?? null,
+      quizStartDate: d.quizStartDate ? new Date(d.quizStartDate) : null,
       notes: d.notes,
     },
   });
@@ -94,6 +126,8 @@ export async function updateClass(
       lmsType: d.lmsType,
       schedule: { slots: d.slots },
       planStartDate: d.planStartDate ? new Date(d.planStartDate) : null,
+      quizDay: d.quizDay ?? null,
+      quizStartDate: d.quizStartDate ? new Date(d.quizStartDate) : null,
       notes: d.notes,
     },
   });

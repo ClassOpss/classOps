@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { updateClass, type FormState } from "@/actions/classes";
 import { DAYS, YEAR_GROUPS, yearGroupLabel } from "@/lib/constants";
+import { QUIZ_CADENCE_DAYS, QUIZ_PREP_LEAD_DAYS } from "@/lib/quiz";
 
 const inputCls = "input";
 
@@ -14,6 +15,8 @@ export type ClassDefaults = {
   // Per-day start times, keyed by weekday name; absent day = not scheduled.
   times: Record<string, string>;
   planStartDate: string; // yyyy-mm-dd or ""
+  quizDay: string; // weekday name or ""
+  quizStartDate: string; // yyyy-mm-dd or ""
   notes: string;
 };
 
@@ -80,6 +83,27 @@ export function EditClassForm({
         <span className="label">Notes</span>
         <input name="notes" className={inputCls} defaultValue={defaults.notes} />
       </label>
+      <fieldset className="sm:col-span-2">
+        <legend className="label">Biweekly quiz (optional)</legend>
+        <p className="field-hint mb-2 mt-0">
+          Set the quiz weekday and the date of the first quiz. Quizzes recur every {QUIZ_CADENCE_DAYS} days;
+          the assistant must create the quiz and send it for printing {QUIZ_PREP_LEAD_DAYS} days before each one.
+          Leave both blank for no quiz task.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="label">Quiz day</span>
+            <select name="quizDay" className={inputCls} defaultValue={defaults.quizDay}>
+              <option value="">— none —</option>
+              {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="label">First quiz date</span>
+            <input name="quizStartDate" type="date" className={inputCls} defaultValue={defaults.quizStartDate} />
+          </label>
+        </div>
+      </fieldset>
       <div className="sm:col-span-2">
         <button type="submit" disabled={pending} className="btn-primary">
           {pending ? "Saving…" : "Save changes"}

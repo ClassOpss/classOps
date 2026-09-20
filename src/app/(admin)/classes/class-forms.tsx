@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { createSchool, type FormState } from "@/actions/schools";
 import { createClass } from "@/actions/classes";
 import { DAYS, YEAR_GROUPS, yearGroupLabel } from "@/lib/constants";
+import { QUIZ_CADENCE_DAYS, QUIZ_PREP_LEAD_DAYS } from "@/lib/quiz";
 
 const inputCls = "input";
 const btnCls = "btn-primary";
@@ -100,6 +101,26 @@ export function NewClassForm({ schools }: { schools: { id: string; name: string 
         <span className="label">Notes (optional)</span>
         <input name="notes" className={inputCls} />
       </label>
+      <fieldset className="sm:col-span-2">
+        <legend className="label">Biweekly quiz (optional)</legend>
+        <p className="field-hint mb-2 mt-0">
+          Quiz weekday + the first quiz date. Quizzes recur every {QUIZ_CADENCE_DAYS} days; the assistant
+          creates the quiz and sends it for printing {QUIZ_PREP_LEAD_DAYS} days before each one. Leave blank for none.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="label">Quiz day</span>
+            <select name="quizDay" className={inputCls} defaultValue="">
+              <option value="">— none —</option>
+              {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="label">First quiz date</span>
+            <input name="quizStartDate" type="date" className={inputCls} />
+          </label>
+        </div>
+      </fieldset>
       <div className="sm:col-span-2">
         <button type="submit" disabled={pending} className={btnCls}>
           {pending ? "Creating…" : "Create class"}

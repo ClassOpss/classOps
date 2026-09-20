@@ -1,7 +1,8 @@
 import { formatInTimeZone } from "date-fns-tz";
 import type { IncidentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { CAIRO_TZ, sessionDeadline, saturdayDeadline, latenessApplies } from "@/lib/datetime";
+import { CAIRO_TZ, sessionDeadline, saturdayDeadline, quizPrepDeadline, latenessApplies } from "@/lib/datetime";
+import { quizForPrepDeadlineDay } from "@/lib/quiz";
 import { subGroupStudentIds, activeAt } from "@/lib/roster";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
 import { loadAllVacations, isSchoolOnVacation, type VacationSpan } from "@/lib/vacations";
@@ -19,6 +20,7 @@ type Queued = {
   assistantId: string;
   sessionId: string | null;
   homeworkId: string | null;
+  quizPrepId?: string | null;
   type: IncidentType;
   deadline: Date;
   operationId: string;
@@ -46,10 +48,11 @@ function key(q: {
   assistantId: string;
   sessionId: string | null;
   homeworkId?: string | null;
+  quizPrepId?: string | null;
   type: string;
   deadline: Date;
 }): string {
-  return `${q.assistantId}|${q.sessionId ?? ""}|${q.homeworkId ?? ""}|${q.type}|${q.deadline.getTime()}`;
+  return `${q.assistantId}|${q.sessionId ?? ""}|${q.homeworkId ?? ""}|${q.quizPrepId ?? ""}|${q.type}|${q.deadline.getTime()}`;
 }
 
 export type DetectResult = { created: number; checked: number };
@@ -87,6 +90,75 @@ async function detectDaily(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queue
     // Classes with no LMS have nothing to upload — never charge a late for it.
     if (hasLms(s.class.lmsType) && !s.classroomUpload)
       queued.push({ assistantId, sessionId: s.id, homeworkId: null, type: "classroom_upload", deadline, operationId });
+  }
+  return queued;
+}
+
+// Daily run: quiz-prep task (create quiz + send to print) is due 3 days before each class's
+// biweekly quiz, at the daily deadline hour. The task is SHARED, so a class whose prep isn't
+// complete on time charges EVERY active assigned assistant. Incidents dedupe by quizPrepId.
+async function detectQuizPrep(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queued[]> {
+  const today = cairoDate(now);
+
+  const classes = await prisma.class.findMany({
+    where: { active: true, quizStartDate: { not: null } },
+    select: {
+      id: true,
+      createdAt: true,
+      quizStartDate: true,
+      operationId: true,
+      schoolId: true,
+      assignments: { where: activeAt(now), select: { assistantId: true } },
+    },
+  });
+
+  const queued: Queued[] = [];
+  for (const c of classes) {
+    if (!c.quizStartDate) continue;
+    // Only fire on the exact prep-deadline day for one of this class's quiz cycles.
+    const quizDate = quizForPrepDeadlineDay(c.quizStartDate, today);
+    if (!quizDate) continue;
+    if (c.assignments.length === 0) continue; // nobody assigned -> nobody to charge
+    if (onVacation(vacs, c.operationId, c.schoolId, quizDate)) continue; // no quiz that week
+
+    const deadline = quizPrepDeadline(quizDate, cfgFor(cfgs, c.operationId));
+    // A class created after the prep deadline can't have "missed" it.
+    if (!latenessApplies(c.createdAt, deadline)) continue;
+
+    const prep = await prisma.quizPrep.findUnique({
+      where: { classId_quizDate: { classId: c.id, quizDate } },
+      select: { id: true, quizCreated: true, sentToPrint: true, completedAt: true },
+    });
+    const doneOnTime =
+      !!prep &&
+      prep.quizCreated &&
+      prep.sentToPrint &&
+      prep.completedAt != null &&
+      prep.completedAt.getTime() <= deadline.getTime();
+    if (doneOnTime) continue;
+
+    // Need a QuizPrep id to key the incident (idempotent on re-runs). Create a placeholder
+    // when the assistants never opened it — it also shows in admin as "not prepared".
+    let quizPrepId = prep?.id ?? null;
+    if (!quizPrepId) {
+      const created = await prisma.quizPrep.create({
+        data: { classId: c.id, quizDate },
+        select: { id: true },
+      });
+      quizPrepId = created.id;
+    }
+
+    for (const { assistantId } of c.assignments) {
+      queued.push({
+        assistantId,
+        sessionId: null,
+        homeworkId: null,
+        quizPrepId,
+        type: "quiz_prep",
+        deadline,
+        operationId: c.operationId,
+      });
+    }
   }
   return queued;
 }
@@ -177,13 +249,15 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
 export async function detectLateIncidents(now: Date, weekly: boolean): Promise<DetectResult> {
   const cfgs = await loadConfigs();
   const vacs = await loadAllVacations();
-  const queued = weekly ? await detectWeekly(now, cfgs, vacs) : await detectDaily(now, cfgs, vacs);
+  const queued = weekly
+    ? await detectWeekly(now, cfgs, vacs)
+    : [...(await detectDaily(now, cfgs, vacs)), ...(await detectQuizPrep(now, cfgs, vacs))];
   if (queued.length === 0) return { created: 0, checked: 0 };
 
   const deadlines = [...new Set(queued.map((q) => q.deadline.getTime()))].map((t) => new Date(t));
   const existing = await prisma.lateIncident.findMany({
     where: { deadline: { in: deadlines } },
-    select: { assistantId: true, sessionId: true, homeworkId: true, type: true, deadline: true },
+    select: { assistantId: true, sessionId: true, homeworkId: true, quizPrepId: true, type: true, deadline: true },
   });
   const seen = new Set(existing.map(key));
 
@@ -201,6 +275,7 @@ export async function detectLateIncidents(now: Date, weekly: boolean): Promise<D
         assistantId: q.assistantId,
         sessionId: q.sessionId,
         homeworkId: q.homeworkId,
+        quizPrepId: q.quizPrepId ?? null,
         type: q.type,
         deadline: q.deadline,
         deductionAmount: cfgFor(cfgs, q.operationId).lateDeduction,

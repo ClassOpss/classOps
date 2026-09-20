@@ -33,7 +33,7 @@ export default async function AssistantClassPage({
 
   const klass = await prisma.class.findUnique({
     where: { id: classId },
-    select: { id: true, name: true, schedule: true, operationId: true, yearGroup: true, school: { select: { name: true } } },
+    select: { id: true, name: true, schedule: true, operationId: true, yearGroup: true, quizStartDate: true, school: { select: { name: true } } },
   });
   if (!klass) {
     return (
@@ -139,6 +139,7 @@ export default async function AssistantClassPage({
           { href: `/my/classes/${classId}/assessments`, label: "Assessments" },
           { href: `/my/classes/${classId}/office-hours`, label: "Office hours" },
           { href: `/my/classes/${classId}/parent-reports`, label: "Parent reports" },
+          ...(klass.quizStartDate ? [{ href: `/my/classes/${classId}/quiz-prep`, label: "Quiz prep" }] : []),
         ].map((l) => (
           <Link key={l.href} href={l.href} className="card px-2 py-3 text-center text-sm font-medium text-fg transition-colors hover:border-border-strong">
             {l.label}

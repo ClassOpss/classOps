@@ -51,6 +51,8 @@ export default async function ClassOverviewPage({
     lmsType: klass.lmsType,
     times: Object.fromEntries(slots.map((s) => [s.day, s.time || "16:00"])),
     planStartDate: toDateInput(klass.planStartDate),
+    quizDay: klass.quizDay ?? "",
+    quizStartDate: toDateInput(klass.quizStartDate),
     notes: klass.notes ?? "",
   };
   const isAdmin = user.role === "admin";
@@ -69,6 +71,12 @@ export default async function ClassOverviewPage({
           {klass.school.name} · {yearGroupLabel(klass.yearGroup)} · {scheduleLabel(klass.schedule as object)} ·{" "}
           {klass._count.students} students
         </p>
+        {klass.quizStartDate && (
+          <p className="mt-0.5 text-sm text-muted">
+            Biweekly quiz on {klass.quizDay ?? scheduleLabel(klass.schedule as object)} · first quiz{" "}
+            {klass.quizStartDate.toISOString().slice(0, 10)}
+          </p>
+        )}
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">

@@ -22,6 +22,7 @@ const INCIDENT_LABEL: Record<string, string> = {
   classroom_upload: "Classroom upload",
   hw_correction: "HW correction",
   grade_entry: "Grade entry",
+  quiz_prep: "Quiz prep",
 };
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
@@ -72,6 +73,7 @@ export default async function DashboardPage() {
         include: {
           assistant: { select: { name: true } },
           session: { select: { class: { select: { id: true, name: true } } } },
+          quizPrep: { select: { class: { select: { id: true, name: true } } } },
         },
       })
     : [];
@@ -244,8 +246,11 @@ export default async function DashboardPage() {
                 >
                   <span className="font-medium">{i.assistant.name}</span>
                   <span className="badge-neutral">{INCIDENT_LABEL[i.type]}</span>
-                  {i.session?.class ? (
-                    <Link href={`/classes/${i.session.class.id}`} className="link">{i.session.class.name}</Link>
+                  {(i.session?.class ?? i.quizPrep?.class) ? (
+                    (() => {
+                      const cls = i.session?.class ?? i.quizPrep?.class;
+                      return cls ? <Link href={`/classes/${cls.id}`} className="link">{cls.name}</Link> : null;
+                    })()
                   ) : null}
                   <span className="text-faint">{formatCairo(i.deadline, "d MMM, h:mm a")}</span>
                   {i.waived ? (

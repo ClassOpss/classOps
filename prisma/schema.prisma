@@ -69,6 +69,7 @@ enum IncidentType {
   classroom_upload
   hw_correction
   grade_entry
+  quiz_prep
 }
 
 enum PayPeriodStatus {
@@ -258,6 +259,11 @@ model Class {
   schedule     Json
   // planStartDate: the date this class's lesson 1 takes place; used to generate sessions
   planStartDate DateTime? @map("plan_start_date") @db.Date
+  // Biweekly quiz: quizStartDate = the date of the FIRST quiz; every quiz recurs +14 days.
+  // quizDay is the weekday label (must match quizStartDate's weekday) — informational.
+  // Both null = this class has no biweekly quiz task. See lib/quiz.ts.
+  quizDay      String?   @map("quiz_day")
+  quizStartDate DateTime? @map("quiz_start_date") @db.Date
   active       Boolean   @default(true)
   notes        String?
   // Per-class destinations for onboarding students/parents. Invite links are pasted
@@ -276,6 +282,7 @@ model Class {
   homework        HomeworkAssignment[]
   assessments     Assessment[]
   officeHours     OfficeHourSession[]
+  quizPreps       QuizPrep[]
   activity        ActivityLog[]
 
   @@index([operationId])
@@ -341,6 +348,7 @@ model Assistant {
   officeHours      OfficeHourSession[]
   incidents        LateIncident[]
   payCalcs         PayCalculation[]
+  quizPreps        QuizPrep[]
   responsibleSessions ClassSession[]        @relation("SessionResponsible")
   coveredSessions     ClassSession[]        @relation("SessionCoveredBy")
 
@@ -620,6 +628,37 @@ model AssessmentGrade {
 }
 
 // ----------------------------------------------------------------------------
+// Biweekly quiz prep (create the quiz + send it for printing)
+// ----------------------------------------------------------------------------
+
+// One record per class per biweekly quiz cycle. quizDate is the quiz day itself;
+// the prep DEADLINE is 3 days before, at the operation's daily deadline hour (see
+// lib/quiz.ts). The task is SHARED — any assigned assistant can tick either step —
+// and is "done" only when BOTH quizCreated and sentToPrint are true. completedAt is
+// stamped once (when the second step is ticked) and never moved, so lateness is
+// judged on the FIRST time the task became complete (edit-stable, like HW corrections).
+model QuizPrep {
+  id            String    @id @default(uuid())
+  classId       String    @map("class_id")
+  quizDate      DateTime  @map("quiz_date") @db.Date
+  quizCreated   Boolean   @default(false) @map("quiz_created")
+  sentToPrint   Boolean   @default(false) @map("sent_to_print")
+  quizCreatedAt DateTime? @map("quiz_created_at") @db.Timestamptz(6)
+  sentToPrintAt DateTime? @map("sent_to_print_at") @db.Timestamptz(6)
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz(6)
+  loggedById    String?   @map("logged_by")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  class     Class          @relation(fields: [classId], references: [id], onDelete: Cascade)
+  loggedBy  Assistant?     @relation(fields: [loggedById], references: [id])
+  incidents LateIncident[]
+
+  @@unique([classId, quizDate])
+  @@index([classId])
+  @@map("quiz_preps")
+}
+
+// ----------------------------------------------------------------------------
 // Office hours
 // ----------------------------------------------------------------------------
 
@@ -657,6 +696,9 @@ model LateIncident {
   // Set on hw_correction incidents for standalone HW (no session) so each is distinct
   // and idempotent on re-runs. Null for session-linked HW (deduped by sessionId) + others.
   homeworkId      String?      @map("homework_id")
+  // Set on quiz_prep incidents so each class+cycle stays distinct + idempotent (there is
+  // no session/HW to dedupe against). Null for every other incident type.
+  quizPrepId      String?      @map("quiz_prep_id")
   type            IncidentType
   deadline        DateTime     @db.Timestamptz(6)
   actualTime      DateTime?    @map("actual_time") @db.Timestamptz(6)
@@ -668,6 +710,7 @@ model LateIncident {
   assistant Assistant           @relation(fields: [assistantId], references: [id])
   session   ClassSession?       @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   homework  HomeworkAssignment? @relation(fields: [homeworkId], references: [id], onDelete: SetNull)
+  quizPrep  QuizPrep?           @relation(fields: [quizPrepId], references: [id], onDelete: SetNull)
 
   @@index([assistantId])
   @@index([sessionId])

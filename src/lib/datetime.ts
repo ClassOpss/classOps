@@ -1,5 +1,6 @@
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { APP_LOCALE, OPERATION_DEFAULTS } from "@/lib/config";
+import { prepDeadlineDate } from "@/lib/quiz";
 
 // All timestamps are stored UTC; display + day-boundary math use the shared app
 // timezone (the one config value that is NOT per-operation — see config.ts).
@@ -80,6 +81,15 @@ export function saturdayDeadline(
     base.setUTCFullYear(date.getUTCFullYear(), date.getUTCMonth(), clampDay);
   }
   return zonedInstant(base, `${pad(weeklyDeadlineHour)}:00:00`);
+}
+
+// Quiz-prep deadline: the daily deadline hour (default 9pm), 3 days before the quiz date.
+// Reuses the daily deadline hour so its reminder window lines up with the daily nudge.
+export function quizPrepDeadline(
+  quizDate: Date,
+  cfg: DailyDeadlineCfg = OPERATION_DEFAULTS,
+): Date {
+  return sessionDeadline(prepDeadlineDate(quizDate), cfg);
 }
 
 export function isLate(loggedAt: Date, deadline: Date): boolean {
