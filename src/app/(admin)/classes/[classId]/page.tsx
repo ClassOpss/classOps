@@ -29,7 +29,7 @@ export default async function ClassOverviewPage({
   const [klass, schools] = await Promise.all([
     prisma.class.findFirst({
       where: { id: classId, operationId },
-      include: { school: { select: { name: true } }, _count: { select: { students: true } } },
+      include: { school: { select: { name: true } }, _count: { select: { students: { where: { active: true } } } } },
     }),
     prisma.school.findMany({ where: { operationId }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);

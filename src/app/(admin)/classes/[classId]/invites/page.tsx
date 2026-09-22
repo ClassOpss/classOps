@@ -23,7 +23,7 @@ export default async function InvitesPage({ params }: { params: Promise<{ classI
       students: {
         where: { active: true },
         orderBy: { name: "asc" },
-        select: { id: true, name: true, phone: true, parentName: true, parentPhone: true },
+        select: { id: true, name: true, phone: true, parentPrefix: true, parentName: true, parentPhone: true },
       },
       assignments: {
         where: { endDate: null },
@@ -103,6 +103,7 @@ export default async function InvitesPage({ params }: { params: Promise<{ classI
                   });
                   const parentMsg = parentInviteMessage({
                     className: klass.name,
+                    parentPrefix: s.parentPrefix,
                     parentName: s.parentName,
                     studentName: s.name,
                     parentCommunityLink: klass.parentCommunityLink,

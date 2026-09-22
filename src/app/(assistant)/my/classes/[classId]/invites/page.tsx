@@ -155,6 +155,7 @@ export default async function AssistantInvitesPage({
                       })
                     : parentInviteMessage({
                         className: klass.name,
+                        parentPrefix: s.parentPrefix,
                         parentName: s.parentName,
                         studentName: s.name,
                         parentCommunityLink: klass.parentCommunityLink,

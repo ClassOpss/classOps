@@ -36,7 +36,7 @@ export default async function MyClassesPage() {
           name: true,
           schedule: true,
           school: { select: { name: true } },
-          _count: { select: { students: true } },
+          _count: { select: { students: { where: { active: true } } } },
         },
       },
     },

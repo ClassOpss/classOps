@@ -21,7 +21,7 @@ export default async function ClassesPage() {
     prisma.class.findMany({
       where: { operationId },
       orderBy: [{ school: { name: "asc" } }, { name: "asc" }],
-      include: { school: { select: { name: true } }, _count: { select: { students: true } } },
+      include: { school: { select: { name: true } }, _count: { select: { students: { where: { active: true } } } } },
     }),
   ]);
 

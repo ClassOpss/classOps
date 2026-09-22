@@ -48,13 +48,11 @@ export type InviteVars = {
 };
 
 export function renderInviteTemplate(template: string, vars: InviteVars): string {
-  const salutation = vars.parentName
-    ? `${vars.parentPrefix ? vars.parentPrefix + " " : ""}${vars.parentName}`
-    : `${vars.studentName}'s parent`;
+  const salutation = parentSalutation(vars);
   const map: Record<string, string> = {
     "{studentName}": vars.studentName,
     "{className}": vars.className,
-    "{parentName}": vars.parentName ?? "there",
+    "{parentName}": vars.parentName ?? `${vars.studentName}'s parent`,
     "{parentSalutation}": salutation,
     "{assistantName}": vars.assistantName ?? "",
     "{link}": vars.link ?? "",
@@ -103,7 +101,8 @@ export function studentCodeMessage(opts: { studentName: string; code: string; si
   ].join("\n");
 }
 
-// How to address a parent: "<prefix> <name>", or a graceful fallback.
+// How to address a parent: "<prefix> <name>", or "<student>'s parent" when the
+// parent would rather not share their name.
 function parentSalutation(opts: { parentPrefix?: string | null; parentName?: string | null; studentName: string }): string {
   if (opts.parentName) return `${opts.parentPrefix ? opts.parentPrefix + " " : ""}${opts.parentName}`;
   return `${opts.studentName}'s parent`;
@@ -138,7 +137,7 @@ export function parentReportMessage(opts: {
   avgPercent: number | null;
   hw: { onTime: number; late: number; missing: number };
 }): string {
-  const who = opts.parentName ? parentSalutation(opts) : "there";
+  const who = parentSalutation(opts);
   const att = opts.attendance;
   const attLine =
     att.total > 0
@@ -158,11 +157,12 @@ export function parentReportMessage(opts: {
 
 export function parentInviteMessage(opts: {
   className: string;
+  parentPrefix?: string | null;
   parentName?: string | null;
   studentName: string;
   parentCommunityLink?: string | null;
 }): string {
-  const who = opts.parentName ? opts.parentName : "there";
+  const who = parentSalutation(opts);
   const lines = [
     `Hello ${who}, this is regarding ${opts.studentName}'s ${opts.className} class.`,
     "",

@@ -29,6 +29,15 @@ async function syncStudentCount(classId: string) {
   await prisma.class.update({ where: { id: classId }, data: { studentCount: count } });
 }
 
+// The roster size shows on the classes list, the class pages (admin + assistant) and
+// the assistant home, so a roster change must refresh all of them, not just /students.
+function revalidateRoster(classId: string) {
+  revalidatePath("/classes");
+  revalidatePath(`/classes/${classId}`, "layout");
+  revalidatePath("/my");
+  revalidatePath(`/my/classes/${classId}`, "layout");
+}
+
 // Manually add a single student to a class.
 export async function addStudent(
   classId: string,
@@ -72,7 +81,7 @@ export async function addStudent(
     entityId: classId,
     classId,
   });
-  revalidatePath(`/classes/${classId}/students`);
+  revalidateRoster(classId);
   return { ok: true };
 }
 
@@ -138,7 +147,7 @@ export async function deactivateStudent(studentId: string): Promise<void> {
     select: { classId: true },
   });
   await syncStudentCount(student.classId);
-  revalidatePath(`/classes/${student.classId}/students`);
+  revalidateRoster(student.classId);
 }
 
 // Batch-insert of students into a class (admin, teacher, or assigned assistant).
@@ -230,6 +239,6 @@ export async function importStudents(
     metadata: { added: result.count, skipped },
   });
 
-  revalidatePath(`/classes/${classId}/students`);
+  revalidateRoster(classId);
   return { added: result.count, skipped };
 }
