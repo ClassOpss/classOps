@@ -46,6 +46,11 @@ export function isQuizDate(quizStartDate: Date, date: Date): boolean {
   return diff >= 0 && diff % QUIZ_CADENCE_DAYS === 0;
 }
 
+// 1-based position of a cadence date in the class's quiz sequence ("Quiz 3").
+export function quizNumber(quizStartDate: Date, scheduledDate: Date): number {
+  return Math.floor(dayDiff(quizStartDate, scheduledDate) / QUIZ_CADENCE_DAYS) + 1;
+}
+
 // The next SCHEDULED quiz date on/after `from` (UTC-midnight).
 export function nextQuizDate(quizStartDate: Date, from: Date): Date {
   if (from <= quizStartDate) return quizStartDate;

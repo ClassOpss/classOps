@@ -12,7 +12,7 @@ export async function submitGrades(assessmentId: string, formData: FormData): Pr
     where: { id: assessmentId },
     select: { id: true, classId: true, maxMark: true },
   });
-  if (!assessment) return;
+  if (!assessment || assessment.maxMark == null) return; // max mark must be set first
 
   const user = await requireClassAccess(assessment.classId);
   if (!user.assistantId) return;

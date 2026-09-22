@@ -72,6 +72,7 @@ export default async function QuizPrepPage({ params }: { params: Promise<{ class
       sentToPrint: true,
       completedAt: true,
       announcedAt: true,
+      assessment: { select: { id: true, label: true, maxMark: true } },
     },
   });
   const bySched = new Map(rows.map((r) => [r.scheduledDate.getTime(), r]));
@@ -128,6 +129,11 @@ export default async function QuizPrepPage({ params }: { params: Promise<{ class
                   Quiz — {dateFmt.format(actual)}
                   {moved && <span className="ml-2 badge-neutral">moved</span>}
                 </p>
+                {row?.assessment && (
+                  <Link href={`/my/classes/${classId}/assessments/${row.assessment.id}`} className="link text-sm">
+                    {row.assessment.maxMark == null ? `Set max mark for ${row.assessment.label} →` : `Enter grades →`}
+                  </Link>
+                )}
               </div>
 
               {/* Announcement */}

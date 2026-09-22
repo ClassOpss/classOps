@@ -173,7 +173,7 @@ export function ClassReportDoc({ data }: { data: ClassReportData }) {
                 { label: "Max", flex: 1, align: "right" },
                 { label: "Class avg", flex: 2, align: "right" },
               ]}
-              rows={data.assessments.map((a) => [a.label, a.date, String(a.max), a.classAvg])}
+              rows={data.assessments.map((a) => [a.label, a.date, a.max == null ? "—" : String(a.max), a.classAvg])}
             />
           </View>
 

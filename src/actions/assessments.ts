@@ -62,6 +62,54 @@ export async function createAssessment(
   return { ok: true };
 }
 
+// Set (or correct) the max mark — auto-created quiz assessments start without one.
+// Existing percentages are recomputed; a max below a mark already entered is refused.
+export async function setMaxMark(
+  assessmentId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const found = await prisma.assessment.findUnique({
+    where: { id: assessmentId },
+    select: { classId: true },
+  });
+  if (!found) return { error: "Assessment not found." };
+  const user = await requireClassAccess(found.classId);
+
+  const parsed = schema.shape.maxMark.safeParse(String(formData.get("maxMark") ?? ""));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const maxMark = parsed.data;
+
+  const grades = await prisma.assessmentGrade.findMany({
+    where: { assessmentId, rawMark: { not: null } },
+    select: { id: true, rawMark: true },
+  });
+  const highest = Math.max(0, ...grades.map((g) => Number(g.rawMark)));
+  if (highest > maxMark) return { error: `A mark of ${highest} is already entered — max must be at least that.` };
+
+  await prisma.$transaction([
+    prisma.assessment.update({ where: { id: assessmentId }, data: { maxMark } }),
+    ...grades.map((g) =>
+      prisma.assessmentGrade.update({
+        where: { id: g.id },
+        data: { percentage: Math.round((Number(g.rawMark) / maxMark) * 10000) / 100 },
+      }),
+    ),
+  ]);
+  await logActivity({
+    actorId: user.id,
+    actorRole: user.role,
+    action: "set_max_mark",
+    entityType: "assessment",
+    entityId: assessmentId,
+    classId: found.classId,
+    metadata: { maxMark },
+  });
+  revalidatePath(`/classes/${found.classId}/assessments`);
+  revalidatePath(`/my/classes/${found.classId}/assessments`, "layout");
+  return { ok: true };
+}
+
 export async function deleteAssessment(assessmentId: string): Promise<void> {
   const found = await prisma.assessment.findUnique({
     where: { id: assessmentId },

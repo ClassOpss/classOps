@@ -64,7 +64,7 @@ export default async function ClassQuizzesPage({ params }: { params: Promise<{ c
 
   const rows = await prisma.quizPrep.findMany({
     where: { classId, scheduledDate: { in: scheduled } },
-    select: { scheduledDate: true, quizDate: true, coverage: true, quizCreated: true, sentToPrint: true, completedAt: true, announcedAt: true },
+    select: { scheduledDate: true, quizDate: true, coverage: true, quizCreated: true, sentToPrint: true, completedAt: true, announcedAt: true, assessment: { select: { label: true, maxMark: true } } },
   });
   const bySched = new Map(rows.map((r) => [r.scheduledDate.getTime(), r]));
 
@@ -94,6 +94,11 @@ export default async function ClassQuizzesPage({ params }: { params: Promise<{ c
                 <div className="flex flex-wrap gap-1.5 text-xs">
                   {quizAnnounced(row) ? <span className="badge-success">Announced</span> : <span className="badge-neutral">Announce by {formatCairo(quizAnnounceDeadline(actual, cfg), "d MMM")}</span>}
                   {quizPrepComplete(row) ? <span className="badge-success">Prepared</span> : <span className="badge-neutral">Prep by {formatCairo(quizPrepDeadline(actual, cfg), "d MMM")}</span>}
+                  {row?.assessment && (
+                    <Link href={`/classes/${classId}/assessments`} className={row.assessment.maxMark == null ? "badge-warn" : "badge-neutral"}>
+                      {row.assessment.label}{row.assessment.maxMark == null ? " · set max mark" : ` · /${row.assessment.maxMark}`}
+                    </Link>
+                  )}
                 </div>
               </div>
 

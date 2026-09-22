@@ -71,12 +71,16 @@ export default async function AssessmentsListPage({
                       {a.label}
                       {a.isDiagnostic ? <span className="ml-1.5 badge-neutral">Diagnostic</span> : null}
                     </p>
-                    <span className={complete ? "badge-success" : "badge-warn"}>
-                      {complete ? "Complete" : `${graded}/${total} graded`}
-                    </span>
+                    {a.maxMark == null ? (
+                      <span className="badge-warn">Set max mark</span>
+                    ) : (
+                      <span className={complete ? "badge-success" : "badge-warn"}>
+                        {complete ? "Complete" : `${graded}/${total} graded`}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-0.5 text-sm text-muted">
-                    {dateFmt.format(a.date)} · max {a.maxMark} · enter by{" "}
+                    {dateFmt.format(a.date)} · max {a.maxMark ?? "not set"} · enter by{" "}
                     {formatCairo(saturdayDeadline(a.date, cfg), "EEE d MMM, h:mm a")}
                   </p>
                 </Link>

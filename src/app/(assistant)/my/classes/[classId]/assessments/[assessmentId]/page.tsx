@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { saturdayDeadline, isLate, formatCairo } from "@/lib/datetime";
 import { resolveConfig } from "@/lib/operation";
 import { GradeEntryForm, type GradeRow } from "./grade-entry-form";
+import { MaxMarkForm } from "@/app/(admin)/classes/[classId]/assessments/max-mark-form";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -79,7 +80,7 @@ export default async function GradeEntryPage({
           {assessment.isDiagnostic ? <span className="ml-1.5 badge-neutral">Diagnostic</span> : null}
         </h1>
         <p className="text-sm text-muted">
-          {dateFmt.format(assessment.date)} · max {assessment.maxMark} · enter by{" "}
+          {dateFmt.format(assessment.date)} · enter by{" "}
           {formatCairo(correctionDeadline, "EEE d MMM, h:mm a")}
         </p>
       </div>
@@ -95,12 +96,26 @@ export default async function GradeEntryPage({
         </div>
       )}
 
-      <GradeEntryForm
-        assessmentId={assessmentId}
-        maxMark={assessment.maxMark}
-        classAverage={classAverage}
-        students={rows}
-      />
+      {assessment.maxMark == null ? (
+        <div className="card flex flex-col gap-2 p-4">
+          <p className="text-sm font-medium">Set the max mark to start entering grades</p>
+          <p className="text-xs text-muted">This quiz was added automatically from the quiz tasks.</p>
+          <MaxMarkForm assessmentId={assessmentId} current={null} />
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 text-sm text-muted">
+            <span>Max mark:</span>
+            <MaxMarkForm assessmentId={assessmentId} current={assessment.maxMark} />
+          </div>
+          <GradeEntryForm
+            assessmentId={assessmentId}
+            maxMark={assessment.maxMark}
+            classAverage={classAverage}
+            students={rows}
+          />
+        </>
+      )}
     </div>
   );
 }

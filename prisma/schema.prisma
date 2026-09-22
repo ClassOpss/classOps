@@ -219,7 +219,7 @@ model School {
   name        String
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  operation Operation @relation(fields: [operationId], references: [id])
+  operation Operation        @relation(fields: [operationId], references: [id])
   classes   Class[]
   vacations SchoolVacation[]
 
@@ -251,43 +251,43 @@ model SchoolVacation {
 }
 
 model Class {
-  id           String    @id @default(uuid())
-  operationId  String    @map("operation_id")
-  schoolId     String    @map("school_id")
-  yearGroup    YearGroup @map("year_group")
-  name         String
+  id                  String    @id @default(uuid())
+  operationId         String    @map("operation_id")
+  schoolId            String    @map("school_id")
+  yearGroup           YearGroup @map("year_group")
+  name                String
   // Which platform this class uses — gates Google Classroom onboarding (IE Learn = none).
-  lmsType      LmsType   @default(google_classroom) @map("lms_type")
-  studentCount Int       @default(0) @map("student_count")
+  lmsType             LmsType   @default(google_classroom) @map("lms_type")
+  studentCount        Int       @default(0) @map("student_count")
   // schedule: { "day": "Sunday", "time": "16:00" } — drives late-detection deadlines
-  schedule     Json
+  schedule            Json
   // planStartDate: the date this class's lesson 1 takes place; used to generate sessions
-  planStartDate DateTime? @map("plan_start_date") @db.Date
+  planStartDate       DateTime? @map("plan_start_date") @db.Date
   // Biweekly quiz: quizStartDate = the date of the FIRST quiz; every quiz recurs +14 days.
   // quizDay is the weekday label (must match quizStartDate's weekday) — informational.
   // Both null = this class has no biweekly quiz task. See lib/quiz.ts.
-  quizDay      String?   @map("quiz_day")
-  quizStartDate DateTime? @map("quiz_start_date") @db.Date
-  active       Boolean   @default(true)
-  notes        String?
+  quizDay             String?   @map("quiz_day")
+  quizStartDate       DateTime? @map("quiz_start_date") @db.Date
+  active              Boolean   @default(true)
+  notes               String?
   // Per-class destinations for onboarding students/parents. Invite links are pasted
   // once; ClassOps sends each student/parent their link (no risky auto-adding).
-  googleClassroomLink String? @map("google_classroom_link")
-  studentGroupLink    String? @map("student_group_link")
-  parentCommunityLink String? @map("parent_community_link")
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  googleClassroomLink String?   @map("google_classroom_link")
+  studentGroupLink    String?   @map("student_group_link")
+  parentCommunityLink String?   @map("parent_community_link")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  operation       Operation                    @relation(fields: [operationId], references: [id])
-  school          School                       @relation(fields: [schoolId], references: [id])
-  students        Student[]
-  assignments     ClassAssignment[]
-  subAssignments  StudentAssistantAssignment[]
-  sessions        ClassSession[]
-  homework        HomeworkAssignment[]
-  assessments     Assessment[]
-  officeHours     OfficeHourSession[]
-  quizPreps       QuizPrep[]
-  activity        ActivityLog[]
+  operation      Operation                    @relation(fields: [operationId], references: [id])
+  school         School                       @relation(fields: [schoolId], references: [id])
+  students       Student[]
+  assignments    ClassAssignment[]
+  subAssignments StudentAssistantAssignment[]
+  sessions       ClassSession[]
+  homework       HomeworkAssignment[]
+  assessments    Assessment[]
+  officeHours    OfficeHourSession[]
+  quizPreps      QuizPrep[]
+  activity       ActivityLog[]
 
   @@index([operationId])
   @@index([schoolId])
@@ -295,20 +295,20 @@ model Class {
 }
 
 model Student {
-  id          String   @id @default(uuid())
-  classId     String   @map("class_id")
-  name        String
-  code        String
+  id           String   @id @default(uuid())
+  classId      String   @map("class_id")
+  name         String
+  code         String
   // Contact details captured at import (for Classroom invites + WhatsApp link sends).
-  email       String?
-  phone       String?
-  parentPrefix String? @map("parent_prefix") // title: Dr / Eng / Mr / Mrs …
-  parentName  String?  @map("parent_name")
-  parentPhone String?  @map("parent_phone")
+  email        String?
+  phone        String?
+  parentPrefix String?  @map("parent_prefix") // title: Dr / Eng / Mr / Mrs …
+  parentName   String?  @map("parent_name")
+  parentPhone  String?  @map("parent_phone")
   // Free-text notes for the parent, included on the student's PDF report.
-  parentNotes String?  @map("parent_notes")
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  parentNotes  String?  @map("parent_notes")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   class          Class                        @relation(fields: [classId], references: [id], onDelete: Cascade)
   subAssignments StudentAssistantAssignment[]
@@ -323,38 +323,38 @@ model Student {
 }
 
 model Assistant {
-  id          String   @id @default(uuid())
-  operationId String   @map("operation_id")
-  userId      String   @unique @map("user_id")
-  name        String
-  email       String
-  phone       String?
+  id                    String   @id @default(uuid())
+  operationId           String   @map("operation_id")
+  userId                String   @unique @map("user_id")
+  name                  String
+  email                 String
+  phone                 String?
   // Optional per-assistant per-class rate (e.g. seniority). Null = use the operation default.
-  perClassSalary Decimal? @map("per_class_salary") @db.Decimal(10, 2)
+  perClassSalary        Decimal? @map("per_class_salary") @db.Decimal(10, 2)
   // Optional per-assistant WhatsApp invite message templates (with {placeholders}).
   // Null = use the shared default. Personal to this assistant — never affects others.
-  studentInviteTemplate String? @map("student_invite_template")
-  parentInviteTemplate  String? @map("parent_invite_template")
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  studentInviteTemplate String?  @map("student_invite_template")
+  parentInviteTemplate  String?  @map("parent_invite_template")
+  active                Boolean  @default(true)
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   operation Operation @relation(fields: [operationId], references: [id])
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  classAssignments ClassAssignment[]            @relation("AssignmentAssistant")
-  substituteFor    ClassAssignment[]            @relation("AssignmentSubstitute")
-  subAssignments   StudentAssistantAssignment[]
-  hwSubmissions    HomeworkSubmission[]
-  attendanceLogs   Attendance[]
-  gradesLogged     AssessmentGrade[]
-  parentUpdates    ParentUpdateLog[]
-  classroomUploads ClassroomUploadLog[]
-  officeHours      OfficeHourSession[]
-  incidents        LateIncident[]
-  payCalcs         PayCalculation[]
-  quizPreps        QuizPrep[]
-  responsibleSessions ClassSession[]        @relation("SessionResponsible")
-  coveredSessions     ClassSession[]        @relation("SessionCoveredBy")
+  classAssignments    ClassAssignment[]            @relation("AssignmentAssistant")
+  substituteFor       ClassAssignment[]            @relation("AssignmentSubstitute")
+  subAssignments      StudentAssistantAssignment[]
+  hwSubmissions       HomeworkSubmission[]
+  attendanceLogs      Attendance[]
+  gradesLogged        AssessmentGrade[]
+  parentUpdates       ParentUpdateLog[]
+  classroomUploads    ClassroomUploadLog[]
+  officeHours         OfficeHourSession[]
+  incidents           LateIncident[]
+  payCalcs            PayCalculation[]
+  quizPreps           QuizPrep[]
+  responsibleSessions ClassSession[]               @relation("SessionResponsible")
+  coveredSessions     ClassSession[]               @relation("SessionCoveredBy")
 
   @@index([operationId])
   @@map("assistants")
@@ -437,11 +437,11 @@ model LessonPlan {
 }
 
 model LessonPlanItem {
-  id        String  @id @default(uuid())
-  planId    String  @map("plan_id")
-  sequence  Int // 1-based position in the year-group plan
-  topicId   String? @map("topic_id")
-  notes     String?
+  id       String  @id @default(uuid())
+  planId   String  @map("plan_id")
+  sequence Int // 1-based position in the year-group plan
+  topicId  String? @map("topic_id")
+  notes    String?
 
   plan     LessonPlan     @relation(fields: [planId], references: [id], onDelete: Cascade)
   topic    Topic?         @relation(fields: [topicId], references: [id])
@@ -453,28 +453,28 @@ model LessonPlanItem {
 }
 
 model ClassSession {
-  id                 String        @id @default(uuid())
-  classId            String        @map("class_id")
+  id                     String        @id @default(uuid())
+  classId                String        @map("class_id")
   // planItemId links a generated session back to its template row; null = ad-hoc/override-added
-  planItemId         String?       @map("plan_item_id")
-  lessonNumber       Int           @map("lesson_number") // stored sequence position; display number computed (excludes day-offs)
-  scheduledDate      DateTime      @map("scheduled_date") @db.Date
-  topicId            String?       @map("topic_id")
+  planItemId             String?       @map("plan_item_id")
+  lessonNumber           Int           @map("lesson_number") // stored sequence position; display number computed (excludes day-offs)
+  scheduledDate          DateTime      @map("scheduled_date") @db.Date
+  topicId                String?       @map("topic_id")
   // Free-text topic typed by an assistant when the lesson isn't in the year-group plan.
   // Takes precedence over topicId for display; analytics stay plan-topic based.
-  customTopic        String?       @map("custom_topic")
-  status             SessionStatus @default(scheduled)
-  dayOff             Boolean       @default(false) @map("day_off")
-  cancellationReason String?       @map("cancellation_reason")
+  customTopic            String?       @map("custom_topic")
+  status                 SessionStatus @default(scheduled)
+  dayOff                 Boolean       @default(false) @map("day_off")
+  cancellationReason     String?       @map("cancellation_reason")
   // free-text notes injected into the class-update WhatsApp message
-  messageNotes       String?       @map("message_notes")
+  messageNotes           String?       @map("message_notes")
   // Optional description for a class-specific (ad-hoc) lesson — planItemId is null on those.
-  notes              String?       @map("notes")
+  notes                  String?       @map("notes")
   // Daily-task ownership (spec: tasks split by schedule day). Stamped at generation.
-  responsibleAssistantId String?   @map("responsible_assistant_id")
+  responsibleAssistantId String?       @map("responsible_assistant_id")
   // Set (admin-confirmed) when another assistant covered this session -> drives ±50 pay.
-  coveredById            String?   @map("covered_by_id")
-  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  coveredById            String?       @map("covered_by_id")
+  createdAt              DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
 
   class                Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
   planItem             LessonPlanItem?     @relation(fields: [planItemId], references: [id])
@@ -598,13 +598,14 @@ model Assessment {
   topicNotes   String?        @map("topic_notes")
   date         DateTime       @db.Date
   time         String? // "HH:mm" — needed for quiz announcement
-  maxMark      Int            @map("max_mark")
+  maxMark      Int?           @map("max_mark") // null = auto-created from a quiz, max not set yet
   isDiagnostic Boolean        @default(false) @map("is_diagnostic")
   createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  class  Class             @relation(fields: [classId], references: [id], onDelete: Cascade)
-  topic  Topic?            @relation(fields: [topicId], references: [id])
-  grades AssessmentGrade[]
+  class    Class             @relation(fields: [classId], references: [id], onDelete: Cascade)
+  topic    Topic?            @relation(fields: [topicId], references: [id])
+  grades   AssessmentGrade[]
+  quizPrep QuizPrep?
 
   @@index([classId])
   @@map("assessments")
@@ -662,12 +663,15 @@ model QuizPrep {
   completedAt   DateTime? @map("completed_at") @db.Timestamptz(6)
   // Announcement sub-task (send the WhatsApp announcement message)
   announcedAt   DateTime? @map("announced_at") @db.Timestamptz(6)
+  // The Assessment auto-created when this quiz is first confirmed (announced / created).
+  assessmentId  String?   @unique @map("assessment_id")
   loggedById    String?   @map("logged_by")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  class     Class          @relation(fields: [classId], references: [id], onDelete: Cascade)
-  loggedBy  Assistant?     @relation(fields: [loggedById], references: [id])
-  incidents LateIncident[]
+  class      Class          @relation(fields: [classId], references: [id], onDelete: Cascade)
+  loggedBy   Assistant?     @relation(fields: [loggedById], references: [id])
+  assessment Assessment?    @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  incidents  LateIncident[]
 
   @@unique([classId, scheduledDate])
   @@index([classId])
@@ -750,20 +754,20 @@ model PayPeriod {
 }
 
 model PayCalculation {
-  id               String        @id @default(uuid())
-  payPeriodId      String        @map("pay_period_id")
-  assistantId      String        @map("assistant_id")
-  classesCovered   Int           @map("classes_covered")
-  baseSalary       Decimal       @map("base_salary") @db.Decimal(10, 2)
-  lateDeductions   Decimal       @map("late_deductions") @db.Decimal(10, 2)
-  officeHoursBonus Decimal       @map("office_hours_bonus") @db.Decimal(10, 2)
-  vacationDeduction Decimal      @default(0) @map("vacation_deduction") @db.Decimal(10, 2)
-  coverageAdjustment Decimal     @default(0) @map("coverage_adjustment") @db.Decimal(10, 2)
-  manualAdjustment Decimal       @default(0) @map("manual_adjustment") @db.Decimal(10, 2)
-  adjustmentNote   String?       @map("adjustment_note")
-  total            Decimal       @db.Decimal(10, 2)
-  status           PayCalcStatus @default(pending)
-  sentAt           DateTime?     @map("sent_at") @db.Timestamptz(6)
+  id                 String        @id @default(uuid())
+  payPeriodId        String        @map("pay_period_id")
+  assistantId        String        @map("assistant_id")
+  classesCovered     Int           @map("classes_covered")
+  baseSalary         Decimal       @map("base_salary") @db.Decimal(10, 2)
+  lateDeductions     Decimal       @map("late_deductions") @db.Decimal(10, 2)
+  officeHoursBonus   Decimal       @map("office_hours_bonus") @db.Decimal(10, 2)
+  vacationDeduction  Decimal       @default(0) @map("vacation_deduction") @db.Decimal(10, 2)
+  coverageAdjustment Decimal       @default(0) @map("coverage_adjustment") @db.Decimal(10, 2)
+  manualAdjustment   Decimal       @default(0) @map("manual_adjustment") @db.Decimal(10, 2)
+  adjustmentNote     String?       @map("adjustment_note")
+  total              Decimal       @db.Decimal(10, 2)
+  status             PayCalcStatus @default(pending)
+  sentAt             DateTime?     @map("sent_at") @db.Timestamptz(6)
 
   payPeriod PayPeriod @relation(fields: [payPeriodId], references: [id], onDelete: Cascade)
   assistant Assistant @relation(fields: [assistantId], references: [id])

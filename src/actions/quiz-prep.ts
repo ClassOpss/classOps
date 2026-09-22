@@ -6,6 +6,7 @@ import { requireClassAccess } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { ymdUtc } from "@/lib/datetime";
 import { isQuizDate } from "@/lib/quiz";
+import { ensureQuizAssessment as linkQuizAssessment } from "@/lib/quiz-assessment";
 
 // Resolve a class + validate that `scheduledDateStr` is a genuine cadence date for it.
 // Returns { user, classId, scheduledDate } or null when access/validation fails.
@@ -18,7 +19,15 @@ async function resolveCycle(classId: string, scheduledDateStr: string) {
   if (!klass?.quizStartDate) return null;
   const scheduledDate = ymdUtc(scheduledDateStr);
   if (Number.isNaN(scheduledDate.getTime()) || !isQuizDate(klass.quizStartDate, scheduledDate)) return null;
-  return { user, scheduledDate };
+  return { user, scheduledDate, quizStartDate: klass.quizStartDate };
+}
+
+// Create/link the quiz's assessment, then refresh the assessment lists.
+async function ensureQuizAssessment(classId: string, scheduledDate: Date, quizStartDate: Date) {
+  if (await linkQuizAssessment(classId, scheduledDate, quizStartDate)) {
+    revalidatePath(`/classes/${classId}/assessments`);
+    revalidatePath(`/my/classes/${classId}/assessments`);
+  }
 }
 
 // Ensure a row exists for the cycle (actual date defaults to the scheduled date on create).
@@ -72,6 +81,8 @@ export async function saveQuizPrep(
     },
   });
 
+  if (quizCreated) await ensureQuizAssessment(classId, scheduledDate, cyc.quizStartDate);
+
   await logActivity({
     actorId: cyc.user.id,
     actorRole: cyc.user.role,
@@ -104,6 +115,7 @@ export async function markQuizAnnounced(classId: string, scheduledDateStr: strin
     update: { announcedAt, loggedById: cyc.user.assistantId },
     create: { classId, scheduledDate, quizDate: scheduledDate, announcedAt, loggedById: cyc.user.assistantId },
   });
+  await ensureQuizAssessment(classId, scheduledDate, cyc.quizStartDate);
 
   await logActivity({
     actorId: cyc.user.id,
@@ -140,6 +152,11 @@ export async function setQuizDate(
     where: { classId_scheduledDate: { classId, scheduledDate } },
     data: { quizDate },
   });
+  // Keep the linked assessment on the same date.
+  await prisma.assessment.updateMany({
+    where: { quizPrep: { is: { classId, scheduledDate } } },
+    data: { date: quizDate },
+  });
 
   await logActivity({
     actorId: cyc.user.id,
@@ -173,6 +190,10 @@ export async function setQuizCoverage(
   await prisma.quizPrep.update({
     where: { classId_scheduledDate: { classId, scheduledDate } },
     data: { coverage },
+  });
+  await prisma.assessment.updateMany({
+    where: { quizPrep: { is: { classId, scheduledDate } } },
+    data: { topicNotes: coverage },
   });
 
   await logActivity({

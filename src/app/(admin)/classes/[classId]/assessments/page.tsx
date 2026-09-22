@@ -7,6 +7,7 @@ import { deleteAssessment } from "@/actions/assessments";
 import { buildQuizAnnouncement, friendlyTime, topicsFromNotes } from "@/lib/whatsapp/quiz-announcement";
 import { AssessmentForm } from "./assessment-form";
 import { QuizAnnouncement } from "./quiz-announcement";
+import { MaxMarkForm } from "./max-mark-form";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -40,7 +41,7 @@ export default async function AssessmentsAdminPage({
   const assessments = await prisma.assessment.findMany({
     where: { classId },
     orderBy: { date: "desc" },
-    include: { _count: { select: { grades: true } }, topic: { select: { title: true } } },
+    include: { _count: { select: { grades: true } }, topic: { select: { title: true } }, quizPrep: { select: { id: true } } },
   });
 
   return (
@@ -80,10 +81,11 @@ export default async function AssessmentsAdminPage({
                   <td className="font-medium">
                     {a.label}
                     {a.isDiagnostic ? <span className="ml-1.5 badge-neutral">Diagnostic</span> : null}
+                    {a.quizPrep ? <span className="ml-1.5 badge-neutral">From quiz tasks</span> : null}
                   </td>
                   <td className="text-muted">{TYPE_LABEL[a.type]}</td>
                   <td className="text-muted">{dateFmt.format(a.date)}</td>
-                  <td>{a.maxMark}</td>
+                  <td><MaxMarkForm assessmentId={a.id} current={a.maxMark} /></td>
                   <td>{a._count.grades}</td>
                   <td>
                     <div className="flex flex-col gap-1">

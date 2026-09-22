@@ -25,7 +25,7 @@ export type ClassReportData = {
   monthLabel: string;
   summary: { sessionsDelivered: number; avgAttendance: string; classAverage: string; students: number };
   sessions: { lesson: string; date: string; topic: string; attendanceRate: string }[];
-  assessments: { label: string; date: string; max: number; classAvg: string }[];
+  assessments: { label: string; date: string; max: number | null; classAvg: string }[];
   // Student rows are identified by CODE (privacy — see student-code-privacy), ordered by code.
   students: { code: string; average: string; absences: number }[];
   homeworks: { description: string; due: string; submissionRate: string }[];
