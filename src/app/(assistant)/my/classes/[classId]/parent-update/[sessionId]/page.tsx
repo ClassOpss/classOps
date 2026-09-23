@@ -7,6 +7,7 @@ import { sessionStart, sessionDeadline, isLate, latenessApplies, formatCairo } f
 import { scheduleTimeForDate } from "@/lib/schedule";
 import { resolveConfig } from "@/lib/operation";
 import { waLink } from "@/lib/invites";
+import { previousHomework, homeworkLabel } from "@/lib/previous-homework";
 import { CopyMessage } from "./copy-message";
 import { SendToGroup } from "./send-to-group";
 
@@ -85,6 +86,34 @@ export default async function ParentUpdatePage({
     .map((a) => a.student.name)
     .sort();
 
+  // Previous homework = HW that came due since the last class. Who didn't submit comes
+  // straight from the assistants' entries on the homework page (row with no submission
+  // date). A HW nobody has reviewed yet is left out of the message; a partly-reviewed
+  // one is included but flagged below so the assistant can finish it first.
+  const [prevHw, activeCount] = await Promise.all([
+    previousHomework(classId, session.scheduledDate),
+    prisma.student.count({ where: { classId, active: true } }),
+  ]);
+  const prevSubs = prevHw.length
+    ? await prisma.homeworkSubmission.findMany({
+        where: { homeworkId: { in: prevHw.map((h) => h.id) }, student: { active: true } },
+        select: { homeworkId: true, submissionDate: true, student: { select: { name: true } } },
+      })
+    : [];
+  const prevHwStatus = prevHw.map((hw) => {
+    const rows = prevSubs.filter((s) => s.homeworkId === hw.id);
+    return {
+      id: hw.id,
+      label: homeworkLabel(hw),
+      reviewed: rows.length,
+      missingNames: rows.filter((s) => !s.submissionDate).map((s) => s.student.name).sort(),
+    };
+  });
+  const previousHw = prevHwStatus
+    .filter((p) => p.reviewed > 0)
+    .map(({ label, missingNames }) => ({ label, missingNames }));
+  const unreviewedHw = prevHwStatus.filter((p) => p.reviewed < activeCount);
+
   const cfg = await resolveConfig();
   const hw = session.homework;
   const message = buildClassUpdateMessage(
@@ -95,6 +124,7 @@ export default async function ParentUpdatePage({
       topic: session.customTopic ?? session.topic?.title,
       attendanceLogged: attendance.length > 0,
       absentNames,
+      previousHomework: previousHw,
       newHomework: hw && !hw.noHomework ? hw.description : null,
       homeworkDueLabel: hw && !hw.noHomework && hw.deadline ? longDate.format(hw.deadline) : null,
       notes: session.messageNotes,
@@ -133,6 +163,16 @@ export default async function ParentUpdatePage({
           Log attendance first so absentees appear in the message.
         </p>
       )}
+
+      {unreviewedHw.map((p) => (
+        <p key={p.id} className="rounded-lg bg-warn-soft px-3 py-2.5 text-sm text-warn">
+          Previous homework ({p.label}) is checked for {p.reviewed} of {activeCount} students
+          {p.reviewed === 0 ? " — it's left out of the message until it's checked." : " — only those are in the message."}{" "}
+          <Link href={`/my/classes/${classId}/homework/${p.id}`} className="font-medium underline">
+            Check homework →
+          </Link>
+        </p>
+      ))}
 
       <pre className="card whitespace-pre-wrap bg-card-muted p-4 text-sm">
         {message}

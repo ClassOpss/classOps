@@ -11,7 +11,9 @@ export type ClassUpdateData = {
   attendanceLogged: boolean;
   absentNames: string[];
   // Optional sections — included only when present.
-  hwMissingNames?: string[];
+  // Homework that came due since the last class, from the homework-page entries.
+  // One entry per homework; an empty missingNames list means everyone submitted.
+  previousHomework?: { label: string; missingNames: string[] }[];
   newHomework?: string | null;
   homeworkDueLabel?: string | null;
   quizLine?: string | null;
@@ -38,13 +40,20 @@ export function buildClassUpdateMessage(
 
   // Homework block — only when there's something to say.
   const hwLines: string[] = [];
-  if (d.hwMissingNames && d.hwMissingNames.length > 0) {
-    hwLines.push(`Students who did not submit previous homework: ${d.hwMissingNames.join(", ")}`);
+  for (const prev of d.previousHomework ?? []) {
+    if (prev.missingNames.length > 0) {
+      hwLines.push(`Students who did not submit previous homework (HW: ${prev.label}):`);
+      hwLines.push(...prev.missingNames);
+    } else {
+      hwLines.push(`Previous homework (HW: ${prev.label}): submitted by all students.`);
+    }
+    hwLines.push("");
   }
   if (d.newHomework) {
     hwLines.push(`New homework assigned: ${d.newHomework}`);
     if (d.homeworkDueLabel) hwLines.push(`Due: ${d.homeworkDueLabel}`);
   }
+  if (hwLines[hwLines.length - 1] === "") hwLines.pop(); // no trailing gap before the next block
   if (hwLines.length > 0) {
     lines.push("");
     lines.push("*Homework:*");
