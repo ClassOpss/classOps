@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { requireRole } from "@/lib/auth-guards";
+import { requireRole, getVisibleStudentIds } from "@/lib/auth-guards";
+import { classProgress } from "@/lib/student-progress";
 import { prisma } from "@/lib/db";
 import { scheduleLabel } from "@/lib/schedule";
 import { formatCairo, cairoToday } from "@/lib/datetime";
@@ -42,9 +43,15 @@ export default async function MyClassesPage() {
     },
   });
 
-  const classes = assignments
-    .map((a) => ({ ...a.class, isCover: a.isSubstitute, coverUntil: a.endDate }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const classes = (
+    await Promise.all(
+      assignments.map(async (a) => {
+        const { students } = await classProgress(a.class.id, await getVisibleStudentIds(a.class.id, user));
+        const flagged = students.filter((s) => s.reasons.length > 0).length;
+        return { ...a.class, isCover: a.isSubstitute, coverUntil: a.endDate, flagged };
+      }),
+    )
+  ).sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className="flex flex-col gap-4">
@@ -66,6 +73,9 @@ export default async function MyClassesPage() {
                       <span className="badge-warn text-[0.65rem]">
                         Cover{c.coverUntil ? ` · until ${formatCairo(c.coverUntil, "d MMM")}` : ""}
                       </span>
+                    )}
+                    {c.flagged > 0 && (
+                      <span className="badge-danger text-[0.65rem]">{c.flagged} need attention</span>
                     )}
                   </p>
                   <p className="mt-0.5 text-sm text-muted">

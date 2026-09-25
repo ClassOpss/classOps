@@ -516,6 +516,14 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
       optional "waive existing fines" for newly-off tasks (grade_entry incidents have no class link, so
       those must be waived by hand). Browser-verified locally: 2 fines waived, re-run cron created 0.
 
+    ── Assistant student-progress dashboard ──
+    • /my/classes/[id]/progress (lib/student-progress.classProgress): the assistant's SUB-GROUP
+      (getVisibleStudentIds) vs the whole class — attendance / HW-on-time / grade-average stat cards
+      (green/red relative to class), recent assessments (group avg vs class avg), and per-student cards
+      (attendance x/y, HW on-time·late·missing, non-diagnostic avg, last grade vs class avg, latest weak
+      points). Flags reuse lib/at-risk.riskReasons (same thresholds as the admin "Needs attention").
+      /my class cards show an "N need attention" badge. Data verified vs dev DB; not yet browser-tested.
+
     ── DEFERRED to v2 (next year — user decision) ──
     Student/parent self-serve portals, in-app HW upload, dropping Google Classroom, fee/payment tracking,
     admin activity tab, automatic daily-update sending to the class WhatsApp group. Design keeps these

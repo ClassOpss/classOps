@@ -6,6 +6,24 @@ const ATTENDANCE_FLOOR = 0.75; // < 75% attendance
 const MISSING_HW_FLOOR = 2; // >= 2 missing homeworks
 const AVERAGE_FLOOR = 50; // average grade < 50%
 
+// Why a student breaches the thresholds (empty = fine). Shared by the admin
+// dashboard and the assistant progress view so both flag the same students.
+export function riskReasons(m: {
+  attended: number;
+  attendanceTotal: number;
+  missingHw: number;
+  average: number | null;
+}): string[] {
+  const reasons: string[] = [];
+  const attRate = m.attendanceTotal > 0 ? m.attended / m.attendanceTotal : 1;
+  if (m.attendanceTotal >= MIN_SESSIONS && attRate < ATTENDANCE_FLOOR) {
+    reasons.push(`Attendance ${Math.round(attRate * 100)}%`);
+  }
+  if (m.missingHw >= MISSING_HW_FLOOR) reasons.push(`${m.missingHw} missing HW`);
+  if (m.average != null && m.average < AVERAGE_FLOOR) reasons.push(`Avg ${Math.round(m.average)}%`);
+  return reasons;
+}
+
 export type AtRiskStudent = {
   id: string;
   name: string;
@@ -33,20 +51,15 @@ export async function detectAtRiskStudents(operationId: string): Promise<AtRiskS
 
   const out: AtRiskStudent[] = [];
   for (const s of students) {
-    const total = s.attendance.length;
-    const present = s.attendance.filter((a) => a.status === "present").length;
-    const attRate = total > 0 ? present / total : 1;
-    const missing = s.hwSubmissions.length;
     const avg = s.grades.length
       ? s.grades.reduce((sum, g) => sum + Number(g.percentage), 0) / s.grades.length
       : null;
-
-    const reasons: string[] = [];
-    if (total >= MIN_SESSIONS && attRate < ATTENDANCE_FLOOR) {
-      reasons.push(`Attendance ${Math.round(attRate * 100)}%`);
-    }
-    if (missing >= MISSING_HW_FLOOR) reasons.push(`${missing} missing HW`);
-    if (avg != null && avg < AVERAGE_FLOOR) reasons.push(`Avg ${Math.round(avg)}%`);
+    const reasons = riskReasons({
+      attended: s.attendance.filter((a) => a.status === "present").length,
+      attendanceTotal: s.attendance.length,
+      missingHw: s.hwSubmissions.length,
+      average: avg,
+    });
 
     if (reasons.length) {
       out.push({ id: s.id, name: s.name, classId: s.class.id, className: s.class.name, reasons });

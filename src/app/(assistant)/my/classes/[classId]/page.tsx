@@ -133,6 +133,7 @@ export default async function AssistantClassPage({
 
       <div className="grid grid-cols-3 gap-2">
         {[
+          { href: `/my/classes/${classId}/progress`, label: "Progress" },
           { href: `/my/classes/${classId}/students`, label: "Students" },
           { href: `/my/classes/${classId}/invites`, label: "Invites" },
           { href: `/my/classes/${classId}/homework`, label: "Homework" },
