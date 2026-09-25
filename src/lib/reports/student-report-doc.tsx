@@ -112,7 +112,9 @@ export function StudentReportDoc({ data }: { data: StudentReportData }) {
               <Text style={[s.th, { flex: 6 }]}>Lesson</Text>
             </View>
             {data.absences.length === 0 ? (
-              <Text style={s.empty}>Full attendance this month.</Text>
+              <Text style={s.empty}>
+                {data.excused.length ? "No unexcused absences this month." : "Full attendance this month."}
+              </Text>
             ) : (
               data.absences.map((a, i) => (
                 <View key={i} style={s.tr} wrap={false}>
@@ -122,6 +124,23 @@ export function StudentReportDoc({ data }: { data: StudentReportData }) {
               ))
             )}
           </View>
+
+          {data.excused.length > 0 && (
+            <View style={s.section}>
+              <Text style={s.h2}>Excused sessions</Text>
+              {data.excusedNote ? <Text style={[s.notes, { marginBottom: 6 }]}>{data.excusedNote} These sessions do not count against attendance.</Text> : null}
+              <View style={s.thead}>
+                <Text style={[s.th, { flex: 2 }]}>Date</Text>
+                <Text style={[s.th, { flex: 6 }]}>Lesson</Text>
+              </View>
+              {data.excused.map((a, i) => (
+                <View key={i} style={s.tr} wrap={false}>
+                  <Text style={[s.td, { flex: 2 }]}>{a.date}</Text>
+                  <Text style={[s.td, { flex: 6 }]}>{a.topic}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <View style={s.section}>
             <Text style={s.h2}>Missed homework</Text>

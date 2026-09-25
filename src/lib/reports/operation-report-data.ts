@@ -2,6 +2,7 @@ import "server-only";
 import { promises as fs } from "fs";
 import path from "path";
 import { prisma } from "@/lib/db";
+import { COUNTED_ATTENDANCE } from "@/lib/attendance";
 import { monthWindow } from "@/lib/pay";
 import { resolveConfigFor } from "@/lib/operation";
 import { detectAtRiskStudents } from "@/lib/at-risk";
@@ -64,7 +65,7 @@ export async function buildOperationReportData(
     }),
     prisma.classSession.findMany({
       where: { dayOff: false, scheduledDate: inMonth, class: { active: true, operationId } },
-      select: { classId: true, scheduledDate: true, responsibleAssistantId: true, coveredById: true, attendance: { select: { status: true } } },
+      select: { classId: true, scheduledDate: true, responsibleAssistantId: true, coveredById: true, attendance: { where: COUNTED_ATTENDANCE, select: { status: true } } },
     }),
     prisma.assessmentGrade.findMany({
       where: { percentage: { not: null }, assessment: { isDiagnostic: false, date: inMonth, class: { active: true, operationId } } },

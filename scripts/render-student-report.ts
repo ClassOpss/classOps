@@ -16,6 +16,11 @@ const data: StudentReportData = {
   summary: { attendanceRate: "83%", average: "76%", missedHw: 1, absences: 1 },
   trend: { averageDelta: 8, attendanceDelta: -5 },
   absences: [{ date: "24 Aug 2026", topic: "Coordinate Geometry" }],
+  excused: [
+    { date: "06 Aug 2026", topic: "Quadratics", reason: "Schedule clash with another subject" },
+    { date: "13 Aug 2026", topic: "Simultaneous Equations", reason: "Schedule clash with another subject" },
+  ],
+  excusedNote: "Excused from 2 Thursday sessions: Schedule clash with another subject.",
   missedHomework: [{ description: "Exercise 3A, Q1–10", due: "10 Aug 2026" }],
   grades: [
     { label: "Algebra Quiz 1", date: "10 Aug 2026", score: "84%", classAvg: "72%", standing: "above" },

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { COUNTED_ATTENDANCE } from "@/lib/attendance";
 
 // Numerical thresholds for flagging a student as needing attention.
 const MIN_SESSIONS = 3; // don't flag attendance until there's enough signal
@@ -40,7 +41,7 @@ export async function detectAtRiskStudents(operationId: string): Promise<AtRiskS
       id: true,
       name: true,
       class: { select: { id: true, name: true } },
-      attendance: { select: { status: true } },
+      attendance: { where: COUNTED_ATTENDANCE, select: { status: true } },
       hwSubmissions: { where: { status: "missing" }, select: { id: true } },
       grades: {
         where: { assessment: { isDiagnostic: false }, percentage: { not: null } },

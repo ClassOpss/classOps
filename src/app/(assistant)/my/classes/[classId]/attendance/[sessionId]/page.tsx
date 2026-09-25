@@ -10,6 +10,7 @@ import { lmsLabel, hasLms } from "@/lib/lms";
 import { taskRequired, exemptionsFor } from "@/lib/task-toggles";
 import { activeAt } from "@/lib/roster";
 import { LessonDetailsForm } from "./lesson-details-form";
+import { AttendanceRow } from "./attendance-row";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   weekday: "long",
@@ -69,7 +70,7 @@ export default async function AttendancePage({
     }),
     prisma.attendance.findMany({
       where: { sessionId },
-      select: { studentId: true, status: true, loggedAt: true },
+      select: { studentId: true, status: true, notes: true, loggedAt: true },
     }),
     prisma.topic.findMany({
       where: { yearGroup: session.class.yearGroup },
@@ -95,7 +96,7 @@ export default async function AttendancePage({
   const parentUpdateOptional = !taskRequired("parent_update", scope);
   const uploadOptional = !taskRequired("classroom_upload", scope);
 
-  const statusByStudent = new Map(existing.map((a) => [a.studentId, a.status]));
+  const statusByStudent = new Map(existing.map((a) => [a.studentId, a]));
   const loggedAt = existing[0]?.loggedAt ?? null;
   const deadline = sessionDeadline(session.scheduledDate, await resolveConfig());
   // A retroactively-added makeup session (created after its deadline) is never "late".
@@ -153,26 +154,20 @@ export default async function AttendancePage({
 
       <form action={submitAttendance.bind(null, sessionId)} className="card overflow-hidden">
         <p className="border-b border-border px-4 py-3 text-xs text-muted">
-          Checked = present. Uncheck absent students, then submit.
+          Checked = present. Uncheck absent students, then submit. Tap &ldquo;Excused&rdquo; for a
+          known reason (e.g. a schedule clash) — it won&apos;t count against their attendance.
         </p>
         {students.length === 0 ? (
           <p className="px-4 py-5 text-sm text-muted">No students in this class yet.</p>
         ) : (
           <ul className="divide-y divide-border">
             {students.map((s) => (
-              <li key={s.id}>
-                <label className="flex cursor-pointer items-center gap-3 px-4 py-3">
-                  <input
-                    type="checkbox"
-                    name="present"
-                    value={s.id}
-                    defaultChecked={statusByStudent.get(s.id) !== "absent"}
-                    className="h-5 w-5 accent-brand"
-                  />
-                  <span className="flex-1 font-medium">{s.name}</span>
-                  <span className="text-xs text-faint">{s.code}</span>
-                </label>
-              </li>
+              <AttendanceRow
+                key={s.id}
+                student={s}
+                status={statusByStudent.get(s.id)?.status}
+                reason={statusByStudent.get(s.id)?.notes ?? null}
+              />
             ))}
           </ul>
         )}

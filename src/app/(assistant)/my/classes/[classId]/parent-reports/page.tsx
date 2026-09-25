@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireClassAccess } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
+import { COUNTED_ATTENDANCE } from "@/lib/attendance";
 import { currentOperationId, resolveConfigFor } from "@/lib/operation";
 import { ParentReports, type PRStudent } from "@/app/(admin)/classes/[classId]/parent-reports/parent-reports";
 
@@ -22,7 +23,7 @@ export default async function AssistantParentReportsPage({
         orderBy: { name: "asc" },
         select: {
           id: true, name: true, code: true, phone: true, parentPrefix: true, parentName: true, parentPhone: true, parentNotes: true,
-          attendance: { select: { status: true } },
+          attendance: { where: COUNTED_ATTENDANCE, select: { status: true } },
           grades: { where: { assessment: { isDiagnostic: false }, percentage: { not: null } }, select: { percentage: true } },
           hwSubmissions: { select: { status: true } },
         },

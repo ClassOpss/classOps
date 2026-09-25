@@ -56,6 +56,7 @@ function StudentCard({ s }: { s: StudentProgress }) {
           <dt className="text-xs text-muted">Attendance</dt>
           <dd className="tabular-nums">
             {s.attendanceTotal ? `${s.attended}/${s.attendanceTotal}` : "—"}
+            {s.excused > 0 && <span className="block text-xs text-faint">{s.excused} excused</span>}
           </dd>
         </div>
         <div>

@@ -2,6 +2,7 @@ import "server-only";
 import { promises as fs } from "fs";
 import path from "path";
 import { prisma } from "@/lib/db";
+import { COUNTED_ATTENDANCE } from "@/lib/attendance";
 import { monthWindow } from "@/lib/pay";
 import { displayedLessonNumbers } from "@/lib/lesson-number";
 import { resolveConfigFor } from "@/lib/operation";
@@ -84,7 +85,7 @@ export async function buildClassReportData(
         dayOff: true,
         customTopic: true,
         topic: { select: { title: true } },
-        attendance: { select: { status: true } },
+        attendance: { where: COUNTED_ATTENDANCE, select: { status: true } },
       },
     }),
     prisma.assessment.findMany({

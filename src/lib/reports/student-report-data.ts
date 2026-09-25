@@ -2,6 +2,7 @@ import "server-only";
 import { promises as fs } from "fs";
 import path from "path";
 import { prisma } from "@/lib/db";
+import { COUNTED_ATTENDANCE } from "@/lib/attendance";
 import { monthWindow } from "@/lib/pay";
 import { resolveConfigFor } from "@/lib/operation";
 
@@ -28,6 +29,9 @@ export type StudentReportData = {
   // Change in percentage points vs the previous month (null = no prior data).
   trend: { averageDelta: number | null; attendanceDelta: number | null };
   absences: { date: string; topic: string }[];
+  // Excused sessions (not counted in attendance) + an auto-built note for parents.
+  excused: { date: string; topic: string; reason: string | null }[];
+  excusedNote: string | null;
   missedHomework: { description: string; due: string }[];
   grades: { label: string; date: string; score: string; classAvg: string; standing: Standing | null }[];
 };
@@ -44,6 +48,27 @@ async function loadLogo(operationId: string, logoPath: string): Promise<string |
   } catch {
     return null;
   }
+}
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+// e.g. "Excused from 4 Thursday sessions: Schedule clash with another subject."
+// One sentence per distinct reason, naming the weekday(s) the excused sessions fell on.
+export function excusedNote(rows: { date: Date; reason: string | null }[]): string | null {
+  if (rows.length === 0) return null;
+  const byReason = new Map<string, Date[]>();
+  for (const r of rows) {
+    const key = r.reason?.trim() || "";
+    byReason.set(key, [...(byReason.get(key) ?? []), r.date]);
+  }
+  return [...byReason.entries()]
+    .map(([reason, dates]) => {
+      const days = [...new Set(dates.map((d) => d.getUTCDay()))].sort().map((d) => WEEKDAYS[d]);
+      const n = dates.length;
+      const what = `${n} ${days.join("/")} session${n === 1 ? "" : "s"}`;
+      return reason ? `Excused from ${what}: ${reason.replace(/\.$/, "")}.` : `Excused from ${what}.`;
+    })
+    .join(" ");
 }
 
 export async function buildStudentReportData(
@@ -69,13 +94,21 @@ export async function buildStudentReportData(
   // Attendance in the month.
   const attendance = await prisma.attendance.findMany({
     where: { studentId, session: { scheduledDate: { gte: start, lt: end } } },
-    select: { status: true, session: { select: { scheduledDate: true, customTopic: true, topic: { select: { title: true } } } } },
+    select: { status: true, notes: true, session: { select: { scheduledDate: true, customTopic: true, topic: { select: { title: true } } } } },
   });
   const present = attendance.filter((a) => a.status === "present").length;
   const absences = attendance
     .filter((a) => a.status === "absent")
     .sort((a, b) => a.session.scheduledDate.getTime() - b.session.scheduledDate.getTime())
     .map((a) => ({ date: ukDate(a.session.scheduledDate), topic: a.session.customTopic ?? a.session.topic?.title ?? "—" }));
+  const excusedRows = attendance
+    .filter((a) => a.status === "excused")
+    .sort((a, b) => a.session.scheduledDate.getTime() - b.session.scheduledDate.getTime());
+  const excused = excusedRows.map((a) => ({
+    date: ukDate(a.session.scheduledDate),
+    topic: a.session.customTopic ?? a.session.topic?.title ?? "—",
+    reason: a.notes,
+  }));
 
   // Missed homework in the month (deadline in month, status missing OR no submission row).
   const homeworks = await prisma.homeworkAssignment.findMany({
@@ -135,14 +168,15 @@ export async function buildStudentReportData(
     .filter((x): x is number => x != null);
   const curAvg = gradedPcts.length ? gradedPcts.reduce((s, x) => s + x, 0) / gradedPcts.length : null;
   const average = curAvg == null ? "—" : `${Math.round(curAvg)}%`;
-  const curAttRate = attendance.length ? (present / attendance.length) * 100 : null;
+  const counted = attendance.filter((a) => a.status !== "excused").length;
+  const curAttRate = counted ? (present / counted) * 100 : null;
 
   // Previous month, for trend deltas.
   const pm = month === 1 ? { m: 12, y: year - 1 } : { m: month - 1, y: year };
   const pw = monthWindow(pm.m, pm.y);
   const [prevAtt, prevGrades] = await Promise.all([
     prisma.attendance.findMany({
-      where: { studentId, session: { scheduledDate: { gte: pw.start, lt: pw.end } } },
+      where: { studentId, ...COUNTED_ATTENDANCE, session: { scheduledDate: { gte: pw.start, lt: pw.end } } },
       select: { status: true },
     }),
     prisma.assessmentGrade.findMany({
@@ -175,6 +209,8 @@ export async function buildStudentReportData(
     },
     trend,
     absences,
+    excused,
+    excusedNote: excusedNote(excusedRows.map((a) => ({ date: a.session.scheduledDate, reason: a.notes }))),
     missedHomework,
     grades,
   };

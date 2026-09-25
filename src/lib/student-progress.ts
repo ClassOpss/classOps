@@ -5,7 +5,8 @@ export type StudentProgress = {
   id: string;
   name: string;
   attended: number;
-  attendanceTotal: number;
+  attendanceTotal: number; // present + absent (excused sessions are left out)
+  excused: number;
   hw: { onTime: number; late: number; missing: number };
   // Non-diagnostic graded average (absent / unmarked excluded). null = no grades yet.
   average: number | null;
@@ -85,6 +86,8 @@ export async function classProgress(classId: string, studentIds: string[]): Prom
       .sort((a, b) => b.loggedAt.getTime() - a.loggedAt.getTime())[0];
 
     const attended = s.attendance.filter((a) => a.status === "present").length;
+    const excused = s.attendance.filter((a) => a.status === "excused").length;
+    const attendanceTotal = s.attendance.length - excused;
     const hw = {
       onTime: s.hwSubmissions.filter((h) => h.status === "on_time").length,
       late: s.hwSubmissions.filter((h) => h.status === "late").length,
@@ -95,14 +98,15 @@ export async function classProgress(classId: string, studentIds: string[]): Prom
       id: s.id,
       name: s.name,
       attended,
-      attendanceTotal: s.attendance.length,
+      attendanceTotal,
+      excused,
       hw,
       average,
       lastGrade: last
         ? { label: last.a.label, percentage: last.pct, classAverage: assessmentAvg.get(last.a.id) ?? last.pct }
         : null,
       weakPoints: weak?.weakPoints?.trim() ?? null,
-      reasons: riskReasons({ attended, attendanceTotal: s.attendance.length, missingHw: hw.missing, average }),
+      reasons: riskReasons({ attended, attendanceTotal, missingHw: hw.missing, average }),
     };
   });
 

@@ -524,6 +524,16 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
       points). Flags reuse lib/at-risk.riskReasons (same thresholds as the admin "Needs attention").
       /my class cards show an "N need attention" badge. Data verified vs dev DB; not yet browser-tested.
 
+    ── Excused attendance (e.g. Y10 Citadel students with a Thursday subject clash) ──
+    • AttendanceStatus += `excused` (migration 20260925202833_attendance_excused); reason stored in
+      Attendance.notes. Attendance page rows (attendance-row.tsx) have an "Excused" toggle revealing a
+      reason (default "Schedule clash with another subject"); excused overrides present/absent.
+    • lib/attendance.COUNTED_ATTENDANCE (present|absent) filters every attendance RATE (at-risk, progress,
+      insights, class/operation/student reports, parent-reports pages) — excused leaves both numerator
+      and denominator. Parent-update message lists only status=absent, so excused never appear.
+    • Parent report PDF: "Excused sessions" section with an auto note (student-report-data.excusedNote:
+      "Excused from 4 Thursday sessions: <reason>."). Make-up quizzes: mark Absent, enter the mark later.
+
     ── DEFERRED to v2 (next year — user decision) ──
     Student/parent self-serve portals, in-app HW upload, dropping Google Classroom, fee/payment tracking,
     admin activity tab, automatic daily-update sending to the class WhatsApp group. Design keeps these

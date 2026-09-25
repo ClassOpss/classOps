@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
+import { COUNTED_ATTENDANCE } from "@/lib/attendance";
 import { currentOperationId } from "@/lib/operation";
 import { TopicChart, type TopicDatum } from "./topic-chart";
 
@@ -38,7 +39,7 @@ export default async function InsightsPage() {
       select: { percentage: true, assessment: { select: { topic: { select: { title: true } } } } },
     }),
     prisma.attendance.findMany({
-      where: { session: { class: { operationId } } },
+      where: { ...COUNTED_ATTENDANCE, session: { class: { operationId } } },
       select: { status: true, session: { select: { classId: true } } },
     }),
     prisma.class.findMany({ where: { active: true, operationId }, select: { id: true, name: true } }),

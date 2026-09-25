@@ -54,6 +54,7 @@ enum HwStatus {
 enum AttendanceStatus {
   present
   absent
+  excused // not counted in attendance rates; reason in Attendance.notes (e.g. a schedule clash)
 }
 
 enum AssessmentType {

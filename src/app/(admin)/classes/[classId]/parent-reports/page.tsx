@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
+import { COUNTED_ATTENDANCE } from "@/lib/attendance";
 import { currentOperationId, resolveConfigFor } from "@/lib/operation";
 import { ParentReports, type PRStudent } from "./parent-reports";
 
@@ -26,7 +27,7 @@ export default async function ParentReportsPage({ params }: { params: Promise<{ 
           parentName: true,
           parentPhone: true,
           parentNotes: true,
-          attendance: { select: { status: true } },
+          attendance: { where: COUNTED_ATTENDANCE, select: { status: true } },
           grades: {
             where: { assessment: { isDiagnostic: false }, percentage: { not: null } },
             select: { percentage: true },
