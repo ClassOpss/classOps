@@ -7,6 +7,8 @@ import { sessionStart, sessionDeadline, isLate, latenessApplies, formatCairo } f
 import { scheduleTimeForDate } from "@/lib/schedule";
 import { resolveConfig } from "@/lib/operation";
 import { lmsLabel, hasLms } from "@/lib/lms";
+import { taskRequired, exemptionsFor } from "@/lib/task-toggles";
+import { activeAt } from "@/lib/roster";
 import { LessonDetailsForm } from "./lesson-details-form";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -23,7 +25,7 @@ export default async function AttendancePage({
   params: Promise<{ classId: string; sessionId: string }>;
 }) {
   const { classId, sessionId } = await params;
-  await requireClassAccess(classId);
+  const user = await requireClassAccess(classId);
 
   const session = await prisma.classSession.findUnique({
     where: { id: sessionId },
@@ -39,7 +41,15 @@ export default async function AttendancePage({
       topic: { select: { title: true } },
       homework: { select: { description: true, deadline: true, noHomework: true } },
       classroomUpload: { select: { uploadedAt: true, notes: true } },
-      class: { select: { schedule: true, yearGroup: true, lmsType: true } },
+      class: {
+        select: {
+          schedule: true,
+          yearGroup: true,
+          lmsType: true,
+          disabledTasks: true,
+          assignments: { where: activeAt(new Date()), select: { assistantId: true, exemptTasks: true } },
+        },
+      },
     },
   });
   if (!session || session.classId !== classId) {
@@ -76,6 +86,14 @@ export default async function AttendancePage({
     noHomework: session.homework?.noHomework ?? false,
     notes: session.messageNotes ?? "",
   };
+
+  // Tasks turned off for this class / this assistant stay usable but are marked optional.
+  const scope = {
+    disabledTasks: session.class.disabledTasks,
+    exemptTasks: user.assistantId ? exemptionsFor(user.assistantId, session.class.assignments) : [],
+  };
+  const parentUpdateOptional = !taskRequired("parent_update", scope);
+  const uploadOptional = !taskRequired("classroom_upload", scope);
 
   const statusByStudent = new Map(existing.map((a) => [a.studentId, a.status]));
   const loggedAt = existing[0]?.loggedAt ?? null;
@@ -129,7 +147,7 @@ export default async function AttendancePage({
 
       {loggedAt && (
         <Link href={`/my/classes/${classId}/parent-update/${sessionId}`} className="btn-secondary w-full">
-          Send parent update →
+          Send parent update →{parentUpdateOptional ? " (optional)" : ""}
         </Link>
       )}
 
@@ -178,7 +196,10 @@ export default async function AttendancePage({
 
       {hasLms(session.class.lmsType) && (
         <section className="card p-4">
-          <h2 className="section-title mb-2">{lmsLabel(session.class.lmsType)}</h2>
+          <h2 className="section-title mb-2">
+            {lmsLabel(session.class.lmsType)}
+            {uploadOptional && <span className="ml-2 text-xs font-normal text-faint">Optional — not required</span>}
+          </h2>
           {uploadedAt && (
             <div className={`mb-2 rounded-lg px-3 py-2.5 text-sm ${uploadLate ? "bg-warn-soft text-warn" : "bg-success-soft text-success"}`}>
               Marked uploaded at {formatCairo(uploadedAt)} — {uploadLate ? "Late (after the 9pm deadline)" : "On time"}

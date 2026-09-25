@@ -275,7 +275,10 @@ model Class {
   googleClassroomLink String?   @map("google_classroom_link")
   studentGroupLink    String?   @map("student_group_link")
   parentCommunityLink String?   @map("parent_community_link")
-  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  // Tasks this class doesn't do at all (e.g. the school has no parents group ->
+  // parent_update). Turned-off tasks are never listed, reminded, or fined. See lib/task-toggles.
+  disabledTasks       IncidentType[] @default([]) @map("disabled_tasks")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   operation      Operation                    @relation(fields: [operationId], references: [id])
   school         School                       @relation(fields: [schoolId], references: [id])
@@ -368,7 +371,9 @@ model ClassAssignment {
   endDate         DateTime? @map("end_date") @db.Date
   isSubstitute    Boolean   @default(false) @map("is_substitute")
   substitutingFor String?   @map("substituting_for")
-  notes           String?
+  // Tasks THIS assistant is excused from in this class (never listed, reminded, or fined).
+  exemptTasks     IncidentType[] @default([]) @map("exempt_tasks")
+  notes          String?
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   class            Class      @relation(fields: [classId], references: [id], onDelete: Cascade)

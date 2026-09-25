@@ -6,7 +6,7 @@ import { scheduledQuizDatesBetween, effectiveQuizDate, quizPrepComplete, quizAnn
 import { subGroupStudentIds, activeAt } from "@/lib/roster";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
 import { loadAllVacations, isSchoolOnVacation, type VacationSpan } from "@/lib/vacations";
-import { hasLms } from "@/lib/lms";
+import { taskRequired, exemptionsFor } from "@/lib/task-toggles";
 
 type VacMap = Map<string, VacationSpan[]>;
 
@@ -68,7 +68,15 @@ async function detectDaily(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queue
       createdAt: true,
       responsibleAssistantId: true,
       coveredById: true,
-      class: { select: { operationId: true, schoolId: true, lmsType: true } },
+      class: {
+        select: {
+          operationId: true,
+          schoolId: true,
+          lmsType: true,
+          disabledTasks: true,
+          assignments: { where: activeAt(now), select: { assistantId: true, exemptTasks: true } },
+        },
+      },
       attendance: { select: { id: true }, take: 1 },
       parentUpdate: { select: { id: true } },
       classroomUpload: { select: { id: true } },
@@ -85,10 +93,17 @@ async function detectDaily(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queue
     const deadline = sessionDeadline(today, cfgFor(cfgs, operationId));
     // A makeup session added after its deadline had already passed can't be "missed".
     if (!latenessApplies(s.createdAt, deadline)) continue;
-    if (s.attendance.length === 0) queued.push({ assistantId, sessionId: s.id, homeworkId: null, type: "attendance", deadline, operationId });
-    if (!s.parentUpdate) queued.push({ assistantId, sessionId: s.id, homeworkId: null, type: "parent_update", deadline, operationId });
-    // Classes with no LMS have nothing to upload — never charge a late for it.
-    if (hasLms(s.class.lmsType) && !s.classroomUpload)
+    // Tasks turned off for this class / this assistant (or no LMS -> no upload) are never charged.
+    const scope = {
+      lmsType: s.class.lmsType,
+      disabledTasks: s.class.disabledTasks,
+      exemptTasks: exemptionsFor(assistantId, s.class.assignments),
+    };
+    if (taskRequired("attendance", scope) && s.attendance.length === 0)
+      queued.push({ assistantId, sessionId: s.id, homeworkId: null, type: "attendance", deadline, operationId });
+    if (taskRequired("parent_update", scope) && !s.parentUpdate)
+      queued.push({ assistantId, sessionId: s.id, homeworkId: null, type: "parent_update", deadline, operationId });
+    if (taskRequired("classroom_upload", scope) && !s.classroomUpload)
       queued.push({ assistantId, sessionId: s.id, homeworkId: null, type: "classroom_upload", deadline, operationId });
   }
   return queued;
@@ -110,7 +125,8 @@ async function detectQuiz(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queued
       quizStartDate: true,
       operationId: true,
       schoolId: true,
-      assignments: { where: activeAt(now), select: { assistantId: true } },
+      disabledTasks: true,
+      assignments: { where: activeAt(now), select: { assistantId: true, exemptTasks: true } },
       quizPreps: {
         select: { id: true, scheduledDate: true, quizDate: true, quizCreated: true, sentToPrint: true, completedAt: true, announcedAt: true },
       },
@@ -153,6 +169,7 @@ async function detectQuiz(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queued
         if (doneOnTime) return;
         const id = await ensureId();
         for (const { assistantId } of c.assignments) {
+          if (!taskRequired(type, { disabledTasks: c.disabledTasks, exemptTasks: exemptionsFor(assistantId, c.assignments) })) continue;
           queued.push({ assistantId, sessionId: null, homeworkId: null, quizPrepId: id, type, deadline, operationId: c.operationId });
         }
       };
@@ -190,7 +207,8 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
         select: {
           operationId: true,
           schoolId: true,
-          assignments: { where: activeAt(now), select: { assistantId: true } },
+          disabledTasks: true,
+          assignments: { where: activeAt(now), select: { assistantId: true, exemptTasks: true } },
         },
       },
     },
@@ -201,6 +219,8 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
     const deadline = saturdayDeadline(hw.deadline, cfgFor(cfgs, operationId));
     const submitted = new Set(hw.submissions.map((s) => s.studentId));
     for (const { assistantId } of hw.class.assignments) {
+      const scope = { disabledTasks: hw.class.disabledTasks, exemptTasks: exemptionsFor(assistantId, hw.class.assignments) };
+      if (!taskRequired("hw_correction", scope)) continue;
       const subIds = await subGroupStudentIds(hw.classId, assistantId, now);
       if (subIds.length === 0) continue;
       const reviewed = subIds.filter((id) => submitted.has(id)).length;
@@ -229,7 +249,8 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
         select: {
           operationId: true,
           schoolId: true,
-          assignments: { where: activeAt(now), select: { assistantId: true } },
+          disabledTasks: true,
+          assignments: { where: activeAt(now), select: { assistantId: true, exemptTasks: true } },
         },
       },
     },
@@ -240,6 +261,8 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
     const deadline = saturdayDeadline(a.date, cfgFor(cfgs, operationId));
     const graded = new Set(a.grades.map((g) => g.studentId));
     for (const { assistantId } of a.class.assignments) {
+      const scope = { disabledTasks: a.class.disabledTasks, exemptTasks: exemptionsFor(assistantId, a.class.assignments) };
+      if (!taskRequired("grade_entry", scope)) continue;
       const subIds = await subGroupStudentIds(a.classId, assistantId, now);
       if (subIds.length === 0) continue;
       const done = subIds.filter((id) => graded.has(id)).length;

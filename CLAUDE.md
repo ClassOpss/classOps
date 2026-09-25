@@ -507,6 +507,15 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     scripts/dev-timeline-setup.ts. Committed + pushed to `deploy main` (Railway build; the notes migration
     auto-applies via entrypoint on container start).
 
+    ── Task on/off toggles (so nobody is fined for work that isn't theirs) ──
+    • Class.disabledTasks (whole class, e.g. no parents group -> parent_update) + ClassAssignment.exemptTasks
+      (one assistant in one class), both IncidentType[] (migration 20260925120000_task_toggles).
+      lib/task-toggles.taskRequired() is the single check (also folds in the no-LMS rule) — used by
+      late-incidents, reminders, the /my/tasks list, and the attendance page ("optional" labels).
+      Admin UI: "Tasks" checkbox grid on /classes/[id]/assistants (actions/task-toggles.saveTaskToggles);
+      optional "waive existing fines" for newly-off tasks (grade_entry incidents have no class link, so
+      those must be waived by hand). Browser-verified locally: 2 fines waived, re-run cron created 0.
+
     ── DEFERRED to v2 (next year — user decision) ──
     Student/parent self-serve portals, in-app HW upload, dropping Google Classroom, fee/payment tracking,
     admin activity tab, automatic daily-update sending to the class WhatsApp group. Design keeps these

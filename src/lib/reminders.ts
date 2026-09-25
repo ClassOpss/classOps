@@ -8,7 +8,8 @@ import { scheduleTimeForDate, type ClassSchedule } from "@/lib/schedule";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
 import { loadAllVacations, isSchoolOnVacation, type VacationSpan } from "@/lib/vacations";
 import { sendEmail, resolveOperationSender } from "@/lib/email";
-import { lmsLabel, hasLms } from "@/lib/lms";
+import { lmsLabel } from "@/lib/lms";
+import { taskRequired, exemptionsFor } from "@/lib/task-toggles";
 
 // How far ahead of a deadline the reminder fires. The cron runs hourly and each
 // operation is nudged only in the single hour that sits this many hours before its
@@ -56,7 +57,17 @@ async function gatherDaily(
     select: {
       responsibleAssistantId: true,
       coveredById: true,
-      class: { select: { name: true, operationId: true, schoolId: true, schedule: true, lmsType: true } },
+      class: {
+        select: {
+          name: true,
+          operationId: true,
+          schoolId: true,
+          schedule: true,
+          lmsType: true,
+          disabledTasks: true,
+          assignments: { where: activeAt(now), select: { assistantId: true, exemptTasks: true } },
+        },
+      },
       attendance: { select: { id: true }, take: 1 },
       parentUpdate: { select: { id: true } },
       classroomUpload: { select: { id: true } },
@@ -77,10 +88,17 @@ async function gatherDaily(
     const deadline = sessionDeadline(today, cfgFor(cfgs, operationId));
     const cls = s.class.name;
     const bucket = buckets.get(assistantId) ?? { operationId, tasks: [] };
-    if (s.attendance.length === 0) bucket.tasks.push({ label: `Log attendance — ${cls}`, deadline });
-    if (!s.parentUpdate) bucket.tasks.push({ label: `Send parent update — ${cls}`, deadline });
-    // No LMS -> no upload task -> nothing to remind about.
-    if (hasLms(s.class.lmsType) && !s.classroomUpload)
+    // Turned-off tasks (class-wide, this assistant, or no LMS) -> nothing to remind about.
+    const scope = {
+      lmsType: s.class.lmsType,
+      disabledTasks: s.class.disabledTasks,
+      exemptTasks: exemptionsFor(assistantId, s.class.assignments),
+    };
+    if (taskRequired("attendance", scope) && s.attendance.length === 0)
+      bucket.tasks.push({ label: `Log attendance — ${cls}`, deadline });
+    if (taskRequired("parent_update", scope) && !s.parentUpdate)
+      bucket.tasks.push({ label: `Send parent update — ${cls}`, deadline });
+    if (taskRequired("classroom_upload", scope) && !s.classroomUpload)
       bucket.tasks.push({ label: `Upload to ${lmsLabel(s.class.lmsType)} — ${cls}`, deadline });
     buckets.set(assistantId, bucket);
   }
@@ -105,7 +123,8 @@ async function gatherQuiz(
       quizStartDate: true,
       operationId: true,
       schoolId: true,
-      assignments: { where: activeAt(now), select: { assistantId: true } },
+      disabledTasks: true,
+      assignments: { where: activeAt(now), select: { assistantId: true, exemptTasks: true } },
       quizPreps: { select: { scheduledDate: true, quizDate: true, quizCreated: true, sentToPrint: true, announcedAt: true } },
     },
   });
@@ -122,8 +141,9 @@ async function gatherQuiz(
       const actual = effectiveQuizDate(sched, row);
       if (onVacation(vacs, c.operationId, c.schoolId, actual)) continue;
 
-      const push = (label: string, deadline: Date) => {
+      const push = (type: "quiz_prep" | "quiz_announcement", label: string, deadline: Date) => {
         for (const { assistantId } of c.assignments) {
+          if (!taskRequired(type, { disabledTasks: c.disabledTasks, exemptTasks: exemptionsFor(assistantId, c.assignments) })) continue;
           const bucket = buckets.get(assistantId) ?? { operationId: c.operationId, tasks: [] };
           bucket.tasks.push({ label: `${label} — ${c.name}`, deadline });
           buckets.set(assistantId, bucket);
@@ -131,9 +151,9 @@ async function gatherQuiz(
       };
 
       if (addDays(actual, -cfg.quizAnnounceLeadDays).getTime() === today.getTime() && !quizAnnounced(row))
-        push("Send quiz announcement", quizAnnounceDeadline(actual, cfg));
+        push("quiz_announcement", "Send quiz announcement", quizAnnounceDeadline(actual, cfg));
       if (addDays(actual, -cfg.quizPrepLeadDays).getTime() === today.getTime() && !quizPrepComplete(row))
-        push("Prepare quiz (create + send to print)", quizPrepDeadline(actual, cfg));
+        push("quiz_prep", "Prepare quiz (create + send to print)", quizPrepDeadline(actual, cfg));
     }
   }
 }
@@ -167,7 +187,8 @@ async function gatherWeekly(
           name: true,
           operationId: true,
           schoolId: true,
-          assignments: { where: activeAt(now), select: { assistantId: true } },
+          disabledTasks: true,
+          assignments: { where: activeAt(now), select: { assistantId: true, exemptTasks: true } },
         },
       },
     },
@@ -178,6 +199,7 @@ async function gatherWeekly(
     const deadline = saturdayDeadline(hw.deadline, cfgFor(cfgs, operationId));
     const submitted = new Set(hw.submissions.map((x) => x.studentId));
     for (const { assistantId } of hw.class.assignments) {
+      if (!taskRequired("hw_correction", { disabledTasks: hw.class.disabledTasks, exemptTasks: exemptionsFor(assistantId, hw.class.assignments) })) continue;
       const subIds = await subGroupStudentIds(hw.classId, assistantId, now);
       if (subIds.length === 0) continue;
       const reviewed = subIds.filter((id) => submitted.has(id)).length;
@@ -200,7 +222,8 @@ async function gatherWeekly(
           name: true,
           operationId: true,
           schoolId: true,
-          assignments: { where: activeAt(now), select: { assistantId: true } },
+          disabledTasks: true,
+          assignments: { where: activeAt(now), select: { assistantId: true, exemptTasks: true } },
         },
       },
     },
@@ -211,6 +234,7 @@ async function gatherWeekly(
     const deadline = saturdayDeadline(a.date, cfgFor(cfgs, operationId));
     const graded = new Set(a.grades.map((g) => g.studentId));
     for (const { assistantId } of a.class.assignments) {
+      if (!taskRequired("grade_entry", { disabledTasks: a.class.disabledTasks, exemptTasks: exemptionsFor(assistantId, a.class.assignments) })) continue;
       const subIds = await subGroupStudentIds(a.classId, assistantId, now);
       if (subIds.length === 0) continue;
       const done = subIds.filter((id) => graded.has(id)).length;

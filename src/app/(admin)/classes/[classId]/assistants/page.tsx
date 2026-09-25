@@ -6,6 +6,7 @@ import { currentOperationId } from "@/lib/operation";
 import { formatCairo, cairoToday } from "@/lib/datetime";
 import { AssignAssistant } from "./assign-assistant";
 import { ArrangeCover } from "./arrange-cover";
+import { TaskToggles } from "./task-toggles";
 
 export default async function AssistantsPage({
   params,
@@ -19,7 +20,7 @@ export default async function AssistantsPage({
 
   const klass = await prisma.class.findFirst({
     where: { id: classId, operationId },
-    select: { id: true, name: true, school: { select: { name: true } } },
+    select: { id: true, name: true, lmsType: true, disabledTasks: true, school: { select: { name: true } } },
   });
   if (!klass) {
     return (
@@ -101,6 +102,23 @@ export default async function AssistantsPage({
         <section className="card p-5">
           <h2 className="section-title mb-3">Assign an assistant</h2>
           <AssignAssistant classId={classId} available={available} />
+        </section>
+      )}
+
+      {isAdmin && (
+        <section className="card p-5">
+          <h2 className="section-title mb-1">Tasks</h2>
+          <p className="mb-3 text-sm text-muted">
+            Untick a task this class doesn’t do (e.g. no parents group → Parent update), or
+            one a specific assistant isn’t responsible for. Turned-off tasks disappear from
+            their task list and reminders, and are never fined.
+          </p>
+          <TaskToggles
+            classId={classId}
+            disabledTasks={klass.disabledTasks}
+            noLms={klass.lmsType === "none"}
+            assignments={assignments.map((a) => ({ id: a.id, name: a.assistant.name, exemptTasks: a.exemptTasks }))}
+          />
         </section>
       )}
 

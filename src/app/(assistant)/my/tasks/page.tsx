@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireRole, requireUser } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
-import { hasLms } from "@/lib/lms";
+import { taskRequired, type TaskScope } from "@/lib/task-toggles";
 import { resolveConfig } from "@/lib/operation";
 import { cairoToday, quizPrepDeadline, quizAnnounceDeadline, formatCairo } from "@/lib/datetime";
 import { scheduledQuizDatesBetween, effectiveQuizDate, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
@@ -38,9 +38,20 @@ export default async function MyTasksPage() {
       // Skip deactivated classes (per class, so only the deactivated one drops).
       class: { active: true },
     },
-    select: { classId: true },
+    select: { classId: true, exemptTasks: true, class: { select: { disabledTasks: true } } },
   });
-  const classIds = assignments.map((a) => a.classId);
+  const classIds = [...new Set(assignments.map((a) => a.classId))];
+  // Per class: what's turned off for the whole class + what I'm personally excused from.
+  const scopeByClass = new Map<string, TaskScope>();
+  for (const a of assignments) {
+    const prev = scopeByClass.get(a.classId);
+    scopeByClass.set(a.classId, {
+      disabledTasks: a.class.disabledTasks,
+      exemptTasks: [...(prev?.exemptTasks ?? []), ...a.exemptTasks],
+    });
+  }
+  const required = (classId: string, type: Parameters<typeof taskRequired>[0], extra?: Partial<TaskScope>) =>
+    taskRequired(type, { ...(scopeByClass.get(classId) ?? { disabledTasks: [] }), ...extra });
 
   // Recent, started, owned (or unowned/covered) sessions that are missing a daily task.
   const sessions =
@@ -72,9 +83,10 @@ export default async function MyTasksPage() {
   const todos = sessions
     .map((s) => {
       const missing: string[] = [];
-      if (s.attendance.length === 0) missing.push("Attendance");
-      if (!s.parentUpdate) missing.push("Parent update");
-      if (hasLms(s.class.lmsType) && !s.classroomUpload) missing.push("Classroom");
+      if (required(s.classId, "attendance") && s.attendance.length === 0) missing.push("Attendance");
+      if (required(s.classId, "parent_update") && !s.parentUpdate) missing.push("Parent update");
+      if (required(s.classId, "classroom_upload", { lmsType: s.class.lmsType }) && !s.classroomUpload)
+        missing.push("Classroom");
       return { s, missing };
     })
     .filter((t) => t.missing.length > 0);
@@ -117,10 +129,10 @@ export default async function MyTasksPage() {
       const row = bySched.get(sched.getTime());
       const actual = effectiveQuizDate(sched, row);
       const annDl = quizAnnounceDeadline(actual, cfg);
-      if (!quizAnnounced(row) && near(annDl))
+      if (required(c.id, "quiz_announcement") && !quizAnnounced(row) && near(annDl))
         quizTodos.push({ classId: c.id, className: c.name, kind: "Announcement", quizDate: actual, deadline: annDl, overdue: now.getTime() > annDl.getTime() });
       const prepDl = quizPrepDeadline(actual, cfg);
-      if (!quizPrepComplete(row) && near(prepDl))
+      if (required(c.id, "quiz_prep") && !quizPrepComplete(row) && near(prepDl))
         quizTodos.push({ classId: c.id, className: c.name, kind: "Prep", quizDate: actual, deadline: prepDl, overdue: now.getTime() > prepDl.getTime() });
     }
   }
