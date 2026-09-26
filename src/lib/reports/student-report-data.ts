@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { COUNTED_ATTENDANCE } from "@/lib/attendance";
 import { monthWindow } from "@/lib/pay";
 import { resolveConfigFor } from "@/lib/operation";
+import { hwFeedbackFor } from "@/lib/reports/hw-feedback";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -33,6 +34,8 @@ export type StudentReportData = {
   excused: { date: string; topic: string; reason: string | null }[];
   excusedNote: string | null;
   missedHomework: { description: string; due: string }[];
+  // Assistant-reviewed homework feedback (drafted from weak points). "" = omit.
+  hwFeedback: string;
   grades: { label: string; date: string; score: string; classAvg: string; standing: Standing | null }[];
 };
 
@@ -212,6 +215,7 @@ export async function buildStudentReportData(
     excused,
     excusedNote: excusedNote(excusedRows.map((a) => ({ date: a.session.scheduledDate, reason: a.notes }))),
     missedHomework,
+    hwFeedback: (await hwFeedbackFor(studentId, month, year)).text.trim(),
     grades,
   };
 }

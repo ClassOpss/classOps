@@ -22,6 +22,7 @@ const data: StudentReportData = {
   ],
   excusedNote: "Excused from 2 Thursday sessions: Schedule clash with another subject.",
   missedHomework: [{ description: "Exercise 3A, Q1–10", due: "10 Aug 2026" }],
+  hwFeedback: "- Exercise 3A: factorising, sign errors\n- Exercise 3B: word problems",
   grades: [
     { label: "Algebra Quiz 1", date: "10 Aug 2026", score: "84%", classAvg: "72%", standing: "above" },
     { label: "Geometry Check", date: "31 Aug 2026", score: "68%", classAvg: "78%", standing: "below" },

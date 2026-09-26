@@ -160,8 +160,15 @@ export function StudentReportDoc({ data }: { data: StudentReportData }) {
             )}
           </View>
 
+          {data.hwFeedback ? (
+            <View style={s.section} wrap={false}>
+              <Text style={s.h2}>Homework feedback</Text>
+              <Text style={s.notes}>{data.hwFeedback}</Text>
+            </View>
+          ) : null}
+
           {data.parentNotes ? (
-            <View style={s.section}>
+            <View style={s.section} wrap={false}>
               <Text style={s.h2}>Notes from the teaching team</Text>
               <Text style={s.notes}>{data.parentNotes}</Text>
             </View>

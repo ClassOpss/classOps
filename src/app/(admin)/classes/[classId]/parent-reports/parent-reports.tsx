@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { setParentNotes, type FormState } from "@/actions/students";
-import { logParentReportSent } from "@/actions/parent-reports";
+import { logParentReportSent, getHwFeedback, saveHwFeedback } from "@/actions/parent-reports";
+import type { HwFeedback } from "@/lib/reports/hw-feedback";
 import { normalizePhone, studentCodeMessage, parentCodeMessage, parentReportMessage } from "@/lib/invites";
 import { WhatsAppSend } from "@/components/whatsapp-send";
 import { SendReportPdf } from "@/components/send-report-pdf";
@@ -161,12 +162,15 @@ function Row({
           {normalizePhone(s.parentPhone) && <SendReportPdf pdfHref={pdfHref} filename={pdfFilename} phone={s.parentPhone} message={reportParentMsg} onSent={onSent} />}
           {normalizePhone(s.phone) && <WhatsAppSend phone={s.phone} message={codeStudentMsg} label="Code → student" />}
           {normalizePhone(s.parentPhone) && <WhatsAppSend phone={s.parentPhone} message={codeParentMsg} label="Code → parent" />}
-          <button type="button" onClick={() => setOpen((o) => !o)} className="link text-sm">{open ? "Hide notes" : "Notes"}</button>
+          <button type="button" onClick={() => setOpen((o) => !o)} className="link text-sm">{open ? "Hide notes" : "Notes & HW feedback"}</button>
         </div>
       </div>
 
       {open && (
-        <form action={action} className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+        <div className="mt-3 flex flex-col gap-4 border-t border-border pt-3">
+        <HwFeedbackEditor studentId={s.id} month={month} year={year} />
+        <form action={action} className="flex flex-col gap-2">
+          <span className="text-xs font-medium text-muted">Notes from the teaching team (every report)</span>
           <textarea
             name="parentNotes"
             defaultValue={s.parentNotes ?? ""}
@@ -180,7 +184,84 @@ function Row({
             {state?.error && <span className="text-xs text-danger">{state.error}</span>}
           </div>
         </form>
+        </div>
       )}
     </li>
+  );
+}
+// Monthly homework feedback for the PDF: drafted from the month's HW weak points,
+// editable before sending. Loads when the notes panel opens / the month changes.
+function HwFeedbackEditor({ studentId, month, year }: { studentId: string; month: number; year: number }) {
+  const [fb, setFb] = useState<HwFeedback | null>(null);
+  const [text, setText] = useState("");
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    setFb(null);
+    setStatus("idle");
+    getHwFeedback(studentId, year, month).then((res) => {
+      if (!live) return;
+      if (res.ok) {
+        setFb(res.feedback);
+        setText(res.feedback.text);
+      } else setError(res.error);
+    });
+    return () => {
+      live = false;
+    };
+  }, [studentId, month, year]);
+
+  async function save(value: string | null) {
+    setStatus("saving");
+    const res = await saveHwFeedback(studentId, year, month, value);
+    if (res.ok) {
+      setFb(res.feedback);
+      setText(res.feedback.text);
+      setStatus("saved");
+    } else {
+      setError(res.error);
+      setStatus("error");
+    }
+  }
+
+  const label = `Homework feedback — ${MONTH_NAMES[month - 1]} ${year}`;
+  if (!fb) {
+    return <p className="text-xs text-faint">{error ?? `Loading ${label.toLowerCase()}…`}</p>;
+  }
+  const dirty = text.trim() !== fb.text.trim();
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-muted">{label}</span>
+        <span className={fb.edited ? "badge-warn" : "badge-neutral"}>{fb.edited ? "Edited" : "From HW notes"}</span>
+      </div>
+      <textarea
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          setStatus("idle");
+        }}
+        rows={Math.min(8, Math.max(3, text.split("\n").length + 1))}
+        placeholder={
+          fb.draft ? "Leave empty to keep this section off the report." : "No weak points were recorded on this month's homework. Anything you write here appears on the report."
+        }
+        className="textarea text-sm"
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" disabled={!dirty || status === "saving"} onClick={() => save(text)} className="btn-secondary btn-sm">
+          {status === "saving" ? "Saving…" : "Save feedback"}
+        </button>
+        {fb.edited && (
+          <button type="button" disabled={status === "saving"} onClick={() => save(null)} className="link text-xs">
+            Reset to HW notes
+          </button>
+        )}
+        {status === "saved" && <span className="text-xs text-success">Saved ✓</span>}
+        {status === "error" && error && <span className="text-xs text-danger">{error}</span>}
+      </div>
+    </div>
   );
 }

@@ -322,6 +322,7 @@ model Student {
   grades         AssessmentGrade[]
   officeHours    OfficeHourSession[]
   reportLogs     ParentReportLog[]
+  reportNotes    ParentReportNote[]
 
   @@unique([classId, code])
   @@index([classId])
@@ -828,4 +829,23 @@ model ParentReportLog {
 
   @@unique([studentId, year, month])
   @@map("parent_report_logs")
+}
+
+// Per-student, per-month report text edited before the PDF goes to the parent.
+// hwFeedback overrides the draft built from that month's HomeworkSubmission.weakPoints
+// ("" = hide the section); no row = use the draft as-is. The raw weak points stay
+// untouched (Insights reads them).
+model ParentReportNote {
+  id          String   @id @default(uuid())
+  studentId   String   @map("student_id")
+  year        Int
+  month       Int // 1-12
+  hwFeedback  String   @map("hw_feedback")
+  updatedById String?  @map("updated_by_id") // user who last edited
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, year, month])
+  @@map("parent_report_notes")
 }
