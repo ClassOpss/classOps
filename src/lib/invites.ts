@@ -101,11 +101,13 @@ export function studentCodeMessage(opts: { studentName: string; code: string; si
   ].join("\n");
 }
 
-// How to address a parent: "<prefix> <name>", or "<student>'s parent" when the
-// parent would rather not share their name.
+// How to address a parent: "<prefix> <name>" (e.g. "Mrs. Sara"), or
+// "<student first name>'s Parent" when no parent name is saved.
 function parentSalutation(opts: { parentPrefix?: string | null; parentName?: string | null; studentName: string }): string {
-  if (opts.parentName) return `${opts.parentPrefix ? opts.parentPrefix + " " : ""}${opts.parentName}`;
-  return `${opts.studentName}'s parent`;
+  const name = opts.parentName?.trim();
+  const prefix = opts.parentPrefix?.trim();
+  if (name) return prefix ? `${prefix} ${name}` : name;
+  return `${opts.studentName.trim().split(/\s+/)[0]}${RSQUO}s Parent`;
 }
 
 // Code message to the PARENT.
@@ -125,34 +127,22 @@ export function parentCodeMessage(opts: {
   ].join("\n");
 }
 
-// A private per-student progress report for the parent (sent 1:1 over WhatsApp).
+// Cover note for the per-student monthly PDF report sent 1:1 to the parent.
+// The PDF carries the detail; this is just the friendly message around it.
+// No emoji on purpose — it goes through a wa.me ?text= link on desktop too.
 export function parentReportMessage(opts: {
-  brandName: string;
-  className: string;
   studentName: string;
+  monthLabel: string; // e.g. "September"
+  signature: string;
   parentPrefix?: string | null;
   parentName?: string | null;
-  periodLabel?: string | null;
-  attendance: { present: number; total: number };
-  avgPercent: number | null;
-  hw: { onTime: number; late: number; missing: number };
 }): string {
-  const who = parentSalutation(opts);
-  const att = opts.attendance;
-  const attLine =
-    att.total > 0
-      ? `Attendance: ${att.present}/${att.total} (${Math.round((att.present / att.total) * 100)}%)`
-      : "Attendance: —";
-  const lines = [
-    `Hello ${who}, here is ${opts.studentName}'s progress report — ${opts.className}${opts.periodLabel ? ` (${opts.periodLabel})` : ""}:`,
-    "",
-    attLine,
-    `Average grade: ${opts.avgPercent == null ? "—" : Math.round(opts.avgPercent) + "%"}`,
-    `Homework: ${opts.hw.onTime} on time · ${opts.hw.late} late · ${opts.hw.missing} missing`,
-    "",
-    `— ${opts.brandName}`,
-  ];
-  return lines.join("\n");
+  return [
+    `${greeting()} ${parentSalutation(opts)},`,
+    `This is ${opts.studentName}${RSQUO}s ${opts.monthLabel} report.`,
+    `If you have any questions, please don${RSQUO}t hesitate to reach out ${MDASH} we${RSQUO}re always happy to help.`,
+    opts.signature,
+  ].join("\n");
 }
 
 export function parentInviteMessage(opts: {

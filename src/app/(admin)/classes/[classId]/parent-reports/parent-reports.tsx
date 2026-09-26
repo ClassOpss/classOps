@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { setParentNotes, type FormState } from "@/actions/students";
 import { normalizePhone, studentCodeMessage, parentCodeMessage, parentReportMessage } from "@/lib/invites";
 import { WhatsAppSend } from "@/components/whatsapp-send";
+import { SendReportPdf } from "@/components/send-report-pdf";
 
 export type PRStudent = {
   id: string;
@@ -21,11 +22,13 @@ export type PRStudent = {
 };
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
 export function ParentReports({
-  brandName,
   signature,
-  className,
   students,
 }: {
   brandName: string;
@@ -51,7 +54,7 @@ export function ParentReports({
 
       <ul className="flex flex-col gap-3">
         {students.map((s) => (
-          <Row key={s.id} s={s} brandName={brandName} signature={signature} className={className} month={month} year={year} />
+          <Row key={s.id} s={s} signature={signature} month={month} year={year} />
         ))}
       </ul>
     </div>
@@ -60,16 +63,12 @@ export function ParentReports({
 
 function Row({
   s,
-  brandName,
   signature,
-  className,
   month,
   year,
 }: {
   s: PRStudent;
-  brandName: string;
   signature: string;
-  className: string;
   month: number;
   year: number;
 }) {
@@ -84,17 +83,16 @@ function Row({
     parentPrefix: s.parentPrefix,
     parentName: s.parentName,
   });
+  const monthLabel = MONTH_NAMES[month - 1];
   const reportParentMsg = parentReportMessage({
-    brandName,
-    className,
     studentName: s.name,
+    monthLabel,
+    signature,
     parentPrefix: s.parentPrefix,
     parentName: s.parentName,
-    attendance: { present: s.present, total: s.total },
-    avgPercent: s.avg,
-    hw: s.hw,
   });
   const pdfHref = `/api/reports/student/${s.id}?month=${month}&year=${year}`;
+  const pdfFilename = `${s.name} - ${monthLabel} ${year} report.pdf`;
 
   return (
     <li className="card p-4">
@@ -108,7 +106,7 @@ function Row({
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <a href={pdfHref} target="_blank" rel="noopener noreferrer" className="btn-primary btn-sm">PDF report</a>
-          {normalizePhone(s.parentPhone) && <WhatsAppSend phone={s.parentPhone} message={reportParentMsg} label="Report → parent" />}
+          {normalizePhone(s.parentPhone) && <SendReportPdf pdfHref={pdfHref} filename={pdfFilename} phone={s.parentPhone} message={reportParentMsg} />}
           {normalizePhone(s.phone) && <WhatsAppSend phone={s.phone} message={codeStudentMsg} label="Code → student" />}
           {normalizePhone(s.parentPhone) && <WhatsAppSend phone={s.parentPhone} message={codeParentMsg} label="Code → parent" />}
           <button type="button" onClick={() => setOpen((o) => !o)} className="link text-sm">{open ? "Hide notes" : "Notes"}</button>
