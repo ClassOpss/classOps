@@ -48,6 +48,9 @@ function StudentCard({ s }: { s: StudentProgress }) {
               <span key={r} className="badge-danger">{r}</span>
             ))
           )}
+          {s.flags.map((f) => (
+            <span key={f} className="badge-warn">{f}</span>
+          ))}
         </span>
       </div>
 

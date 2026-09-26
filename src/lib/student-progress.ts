@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { riskReasons } from "@/lib/at-risk";
+import { riskReasons, watchFlags, type RiskInput } from "@/lib/at-risk";
 
 export type StudentProgress = {
   id: string;
@@ -13,7 +13,8 @@ export type StudentProgress = {
   // Most recent graded assessment, relative to that assessment's class average.
   lastGrade: { label: string; percentage: number; classAverage: number } | null;
   weakPoints: string | null;
-  reasons: string[];
+  reasons: string[]; // at risk (grades / homework)
+  flags: string[]; // informational only (attendance)
 };
 
 export type AssessmentSummary = {
@@ -94,6 +95,13 @@ export async function classProgress(classId: string, studentIds: string[]): Prom
       missing: s.hwSubmissions.filter((h) => h.status === "missing").length,
     };
     const average = mean(counted);
+    const risk: RiskInput = {
+      attended,
+      attendanceTotal,
+      hwSubmitted: hw.onTime + hw.late,
+      hwTotal: hw.onTime + hw.late + hw.missing,
+      average,
+    };
     return {
       id: s.id,
       name: s.name,
@@ -106,7 +114,8 @@ export async function classProgress(classId: string, studentIds: string[]): Prom
         ? { label: last.a.label, percentage: last.pct, classAverage: assessmentAvg.get(last.a.id) ?? last.pct }
         : null,
       weakPoints: weak?.weakPoints?.trim() ?? null,
-      reasons: riskReasons({ attended, attendanceTotal, missingHw: hw.missing, average }),
+      reasons: riskReasons(risk),
+      flags: watchFlags(risk),
     };
   });
 

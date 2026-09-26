@@ -148,7 +148,7 @@ export default async function DashboardPage() {
           <div className="border-b border-border px-5 py-4">
             <h2 className="section-title">Needs attention ({atRisk.length})</h2>
             <p className="mt-0.5 text-sm text-muted">
-              Students below thresholds on attendance, homework, or grades.
+              Students averaging under 50% or submitting under half their homework. Low attendance is noted, not counted.
             </p>
           </div>
           <ul className="divide-y divide-border">
@@ -159,6 +159,9 @@ export default async function DashboardPage() {
                 <span className="ml-auto flex flex-wrap gap-1.5">
                   {st.reasons.map((r) => (
                     <span key={r} className="badge-danger">{r}</span>
+                  ))}
+                  {st.flags.map((f) => (
+                    <span key={f} className="badge-warn">{f}</span>
                   ))}
                 </span>
               </li>
