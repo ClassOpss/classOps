@@ -3,7 +3,8 @@ import { requireRole, requireUser } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { taskRequired, type TaskScope } from "@/lib/task-toggles";
 import { resolveConfig } from "@/lib/operation";
-import { cairoToday, quizPrepDeadline, quizAnnounceDeadline, formatCairo } from "@/lib/datetime";
+import { cairoToday, quizPrepDeadline, quizAnnounceDeadline, monthlyReportDeadline, formatCairo } from "@/lib/datetime";
+import { monthlyReportProgress, monthlyReportDone, yearMonthOf, previousMonth, monthName } from "@/lib/monthly-reports";
 import { scheduledQuizDatesBetween, effectiveQuizDate, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -38,7 +39,7 @@ export default async function MyTasksPage() {
       // Skip deactivated classes (per class, so only the deactivated one drops).
       class: { active: true },
     },
-    select: { classId: true, exemptTasks: true, class: { select: { disabledTasks: true } } },
+    select: { classId: true, exemptTasks: true, class: { select: { name: true, disabledTasks: true } } },
   });
   const classIds = [...new Set(assignments.map((a) => a.classId))];
   // Per class: what's turned off for the whole class + what I'm personally excused from.
@@ -138,16 +139,39 @@ export default async function MyTasksPage() {
   }
   quizTodos.sort((a, b) => a.deadline.getTime() - b.deadline.getTime());
 
+  // Monthly parent reports (due the 30th / Feb 28th): this month's shows up from a week
+  // before the deadline; last month's stays listed as overdue until it's done.
+  const reportTodos: {
+    classId: string; className: string; year: number; month: number; deadline: Date; sent: number; total: number; overdue: boolean;
+  }[] = [];
+  const thisMonth = yearMonthOf(today);
+  const months = [previousMonth(thisMonth.year, thisMonth.month), thisMonth];
+  const classNames = new Map(assignments.map((a) => [a.classId, a.class.name]));
+  for (const classId of classIds) {
+    if (!required(classId, "monthly_report")) continue;
+    for (const { year, month } of months) {
+      const deadline = monthlyReportDeadline(year, month, cfg);
+      const overdue = now.getTime() > deadline.getTime();
+      if (!overdue && deadline.getTime() > soon) continue; // not due within a week yet
+      if (overdue && deadline.getTime() < recent) continue; // too old to chase
+      const progress = await monthlyReportProgress(classId, user.assistantId, year, month, now);
+      if (progress.total === 0 || monthlyReportDone(progress)) continue;
+      reportTodos.push({ classId, className: classNames.get(classId) ?? "", year, month, deadline, overdue, ...progress });
+    }
+  }
+  reportTodos.sort((a, b) => a.deadline.getTime() - b.deadline.getTime());
+  const nothing = todos.length === 0 && quizTodos.length === 0 && reportTodos.length === 0;
+
   return (
     <div className="flex flex-col gap-5">
       <div>
         <h1 className="page-title">Tasks</h1>
-        {(todos.length > 0 || quizTodos.length > 0) && (
-          <p className="page-subtitle">Sessions from the last 3 weeks and upcoming quiz prep still needing your attention.</p>
+        {!nothing && (
+          <p className="page-subtitle">Sessions from the last 3 weeks, upcoming quiz prep and monthly reports still needing your attention.</p>
         )}
       </div>
 
-      {todos.length === 0 && quizTodos.length === 0 ? (
+      {nothing ? (
         <div className="card px-5 py-8 text-center">
           <p className="text-sm font-medium text-success">All caught up</p>
           <p className="mt-1 text-sm text-muted">No outstanding tasks right now.</p>
@@ -175,6 +199,30 @@ export default async function MyTasksPage() {
                 </li>
               ))}
             </ul>
+          )}
+
+          {reportTodos.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <h2 className="section-title mt-2">Monthly parent reports</h2>
+              <ul className="flex flex-col gap-2">
+                {reportTodos.map((r) => (
+                  <li key={`${r.classId}-${r.year}-${r.month}`}>
+                    <Link
+                      href={`/my/classes/${r.classId}/parent-reports?month=${r.month}&year=${r.year}`}
+                      className="card flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:border-border-strong"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{r.className}</p>
+                        <p className="text-xs text-faint">
+                          {monthName(r.month)} reports · {r.sent} of {r.total} sent · due {formatCairo(r.deadline, "d MMM, h:mm a")}
+                        </p>
+                      </div>
+                      <span className={r.overdue ? "badge-danger" : "badge-warn"}>{r.overdue ? "Overdue" : "Reports"}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {quizTodos.length > 0 && (

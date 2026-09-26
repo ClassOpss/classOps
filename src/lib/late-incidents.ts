@@ -1,12 +1,13 @@
 import { formatInTimeZone } from "date-fns-tz";
 import type { IncidentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { CAIRO_TZ, sessionDeadline, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, latenessApplies } from "@/lib/datetime";
+import { CAIRO_TZ, sessionDeadline, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, monthlyReportDueDate, monthlyReportDeadline, latenessApplies } from "@/lib/datetime";
 import { scheduledQuizDatesBetween, effectiveQuizDate, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
 import { subGroupStudentIds, activeAt } from "@/lib/roster";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
 import { loadAllVacations, isSchoolOnVacation, type VacationSpan } from "@/lib/vacations";
 import { taskRequired, exemptionsFor } from "@/lib/task-toggles";
+import { monthlyReportProgress, monthlyReportDone, yearMonthOf } from "@/lib/monthly-reports";
 
 type VacMap = Map<string, VacationSpan[]>;
 
@@ -186,6 +187,40 @@ async function detectQuiz(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queued
   return queued;
 }
 
+// Daily run, but only on the month-end due day (30th / Feb 28th): an assistant who hasn't
+// sent every sub-group student's monthly PDF report (students with a parent phone) by the
+// deadline gets one monthly_report incident. Deduped by (assistant, type, deadline), so an
+// assistant with several incomplete classes is charged once for the month.
+async function detectMonthly(now: Date, cfgs: CfgMap): Promise<Queued[]> {
+  const today = cairoDate(now);
+  const { year, month } = yearMonthOf(today);
+  if (monthlyReportDueDate(year, month).getTime() !== today.getTime()) return [];
+
+  const classes = await prisma.class.findMany({
+    where: { active: true },
+    select: {
+      id: true,
+      createdAt: true,
+      operationId: true,
+      disabledTasks: true,
+      assignments: { where: activeAt(now), select: { assistantId: true, exemptTasks: true } },
+    },
+  });
+
+  const queued: Queued[] = [];
+  for (const c of classes) {
+    const deadline = monthlyReportDeadline(year, month, cfgFor(cfgs, c.operationId));
+    if (!latenessApplies(c.createdAt, deadline)) continue;
+    for (const { assistantId } of c.assignments) {
+      if (!taskRequired("monthly_report", { disabledTasks: c.disabledTasks, exemptTasks: exemptionsFor(assistantId, c.assignments) })) continue;
+      const progress = await monthlyReportProgress(c.id, assistantId, year, month, now);
+      if (progress.total === 0 || monthlyReportDone(progress)) continue;
+      queued.push({ assistantId, sessionId: null, homeworkId: null, type: "monthly_report", deadline, operationId: c.operationId });
+    }
+  }
+  return queued;
+}
+
 // Weekly run (Saturday 9pm): incident per assistant whose sub-group HW/grades aren't complete
 // for items due this week (Sunday–Saturday).
 async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queued[]> {
@@ -280,7 +315,11 @@ export async function detectLateIncidents(now: Date, weekly: boolean): Promise<D
   const vacs = await loadAllVacations();
   const queued = weekly
     ? await detectWeekly(now, cfgs, vacs)
-    : [...(await detectDaily(now, cfgs, vacs)), ...(await detectQuiz(now, cfgs, vacs))];
+    : [
+        ...(await detectDaily(now, cfgs, vacs)),
+        ...(await detectQuiz(now, cfgs, vacs)),
+        ...(await detectMonthly(now, cfgs)),
+      ];
   if (queued.length === 0) return { created: 0, checked: 0 };
 
   const deadlines = [...new Set(queued.map((q) => q.deadline.getTime()))].map((t) => new Date(t));

@@ -1,17 +1,19 @@
 import Link from "next/link";
-import { requireClassAccess } from "@/lib/auth-guards";
+import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { COUNTED_ATTENDANCE } from "@/lib/attendance";
 import { currentOperationId, resolveConfigFor } from "@/lib/operation";
-import { ParentReports, type PRStudent } from "@/app/(admin)/classes/[classId]/parent-reports/parent-reports";
+import { ParentReports, type PRStudent, type PRSentLog } from "@/app/(admin)/classes/[classId]/parent-reports/parent-reports";
 
 export default async function AssistantParentReportsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ classId: string }>;
+  searchParams: Promise<{ month?: string; year?: string }>;
 }) {
   const { classId } = await params;
-  await requireClassAccess(classId);
+  const user = await requireClassAccess(classId);
   const operationId = await currentOperationId();
 
   const klass = await prisma.class.findUnique({
@@ -26,6 +28,7 @@ export default async function AssistantParentReportsPage({
           attendance: { where: COUNTED_ATTENDANCE, select: { status: true } },
           grades: { where: { assessment: { isDiagnostic: false }, percentage: { not: null } }, select: { percentage: true } },
           hwSubmissions: { select: { status: true } },
+          reportLogs: { select: { year: true, month: true, sentAt: true } },
         },
       },
     },
@@ -34,6 +37,15 @@ export default async function AssistantParentReportsPage({
     return <div><Link href="/my" className="link text-sm">← My Classes</Link></div>;
   }
   const cfg = await resolveConfigFor(operationId);
+  // "N of M sent" counts only this assistant's sub-group (what the monthly task checks).
+  const countIds = await getVisibleStudentIds(classId, user);
+  const sp = await searchParams;
+  const initialMonth = Number(sp.month) >= 1 && Number(sp.month) <= 12 ? Number(sp.month) : undefined;
+  const initialYear = Number(sp.year) > 2000 ? Number(sp.year) : undefined;
+  const sentLogs: PRSentLog[] = klass.students.flatMap((s) =>
+    s.reportLogs.map((l) => ({ studentId: s.id, year: l.year, month: l.month, sentAt: l.sentAt.toISOString() })),
+  );
+
 
   const students: PRStudent[] = klass.students.map((s) => ({
     id: s.id, name: s.name, code: s.code, phone: s.phone, parentPrefix: s.parentPrefix, parentName: s.parentName,
@@ -58,7 +70,13 @@ export default async function AssistantParentReportsPage({
       {students.length === 0 ? (
         <div className="card p-5 text-sm text-muted">No students yet.</div>
       ) : (
-        <ParentReports brandName={cfg.brandName} signature={cfg.brandSignature} className={klass.name} students={students} />
+        <ParentReports brandName={cfg.brandName} signature={cfg.brandSignature} className={klass.name}
+          students={students}
+          sentLogs={sentLogs}
+          countIds={countIds}
+          initialMonth={initialMonth}
+          initialYear={initialYear}
+        />
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 import "server-only";
 import { formatInTimeZone } from "date-fns-tz";
 import { prisma } from "@/lib/db";
-import { CAIRO_TZ, sessionDeadline, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, sessionStart, formatCairo } from "@/lib/datetime";
+import { CAIRO_TZ, sessionDeadline, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, monthlyReportDueDate, monthlyReportDeadline, sessionStart, formatCairo } from "@/lib/datetime";
 import { scheduledQuizDatesBetween, effectiveQuizDate, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
 import { subGroupStudentIds, activeAt } from "@/lib/roster";
 import { scheduleTimeForDate, type ClassSchedule } from "@/lib/schedule";
@@ -10,6 +10,7 @@ import { loadAllVacations, isSchoolOnVacation, type VacationSpan } from "@/lib/v
 import { sendEmail, resolveOperationSender } from "@/lib/email";
 import { lmsLabel } from "@/lib/lms";
 import { taskRequired, exemptionsFor } from "@/lib/task-toggles";
+import { monthlyReportProgress, monthlyReportDone, yearMonthOf, monthName } from "@/lib/monthly-reports";
 
 // How far ahead of a deadline the reminder fires. The cron runs hourly and each
 // operation is nudged only in the single hour that sits this many hours before its
@@ -154,6 +155,41 @@ async function gatherQuiz(
         push("quiz_announcement", "Send quiz announcement", quizAnnounceDeadline(actual, cfg));
       if (addDays(actual, -cfg.quizPrepLeadDays).getTime() === today.getTime() && !quizPrepComplete(row))
         push("quiz_prep", "Prepare quiz (create + send to print)", quizPrepDeadline(actual, cfg));
+    }
+  }
+}
+
+// Monthly parent reports, on the month-end due day only (30th / Feb 28th), in the daily
+// window: each assistant is nudged per class where sub-group reports are still unsent.
+async function gatherMonthly(
+  now: Date,
+  today: Date,
+  ops: Set<string>,
+  cfgs: CfgMap,
+  buckets: Map<string, Bucket>,
+): Promise<void> {
+  if (ops.size === 0) return;
+  const { year, month } = yearMonthOf(today);
+  if (monthlyReportDueDate(year, month).getTime() !== today.getTime()) return;
+  const classes = await prisma.class.findMany({
+    where: { active: true, operationId: { in: [...ops] } },
+    select: {
+      id: true,
+      name: true,
+      operationId: true,
+      disabledTasks: true,
+      assignments: { where: activeAt(now), select: { assistantId: true, exemptTasks: true } },
+    },
+  });
+  for (const c of classes) {
+    const deadline = monthlyReportDeadline(year, month, cfgFor(cfgs, c.operationId));
+    for (const { assistantId } of c.assignments) {
+      if (!taskRequired("monthly_report", { disabledTasks: c.disabledTasks, exemptTasks: exemptionsFor(assistantId, c.assignments) })) continue;
+      const p = await monthlyReportProgress(c.id, assistantId, year, month, now);
+      if (p.total === 0 || monthlyReportDone(p)) continue;
+      const bucket = buckets.get(assistantId) ?? { operationId: c.operationId, tasks: [] };
+      bucket.tasks.push({ label: `Send ${monthName(month)} parent reports (${p.sent}/${p.total} sent) — ${c.name}`, deadline });
+      buckets.set(assistantId, bucket);
     }
   }
 }
@@ -334,6 +370,7 @@ export async function sendDeadlineReminders(
   const buckets = new Map<string, Bucket>();
   await gatherDaily(now, today, daily, cfgs, vacs, buckets);
   await gatherQuiz(now, today, daily, cfgs, vacs, buckets);
+  await gatherMonthly(now, today, daily, cfgs, buckets);
   await gatherWeekly(now, weekly, cfgs, vacs, buckets);
   if (buckets.size === 0) return { operations: openOps.size, candidates: 0, sent: 0, failed: 0 };
 

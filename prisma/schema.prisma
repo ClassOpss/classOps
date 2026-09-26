@@ -72,6 +72,7 @@ enum IncidentType {
   grade_entry
   quiz_prep
   quiz_announcement
+  monthly_report
 }
 
 enum PayPeriodStatus {
@@ -252,34 +253,34 @@ model SchoolVacation {
 }
 
 model Class {
-  id                  String    @id @default(uuid())
-  operationId         String    @map("operation_id")
-  schoolId            String    @map("school_id")
-  yearGroup           YearGroup @map("year_group")
+  id                  String         @id @default(uuid())
+  operationId         String         @map("operation_id")
+  schoolId            String         @map("school_id")
+  yearGroup           YearGroup      @map("year_group")
   name                String
   // Which platform this class uses — gates Google Classroom onboarding (IE Learn = none).
-  lmsType             LmsType   @default(google_classroom) @map("lms_type")
-  studentCount        Int       @default(0) @map("student_count")
+  lmsType             LmsType        @default(google_classroom) @map("lms_type")
+  studentCount        Int            @default(0) @map("student_count")
   // schedule: { "day": "Sunday", "time": "16:00" } — drives late-detection deadlines
   schedule            Json
   // planStartDate: the date this class's lesson 1 takes place; used to generate sessions
-  planStartDate       DateTime? @map("plan_start_date") @db.Date
+  planStartDate       DateTime?      @map("plan_start_date") @db.Date
   // Biweekly quiz: quizStartDate = the date of the FIRST quiz; every quiz recurs +14 days.
   // quizDay is the weekday label (must match quizStartDate's weekday) — informational.
   // Both null = this class has no biweekly quiz task. See lib/quiz.ts.
-  quizDay             String?   @map("quiz_day")
-  quizStartDate       DateTime? @map("quiz_start_date") @db.Date
-  active              Boolean   @default(true)
+  quizDay             String?        @map("quiz_day")
+  quizStartDate       DateTime?      @map("quiz_start_date") @db.Date
+  active              Boolean        @default(true)
   notes               String?
   // Per-class destinations for onboarding students/parents. Invite links are pasted
   // once; ClassOps sends each student/parent their link (no risky auto-adding).
-  googleClassroomLink String?   @map("google_classroom_link")
-  studentGroupLink    String?   @map("student_group_link")
-  parentCommunityLink String?   @map("parent_community_link")
+  googleClassroomLink String?        @map("google_classroom_link")
+  studentGroupLink    String?        @map("student_group_link")
+  parentCommunityLink String?        @map("parent_community_link")
   // Tasks this class doesn't do at all (e.g. the school has no parents group ->
   // parent_update). Turned-off tasks are never listed, reminded, or fined. See lib/task-toggles.
   disabledTasks       IncidentType[] @default([]) @map("disabled_tasks")
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
 
   operation      Operation                    @relation(fields: [operationId], references: [id])
   school         School                       @relation(fields: [schoolId], references: [id])
@@ -320,6 +321,7 @@ model Student {
   attendance     Attendance[]
   grades         AssessmentGrade[]
   officeHours    OfficeHourSession[]
+  reportLogs     ParentReportLog[]
 
   @@unique([classId, code])
   @@index([classId])
@@ -357,6 +359,7 @@ model Assistant {
   incidents           LateIncident[]
   payCalcs            PayCalculation[]
   quizPreps           QuizPrep[]
+  reportsSent         ParentReportLog[]
   responsibleSessions ClassSession[]               @relation("SessionResponsible")
   coveredSessions     ClassSession[]               @relation("SessionCoveredBy")
 
@@ -365,17 +368,17 @@ model Assistant {
 }
 
 model ClassAssignment {
-  id              String    @id @default(uuid())
-  classId         String    @map("class_id")
-  assistantId     String    @map("assistant_id")
-  startDate       DateTime  @map("start_date") @db.Date
-  endDate         DateTime? @map("end_date") @db.Date
-  isSubstitute    Boolean   @default(false) @map("is_substitute")
-  substitutingFor String?   @map("substituting_for")
+  id              String         @id @default(uuid())
+  classId         String         @map("class_id")
+  assistantId     String         @map("assistant_id")
+  startDate       DateTime       @map("start_date") @db.Date
+  endDate         DateTime?      @map("end_date") @db.Date
+  isSubstitute    Boolean        @default(false) @map("is_substitute")
+  substitutingFor String?        @map("substituting_for")
   // Tasks THIS assistant is excused from in this class (never listed, reminded, or fined).
   exemptTasks     IncidentType[] @default([]) @map("exempt_tasks")
-  notes          String?
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  notes           String?
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
 
   class            Class      @relation(fields: [classId], references: [id], onDelete: Cascade)
   assistant        Assistant  @relation("AssignmentAssistant", fields: [assistantId], references: [id])
@@ -807,4 +810,22 @@ model ActivityLog {
   @@index([actorId])
   @@index([createdAt])
   @@map("activity_log")
+}
+
+// Monthly parent report sent for one student (the "Report → parent" button logs it).
+// The monthly_report task is complete when every sub-group student with a parent phone
+// has a row for that month. sentAt is set once (first send) so re-sends don't move it.
+model ParentReportLog {
+  id        String   @id @default(uuid())
+  studentId String   @map("student_id")
+  year      Int
+  month     Int // 1-12, the month the report covers
+  sentById  String?  @map("sent_by_id") // assistant who sent it (null if an admin did)
+  sentAt    DateTime @default(now()) @map("sent_at") @db.Timestamptz(6)
+
+  student Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  sentBy  Assistant? @relation(fields: [sentById], references: [id], onDelete: SetNull)
+
+  @@unique([studentId, year, month])
+  @@map("parent_report_logs")
 }

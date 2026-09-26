@@ -14,6 +14,7 @@ export const TASKS: { type: IncidentType; label: string }[] = [
   { type: "grade_entry", label: "Grade entry" },
   { type: "quiz_prep", label: "Quiz prep" },
   { type: "quiz_announcement", label: "Quiz announcement" },
+  { type: "monthly_report", label: "Monthly reports" },
 ];
 
 const TASK_TYPES = new Set<string>(TASKS.map((t) => t.type));

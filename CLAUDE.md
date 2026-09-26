@@ -534,6 +534,16 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
     • Parent report PDF: "Excused sessions" section with an auto note (student-report-data.excusedNote:
       "Excused from 4 Thursday sessions: <reason>."). Make-up quizzes: mark Absent, enter the mark later.
 
+    ── Monthly parent-report task (IncidentType monthly_report) ──
+    • Due the 30th (28th in Feb) at the daily deadline hour (lib/datetime.monthlyReportDeadline). Each
+      assistant sends every SUB-GROUP student with a parent phone their PDF (lib/monthly-reports).
+      "Report → parent" (components/send-report-pdf: phone = share sheet w/ PDF; laptop = download PDF +
+      open parent chat pre-filled) logs ParentReportLog (student+year+month unique, sentAt first-send
+      only; migration 20260926195740_monthly_parent_reports) via actions/parent-reports. Parent-reports
+      page shows "Report sent <date>" + "N of M sent" (?month=&year= preselects). Tasks page lists it a
+      week before + overdue; 7pm reminder email on the due day; daily cron fines once per assistant per
+      month (no class link on the incident, like grade_entry). Toggleable per class/assistant.
+
     ── DEFERRED to v2 (next year — user decision) ──
     Student/parent self-serve portals, in-app HW upload, dropping Google Classroom, fee/payment tracking,
     admin activity tab, automatic daily-update sending to the class WhatsApp group. Design keeps these

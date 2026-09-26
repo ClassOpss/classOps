@@ -101,6 +101,21 @@ export function quizAnnounceDeadline(quizDate: Date, cfg: QuizDeadlineCfg = OPER
   return sessionDeadline(minusDays(quizDate, cfg.quizAnnounceLeadDays), cfg);
 }
 
+// Monthly parent-report due day: the 30th (28th in February — same month-end rule as
+// saturdayDeadline's clamp). `month` is 1-12. Returned as a UTC-midnight date.
+export function monthlyReportDueDate(year: number, month: number): Date {
+  return new Date(Date.UTC(year, month - 1, month === 2 ? 28 : 30));
+}
+
+// ...due at the daily deadline hour (default 9pm Cairo) on that day.
+export function monthlyReportDeadline(
+  year: number,
+  month: number,
+  cfg: DailyDeadlineCfg = OPERATION_DEFAULTS,
+): Date {
+  return sessionDeadline(monthlyReportDueDate(year, month), cfg);
+}
+
 export function isLate(loggedAt: Date, deadline: Date): boolean {
   return loggedAt.getTime() > deadline.getTime();
 }

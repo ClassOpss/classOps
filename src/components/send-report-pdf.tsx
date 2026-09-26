@@ -21,6 +21,7 @@ export function SendReportPdf({
   message,
   label = "Report → parent",
   className = "btn-secondary btn-sm",
+  onSent,
 }: {
   pdfHref: string;
   filename: string;
@@ -28,6 +29,8 @@ export function SendReportPdf({
   message: string;
   label?: string;
   className?: string;
+  // Called once the PDF has been handed off (shared, or downloaded + chat opened).
+  onSent?: () => void;
 }) {
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "downloaded" | "error">("idle");
   const [file, setFile] = useState<File | null>(null);
@@ -37,6 +40,7 @@ export function SendReportPdf({
   async function share(f: File): Promise<boolean> {
     try {
       await navigator.share({ files: [f], text: message });
+      onSent?.();
       setStatus("idle");
       setFile(null);
       return true;
@@ -64,6 +68,7 @@ export function SendReportPdf({
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
     window.open(waLink(phone, message)!, "_blank", "noopener,noreferrer");
+    onSent?.();
     setStatus("downloaded");
     setTimeout(() => setStatus("idle"), 6000);
   }

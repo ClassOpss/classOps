@@ -24,6 +24,7 @@ const INCIDENT_LABEL: Record<string, string> = {
   grade_entry: "Grade entry",
   quiz_prep: "Quiz prep",
   quiz_announcement: "Quiz announcement",
+  monthly_report: "Monthly reports",
 };
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
