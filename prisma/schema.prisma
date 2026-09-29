@@ -120,7 +120,7 @@ model Operation {
   weeklyDeadlineHour    Int @default(21) @map("weekly_deadline_hour")
   // Quiz task lead times (days before each biweekly quiz), at the daily deadline hour.
   quizPrepLeadDays      Int @default(3) @map("quiz_prep_lead_days") // create quiz + send to print
-  quizAnnounceLeadDays  Int @default(7) @map("quiz_announce_lead_days") // send the announcement message
+  quizAnnounceLeadDays  Int @default(5) @map("quiz_announce_lead_days") // send the announcement message
 
   // Pay
   perClassSalary     Decimal @default(1000) @map("per_class_salary") @db.Decimal(10, 2)
@@ -652,7 +652,7 @@ model AssessmentGrade {
 // override it for a one-off change, which shifts this cycle's deadlines only).
 //
 // Three SHARED sub-tasks, each with its own deadline before the (actual) quiz date:
-//   • announcement — send the WhatsApp announcement, quizAnnounceLeadDays before (default 7)
+//   • announcement — send the WhatsApp announcement, quizAnnounceLeadDays before (default 5)
 //   • prep         — create the quiz + send it for printing, quizPrepLeadDays before (default 3)
 // Any assigned assistant can complete them. Prep is "done" only when BOTH quizCreated and
 // sentToPrint are true; completedAt/announcedAt are stamped once and never moved, so

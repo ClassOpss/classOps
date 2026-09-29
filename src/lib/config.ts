@@ -28,7 +28,7 @@ export const OPERATION_DEFAULTS = {
   weeklyDeadlineWeekday: 6, // Saturday (0=Sun … 6=Sat) — HW correction / grade entry
   weeklyDeadlineHour: 21, // 9pm
   quizPrepLeadDays: 3, // create quiz + send to print, this many days before each biweekly quiz
-  quizAnnounceLeadDays: 7, // send the announcement message this many days before
+  quizAnnounceLeadDays: 5, // send the announcement message this many days before
 
   // Pay
   perClassSalary: 1500, // EGP per class covered per month

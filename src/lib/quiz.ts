@@ -5,7 +5,7 @@
 // which shifts only that cycle's deadlines (later cycles stay on the cadence).
 //
 // Each cycle carries three shared sub-tasks with their own deadlines before the actual date:
-//   • announcement — send the WhatsApp announcement (quizAnnounceLeadDays before, default 7)
+//   • announcement — send the WhatsApp announcement (quizAnnounceLeadDays before, default 5)
 //   • prep         — create the quiz + send it to print (quizPrepLeadDays before, default 3)
 //
 // This module is dependency-light (only lib/constants) so server actions, datetime and
@@ -16,7 +16,7 @@ import { DAYS } from "@/lib/constants";
 export const QUIZ_CADENCE_DAYS = 14; // biweekly
 // Fallbacks for UI copy when an operation config isn't in hand; real deadlines read config.
 export const DEFAULT_QUIZ_PREP_LEAD_DAYS = 3;
-export const DEFAULT_QUIZ_ANNOUNCE_LEAD_DAYS = 7;
+export const DEFAULT_QUIZ_ANNOUNCE_LEAD_DAYS = 5;
 
 const MS_PER_DAY = 86_400_000;
 
