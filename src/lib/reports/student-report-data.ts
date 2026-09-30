@@ -6,6 +6,8 @@ import { COUNTED_ATTENDANCE } from "@/lib/attendance";
 import { monthWindow } from "@/lib/pay";
 import { resolveConfigFor } from "@/lib/operation";
 import { hwFeedbackFor } from "@/lib/reports/hw-feedback";
+import { hwIsMissing, reportWindow } from "@/lib/report-month";
+import { cairoToday } from "@/lib/datetime";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -80,7 +82,8 @@ export async function buildStudentReportData(
   year: number,
   operationId: string,
 ): Promise<StudentReportData | null> {
-  const { start, end } = monthWindow(month, year);
+  const { start, end } = monthWindow(month, year); // attendance: calendar month
+  const rw = reportWindow(month, year); // HW deadlines + quiz dates (see lib/report-month)
 
   const student = await prisma.student.findFirst({
     where: { id: studentId, class: { operationId } },
@@ -113,27 +116,27 @@ export async function buildStudentReportData(
     reason: a.notes,
   }));
 
-  // Missed homework in the month (deadline in month, status missing OR no submission row).
+  // Missed homework in the month: its DEADLINE is in the month (not the day it was set),
+  // and it's marked missing or still has no submission row after the due day.
   const homeworks = await prisma.homeworkAssignment.findMany({
-    where: { noHomework: false, deadline: { gte: start, lt: end }, class: { students: { some: { id: studentId } } } },
+    where: { noHomework: false, deadline: { gte: rw.start, lt: rw.end }, class: { students: { some: { id: studentId } } } },
     select: {
       description: true,
       deadline: true,
       submissions: { where: { studentId }, select: { status: true } },
     },
   });
+  const today = cairoToday();
   const missedHomework = homeworks
-    .filter((h) => {
-      const sub = h.submissions[0];
-      return !sub || sub.status === "missing";
-    })
+    .filter((h) => hwIsMissing(h.deadline, h.submissions[0]?.status, today))
+    .sort((a, b) => a.deadline.getTime() - b.deadline.getTime())
     .map((h) => ({ description: h.description ?? "Homework", due: ukDate(h.deadline) }));
 
   // Grades in the month (non-diagnostic) with class average + standing.
   const gradeRows = await prisma.assessmentGrade.findMany({
     where: {
       studentId,
-      assessment: { isDiagnostic: false, date: { gte: start, lt: end } },
+      assessment: { isDiagnostic: false, date: { gte: rw.start, lt: rw.end } },
     },
     select: {
       percentage: true,
@@ -177,13 +180,14 @@ export async function buildStudentReportData(
   // Previous month, for trend deltas.
   const pm = month === 1 ? { m: 12, y: year - 1 } : { m: month - 1, y: year };
   const pw = monthWindow(pm.m, pm.y);
+  const prw = reportWindow(pm.m, pm.y);
   const [prevAtt, prevGrades] = await Promise.all([
     prisma.attendance.findMany({
       where: { studentId, ...COUNTED_ATTENDANCE, session: { scheduledDate: { gte: pw.start, lt: pw.end } } },
       select: { status: true },
     }),
     prisma.assessmentGrade.findMany({
-      where: { studentId, absent: false, percentage: { not: null }, assessment: { isDiagnostic: false, date: { gte: pw.start, lt: pw.end } } },
+      where: { studentId, absent: false, percentage: { not: null }, assessment: { isDiagnostic: false, date: { gte: prw.start, lt: prw.end } } },
       select: { percentage: true },
     }),
   ]);

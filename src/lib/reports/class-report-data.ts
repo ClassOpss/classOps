@@ -6,6 +6,8 @@ import { COUNTED_ATTENDANCE } from "@/lib/attendance";
 import { monthWindow } from "@/lib/pay";
 import { displayedLessonNumbers } from "@/lib/lesson-number";
 import { resolveConfigFor } from "@/lib/operation";
+import { cairoToday } from "@/lib/datetime";
+import { reportWindow } from "@/lib/report-month";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -57,7 +59,8 @@ export async function buildClassReportData(
   year: number,
   operationId: string,
 ): Promise<ClassReportData | null> {
-  const { start, end } = monthWindow(month, year);
+  const { start, end } = monthWindow(month, year); // sessions/attendance: calendar month
+  const rw = reportWindow(month, year); // HW deadlines + quiz dates (see lib/report-month)
 
   const klass = await prisma.class.findFirst({
     where: { id: classId, operationId },
@@ -89,7 +92,7 @@ export async function buildClassReportData(
       },
     }),
     prisma.assessment.findMany({
-      where: { classId, date: { gte: start, lt: end } },
+      where: { classId, date: { gte: rw.start, lt: rw.end } },
       orderBy: { date: "asc" },
       select: { label: true, date: true, maxMark: true, grades: { select: { percentage: true } } },
     }),
@@ -97,15 +100,19 @@ export async function buildClassReportData(
       where: { classId, active: true },
       select: {
         code: true,
+        // Only this month's items: assessments in the report window, absences at the month's sessions.
         grades: {
-          where: { assessment: { isDiagnostic: false } },
+          where: { assessment: { isDiagnostic: false, date: { gte: rw.start, lt: rw.end } } },
           select: { percentage: true },
         },
-        attendance: { where: { status: "absent" }, select: { id: true } },
+        attendance: {
+          where: { status: "absent", session: { scheduledDate: { gte: start, lt: end } } },
+          select: { id: true },
+        },
       },
     }),
     prisma.homeworkAssignment.findMany({
-      where: { classId, noHomework: false, deadline: { gte: start, lt: end } },
+      where: { classId, noHomework: false, deadline: { gte: rw.start, lt: rw.end } },
       orderBy: { deadline: "asc" },
       select: {
         description: true,
@@ -160,10 +167,15 @@ export async function buildClassReportData(
     })
     .sort((a, b) => a.code.localeCompare(b.code));
 
+  const today = cairoToday();
   const homeworks = monthHomeworks.map((h) => ({
     description: h.description ?? "Homework",
     due: ukDate(h.deadline),
-    submissionRate: activeStudentCount > 0 ? `${Math.round((h.submissions.length / activeStudentCount) * 100)}%` : "—",
+    // Not yet due => no rate yet (can't count unsubmitted as missed).
+    submissionRate:
+      activeStudentCount > 0 && h.deadline < today
+        ? `${Math.round((h.submissions.length / activeStudentCount) * 100)}%`
+        : "—",
   }));
 
   // Summary KPIs

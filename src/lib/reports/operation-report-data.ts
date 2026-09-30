@@ -6,6 +6,8 @@ import { COUNTED_ATTENDANCE } from "@/lib/attendance";
 import { monthWindow } from "@/lib/pay";
 import { resolveConfigFor } from "@/lib/operation";
 import { detectAtRiskStudents } from "@/lib/at-risk";
+import { cairoToday } from "@/lib/datetime";
+import { reportWindow } from "@/lib/report-month";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -55,6 +57,8 @@ export async function buildOperationReportData(
 ): Promise<OperationReportData> {
   const { start, end } = monthWindow(month, year);
   const inMonth = { gte: start, lt: end };
+  const rw = reportWindow(month, year);
+  const inReport = { gte: rw.start, lt: rw.end }; // HW deadlines + quiz dates (see lib/report-month)
   const now = new Date();
 
   const [classes, sessions, grades, homeworks, assistants, payPeriod, atRisk, cfg] = await Promise.all([
@@ -68,13 +72,14 @@ export async function buildOperationReportData(
       select: { classId: true, scheduledDate: true, responsibleAssistantId: true, coveredById: true, attendance: { where: COUNTED_ATTENDANCE, select: { status: true } } },
     }),
     prisma.assessmentGrade.findMany({
-      where: { percentage: { not: null }, assessment: { isDiagnostic: false, date: inMonth, class: { active: true, operationId } } },
+      where: { percentage: { not: null }, assessment: { isDiagnostic: false, date: inReport, class: { active: true, operationId } } },
       select: { percentage: true, assessment: { select: { classId: true } } },
     }),
     prisma.homeworkAssignment.findMany({
-      where: { noHomework: false, deadline: inMonth, class: { active: true, operationId } },
+      where: { noHomework: false, deadline: inReport, class: { active: true, operationId } },
       select: {
         classId: true,
+        deadline: true,
         submissions: { where: { status: { in: ["on_time", "late"] } }, select: { id: true } },
         class: { select: { _count: { select: { students: { where: { active: true } } } } } },
       },
@@ -134,10 +139,13 @@ export async function buildOperationReportData(
     gradeN++;
   }
 
-  // Homework completion (overall): submitted / expected.
+  // Homework completion (overall): submitted / expected, over HW already past its due day
+  // (HW due later this month isn't missed yet).
   let hwSubs = 0;
   let hwExpected = 0;
+  const today = cairoToday(now);
   for (const h of homeworks) {
+    if (h.deadline >= today) continue;
     hwSubs += h.submissions.length;
     hwExpected += h.class._count.students;
   }

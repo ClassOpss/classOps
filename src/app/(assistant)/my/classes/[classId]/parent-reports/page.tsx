@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
-import { COUNTED_ATTENDANCE } from "@/lib/attendance";
+import { loadParentReportStudents } from "@/lib/parent-report-students";
+import { cairoToday } from "@/lib/datetime";
 import { currentOperationId, resolveConfigFor } from "@/lib/operation";
 import { ParentReports, type PRStudent, type PRSentLog } from "@/app/(admin)/classes/[classId]/parent-reports/parent-reports";
 
@@ -24,10 +25,7 @@ export default async function AssistantParentReportsPage({
         where: { active: true },
         orderBy: { name: "asc" },
         select: {
-          id: true, name: true, code: true, phone: true, parentPrefix: true, parentName: true, parentPhone: true, parentNotes: true,
-          attendance: { where: COUNTED_ATTENDANCE, select: { status: true } },
-          grades: { where: { assessment: { isDiagnostic: false }, percentage: { not: null } }, select: { percentage: true } },
-          hwSubmissions: { select: { status: true } },
+          id: true,
           reportLogs: { select: { year: true, month: true, sentAt: true } },
         },
       },
@@ -47,18 +45,7 @@ export default async function AssistantParentReportsPage({
   );
 
 
-  const students: PRStudent[] = klass.students.map((s) => ({
-    id: s.id, name: s.name, code: s.code, phone: s.phone, parentPrefix: s.parentPrefix, parentName: s.parentName,
-    parentPhone: s.parentPhone, parentNotes: s.parentNotes,
-    present: s.attendance.filter((a) => a.status === "present").length,
-    total: s.attendance.length,
-    avg: s.grades.length ? s.grades.reduce((sum, g) => sum + Number(g.percentage), 0) / s.grades.length : null,
-    hw: {
-      onTime: s.hwSubmissions.filter((h) => h.status === "on_time").length,
-      late: s.hwSubmissions.filter((h) => h.status === "late").length,
-      missing: s.hwSubmissions.filter((h) => h.status === "missing").length,
-    },
-  }));
+  const students: PRStudent[] = await loadParentReportStudents(classId);
 
   return (
     <div className="flex flex-col gap-5">
@@ -76,6 +63,7 @@ export default async function AssistantParentReportsPage({
           countIds={countIds}
           initialMonth={initialMonth}
           initialYear={initialYear}
+          today={cairoToday().toISOString()}
         />
       )}
     </div>

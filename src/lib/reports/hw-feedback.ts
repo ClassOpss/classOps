@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { monthWindow } from "@/lib/pay";
+import { reportWindow } from "@/lib/report-month";
 
 export type HwFeedback = {
   text: string; // what the report prints ("" = section hidden)
@@ -10,9 +10,9 @@ export type HwFeedback = {
 
 // One line per homework due in the month that has weak points recorded, e.g.
 // "- Quadratics worksheet: factorising, sign errors". Same month rule as the
-// report's missed-homework list (by homework deadline).
+// report's missed-homework list (by homework deadline, report window).
 export async function draftHwFeedback(studentId: string, month: number, year: number): Promise<string> {
-  const { start, end } = monthWindow(month, year);
+  const { start, end } = reportWindow(month, year);
   const subs = await prisma.homeworkSubmission.findMany({
     where: { studentId, weakPoints: { not: null }, homework: { deadline: { gte: start, lt: end } } },
     select: { weakPoints: true, homework: { select: { description: true, deadline: true } } },

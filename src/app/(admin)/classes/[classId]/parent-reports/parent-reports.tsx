@@ -7,6 +7,7 @@ import type { HwFeedback } from "@/lib/reports/hw-feedback";
 import { normalizePhone, studentCodeMessage, parentCodeMessage, parentReportMessage } from "@/lib/invites";
 import { WhatsAppSend } from "@/components/whatsapp-send";
 import { SendReportPdf } from "@/components/send-report-pdf";
+import { inCalendarMonth, inReportWindow, hwIsMissing } from "@/lib/report-month";
 
 export type PRStudent = {
   id: string;
@@ -17,11 +18,26 @@ export type PRStudent = {
   parentName: string | null;
   parentPhone: string | null;
   parentNotes: string | null;
-  present: number;
-  total: number;
-  avg: number | null;
-  hw: { onTime: number; late: number; missing: number };
+  // Dated records (ISO strings); the row summarises the selected month from these.
+  attendance: { date: string; present: boolean }[];
+  grades: { date: string; pct: number }[];
+  homework: { deadline: string; status: string | null }[];
 };
+
+// Same rules as the PDF (lib/report-month): attendance by calendar month; HW by deadline and
+// grades by assessment date, within the report window (due-on-report-day rolls to next month).
+function monthSummary(s: PRStudent, month: number, year: number, today: Date) {
+  const inM = (iso: string) => inCalendarMonth(new Date(iso), month, year);
+  const inW = (iso: string) => inReportWindow(new Date(iso), month, year);
+  const att = s.attendance.filter((a) => inM(a.date));
+  const grades = s.grades.filter((g) => inW(g.date));
+  return {
+    present: att.filter((a) => a.present).length,
+    total: att.length,
+    avg: grades.length ? grades.reduce((sum, g) => sum + g.pct, 0) / grades.length : null,
+    missing: s.homework.filter((h) => inW(h.deadline) && hwIsMissing(new Date(h.deadline), h.status, today)).length,
+  };
+}
 
 // A monthly report already sent (ParentReportLog), as plain data for the client.
 export type PRSentLog = { studentId: string; year: number; month: number; sentAt: string };
@@ -42,6 +58,7 @@ export function ParentReports({
   countIds,
   initialMonth,
   initialYear,
+  today,
 }: {
   brandName: string;
   signature: string;
@@ -53,6 +70,8 @@ export function ParentReports({
   countIds?: string[];
   initialMonth?: number;
   initialYear?: number;
+  // Cairo calendar date (UTC-midnight ISO) from the server — decides "past its due day".
+  today: string;
 }) {
   const now = new Date();
   const [month, setMonth] = useState(initialMonth ?? now.getUTCMonth() + 1);
@@ -98,6 +117,7 @@ export function ParentReports({
             signature={signature}
             month={month}
             year={year}
+            today={today}
             sentAt={sent[sentKey(s.id, year, month)] ?? null}
             onSent={() => markSent(s.id)}
           />
@@ -112,6 +132,7 @@ function Row({
   signature,
   month,
   year,
+  today,
   sentAt,
   onSent,
 }: {
@@ -119,6 +140,7 @@ function Row({
   signature: string;
   month: number;
   year: number;
+  today: string;
   sentAt: string | null;
   onSent: () => void;
 }) {
@@ -141,6 +163,7 @@ function Row({
     parentPrefix: s.parentPrefix,
     parentName: s.parentName,
   });
+  const m = monthSummary(s, month, year, new Date(today));
   const pdfHref = `/api/reports/student/${s.id}?month=${month}&year=${year}`;
   const pdfFilename = `${s.name} - ${monthLabel} ${year} report.pdf`;
 
@@ -153,8 +176,8 @@ function Row({
             {sentAt && <span className="badge-success">Report sent {sentFmt.format(new Date(sentAt))}</span>}
           </p>
           <p className="text-xs text-faint">
-            {s.code} · att {s.total > 0 ? `${s.present}/${s.total}` : "—"} · avg {s.avg == null ? "—" : `${Math.round(s.avg)}%`} ·
-            hw <span className="text-danger">{s.hw.missing}</span> missing
+            {s.code} · att {m.total > 0 ? `${m.present}/${m.total}` : "—"} · avg {m.avg == null ? "—" : `${Math.round(m.avg)}%`} ·
+            hw <span className="text-danger">{m.missing}</span> missing
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">

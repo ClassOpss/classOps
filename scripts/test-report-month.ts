@@ -1,0 +1,12 @@
+import { inReportWindow, hwIsMissing, reportWindow } from "../src/lib/report-month";
+const d = (m: number, day: number) => new Date(Date.UTC(2026, m - 1, day));
+const ok = (name: string, v: boolean) => { console.log(v ? "PASS" : "FAIL", name); if (!v) process.exitCode = 1; };
+ok("set 30 Sep, due 4 Oct -> October, not September", !inReportWindow(d(10, 4), 9, 2026) && inReportWindow(d(10, 4), 10, 2026));
+ok("due 30 Sep (report day) -> October", !inReportWindow(d(9, 30), 9, 2026) && inReportWindow(d(9, 30), 10, 2026));
+ok("due 29 Sep -> September", inReportWindow(d(9, 29), 9, 2026));
+ok("due 31 Oct -> November", inReportWindow(d(10, 31), 11, 2026));
+ok("Feb window = 30 Jan..27 Feb", reportWindow(2, 2027).start.getTime() === Date.UTC(2027, 0, 30) && reportWindow(2, 2027).end.getTime() === Date.UTC(2027, 1, 28));
+ok("Jan window starts 30 Dec prev year", reportWindow(1, 2027).start.getTime() === Date.UTC(2026, 11, 30));
+ok("not missing before/on due day", !hwIsMissing(d(10, 4), null, d(9, 30)) && !hwIsMissing(d(10, 4), null, d(10, 4)));
+ok("missing after due day with no row", hwIsMissing(d(10, 4), null, d(10, 5)));
+ok("submitted is never missing", !hwIsMissing(d(9, 1), "late", d(9, 30)));

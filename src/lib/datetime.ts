@@ -1,5 +1,6 @@
 import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { APP_LOCALE, OPERATION_DEFAULTS } from "@/lib/config";
+import { monthlyReportDueDate } from "@/lib/report-month";
 
 // All timestamps are stored UTC; display + day-boundary math use the shared app
 // timezone (the one config value that is NOT per-operation — see config.ts).
@@ -101,11 +102,9 @@ export function quizAnnounceDeadline(quizDate: Date, cfg: QuizDeadlineCfg = OPER
   return sessionDeadline(minusDays(quizDate, cfg.quizAnnounceLeadDays), cfg);
 }
 
-// Monthly parent-report due day: the 30th (28th in February — same month-end rule as
-// saturdayDeadline's clamp). `month` is 1-12. Returned as a UTC-midnight date.
-export function monthlyReportDueDate(year: number, month: number): Date {
-  return new Date(Date.UTC(year, month - 1, month === 2 ? 28 : 30));
-}
+// Monthly parent-report due day: the 30th (28th in February). Lives in lib/report-month
+// because it also cuts the report's HW/quiz window.
+export { monthlyReportDueDate };
 
 // ...due at the daily deadline hour (default 9pm Cairo) on that day.
 export function monthlyReportDeadline(
