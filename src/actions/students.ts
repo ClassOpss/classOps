@@ -85,7 +85,8 @@ export async function addStudent(
   return { ok: true };
 }
 
-// Edit a student's contact details (numbers/emails often unknown at form-fill time).
+// Edit a student's name (typo fixes) + contact details (numbers/emails often unknown at
+// form-fill time). The code never changes.
 export async function updateStudentContacts(
   studentId: string,
   _prev: FormState,
@@ -93,18 +94,22 @@ export async function updateStudentContacts(
 ): Promise<FormState> {
   const student = await prisma.student.findUnique({
     where: { id: studentId },
-    select: { classId: true },
+    select: { classId: true, name: true },
   });
   if (!student) return { error: "Student not found." };
-  await requireClassAccess(student.classId);
+  const user = await requireClassAccess(student.classId);
 
   const clean = (k: string) => {
     const v = String(formData.get(k) ?? "").trim();
     return v.length ? v : null;
   };
+  const name = String(formData.get("name") ?? "").trim().replace(/\s+/g, " ");
+  if (!name) return { error: "Name can't be empty." };
+  const renamed = name !== student.name;
   await prisma.student.update({
     where: { id: studentId },
     data: {
+      name,
       email: clean("email"),
       phone: egyptPhone(clean("phone")),
       parentPrefix: clean("parentPrefix"),
@@ -112,6 +117,19 @@ export async function updateStudentContacts(
       parentPhone: egyptPhone(clean("parentPhone")),
     },
   });
+  if (renamed) {
+    await logActivity({
+      actorId: user.id,
+      actorRole: user.role,
+      action: "renamed_student",
+      entityType: "student",
+      entityId: studentId,
+      classId: student.classId,
+      metadata: { from: student.name, to: name },
+    });
+    // The name shows on nearly every class page (attendance, HW, grades, reports).
+    revalidateRoster(student.classId);
+  }
   revalidatePath(`/classes/${student.classId}/students`);
   revalidatePath(`/classes/${student.classId}/invites`);
   return { ok: true };

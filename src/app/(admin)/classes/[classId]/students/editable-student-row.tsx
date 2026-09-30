@@ -32,9 +32,9 @@ export function EditableStudentRow({ student, canRemove }: { student: StudentRow
     return (
       <tr>
         <td className="align-top"><span className="badge-neutral">{student.code}</span></td>
-        <td className="align-top font-medium">{student.name}</td>
-        <td colSpan={2}>
+        <td colSpan={3}>
           <form action={action} className="flex flex-col gap-2 py-1">
+            <input name="name" required defaultValue={student.name} placeholder="Student name" aria-label="Student name" className="input !py-1.5 text-sm font-medium" />
             <div className="grid gap-2 sm:grid-cols-2">
               <input name="email" type="email" defaultValue={student.email ?? ""} placeholder="Email" className="input !py-1.5 text-sm" />
               <input name="phone" defaultValue={student.phone ?? ""} placeholder="Student phone" className="input !py-1.5 text-sm" />
