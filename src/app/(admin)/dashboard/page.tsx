@@ -2,30 +2,13 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { formatCairo } from "@/lib/datetime";
-import { waiveIncident, unwaiveIncident } from "@/actions/incidents";
 import { detectCoverageCandidates } from "@/lib/coverage";
 import { detectAtRiskStudents } from "@/lib/at-risk";
 import { confirmCoverage } from "@/actions/coverage";
 import { approveOfficeHour, rejectOfficeHour } from "@/actions/office-hours";
 import { currentOperationId } from "@/lib/operation";
-import { effectiveDeductionTotal, perIncidentCharge } from "@/lib/incident-deductions";
-
-const dateFmt = new Intl.DateTimeFormat("en-GB", {
-  day: "2-digit",
-  month: "short",
-  timeZone: "UTC",
-});
-
-const INCIDENT_LABEL: Record<string, string> = {
-  attendance: "Attendance",
-  parent_update: "Parent update",
-  classroom_upload: "Classroom upload",
-  hw_correction: "HW correction",
-  grade_entry: "Grade entry",
-  quiz_prep: "Quiz prep",
-  quiz_announcement: "Quiz announcement",
-  monthly_report: "Monthly reports",
-};
+import { cairoMonthWindow } from "@/lib/datetime";
+import { IncidentsPanel, type IncidentFilters } from "./incidents-panel";
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -36,7 +19,12 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<IncidentFilters>;
+}) {
+  const sp = await searchParams;
   const user = await requireRole("admin", "teacher");
   const isAdmin = user.role === "admin";
   const operationId = await currentOperationId();
@@ -57,7 +45,13 @@ export default async function DashboardPage() {
         where: { dayOff: false, scheduledDate: { gte: monthStart, lt: todayEnd }, class: { active: true, operationId } },
       }),
       isAdmin
-        ? prisma.lateIncident.count({ where: { waived: false, assistant: { operationId } } })
+        ? (() => {
+            // This Cairo month only — earlier months are billed on their own payslips.
+            const w = cairoMonthWindow(Number(formatCairo(now, "M")), Number(formatCairo(now, "yyyy")));
+            return prisma.lateIncident.count({
+              where: { waived: false, assistant: { operationId }, deadline: { gte: w.start, lt: w.end } },
+            });
+          })()
         : Promise.resolve(0),
       prisma.activityLog.findMany({
         where: { operationId },
@@ -67,31 +61,6 @@ export default async function DashboardPage() {
       }),
     ]);
 
-  const incidents = isAdmin
-    ? await prisma.lateIncident.findMany({
-        where: { assistant: { operationId } },
-        orderBy: { createdAt: "desc" },
-        take: 60,
-        include: {
-          assistant: { select: { name: true } },
-          session: { select: { class: { select: { id: true, name: true } } } },
-          quizPrep: { select: { class: { select: { id: true, name: true } } } },
-        },
-      })
-    : [];
-  const outstanding = incidents.filter((i) => !i.waived);
-  // Daily tasks are capped at one charge per assistant+session-day; weekly charge per incident.
-  const deductible = incidents.map((i) => ({
-    id: i.id,
-    assistantId: i.assistantId,
-    sessionId: i.sessionId,
-    quizPrepId: i.quizPrepId,
-    type: i.type,
-    deductionAmount: Number(i.deductionAmount),
-    waived: i.waived,
-  }));
-  const dueTotal = effectiveDeductionTotal(deductible);
-  const rowCharge = perIncidentCharge(deductible);
   const coverages = isAdmin ? await detectCoverageCandidates(operationId) : [];
   const atRisk = await detectAtRiskStudents(operationId);
   const pendingOfficeHours = isAdmin
@@ -140,7 +109,7 @@ export default async function DashboardPage() {
         <StatCard label="Active classes" value={activeClasses} />
         <StatCard label="Active assistants" value={activeAssistants} />
         <StatCard label="Sessions this month (delivered / planned)" value={`${delivered} / ${planned}`} />
-        {isAdmin && <StatCard label="Open late incidents" value={openIncidentCount} />}
+        {isAdmin && <StatCard label="Open late incidents (this month)" value={openIncidentCount} />}
       </div>
 
       {atRisk.length > 0 && (
@@ -231,61 +200,7 @@ export default async function DashboardPage() {
         </section>
       )}
 
-      {isAdmin && (
-        <section className="card overflow-hidden">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <div>
-              <h2 className="section-title">Late incidents</h2>
-              <p className="mt-0.5 text-sm text-muted">
-                {outstanding.length} unwaived · {dueTotal} EGP in deductions
-              </p>
-            </div>
-          </div>
-          {incidents.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-muted">None — everyone&apos;s on time.</p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {incidents.map((i) => (
-                <li
-                  key={i.id}
-                  className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 px-5 py-3 text-sm ${i.waived ? "opacity-60" : ""}`}
-                >
-                  <span className="font-medium">{i.assistant.name}</span>
-                  <span className="badge-neutral">{INCIDENT_LABEL[i.type]}</span>
-                  {(i.session?.class ?? i.quizPrep?.class) ? (
-                    (() => {
-                      const cls = i.session?.class ?? i.quizPrep?.class;
-                      return cls ? <Link href={`/classes/${cls.id}`} className="link">{cls.name}</Link> : null;
-                    })()
-                  ) : null}
-                  <span className="text-faint">{formatCairo(i.deadline, "d MMM, h:mm a")}</span>
-                  {i.waived ? (
-                    <span className="badge-neutral">Waived{i.waiveReason ? ` · ${i.waiveReason}` : ""}</span>
-                  ) : (rowCharge.get(i.id) ?? 0) > 0 ? (
-                    <span className="badge-danger">−{rowCharge.get(i.id)} EGP</span>
-                  ) : (
-                    <span className="badge-neutral" title="Grouped tasks (a session-day, or one quiz) are charged once">
-                      included in cap
-                    </span>
-                  )}
-                  <span className="ml-auto">
-                    {i.waived ? (
-                      <form action={unwaiveIncident.bind(null, i.id)}>
-                        <button type="submit" className="link">Un-waive</button>
-                      </form>
-                    ) : (
-                      <form action={waiveIncident.bind(null, i.id)} className="flex items-center gap-2">
-                        <input name="reason" placeholder="reason" className="input !w-32 !py-1.5 text-xs" />
-                        <button type="submit" className="btn-secondary btn-sm">Waive</button>
-                      </form>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
+      {isAdmin && <IncidentsPanel operationId={operationId} sp={sp} />}
 
       <section className="card overflow-hidden">
         <div className="border-b border-border px-5 py-4">

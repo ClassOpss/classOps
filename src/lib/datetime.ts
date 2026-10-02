@@ -126,3 +126,24 @@ export function isLate(loggedAt: Date, deadline: Date): boolean {
 export function latenessApplies(sessionCreatedAt: Date, deadline: Date): boolean {
   return sessionCreatedAt.getTime() <= deadline.getTime();
 }
+
+// A calendar month in Cairo local time as a UTC instant window [start, end). Used to bucket
+// deadline TIMESTAMPS (late incidents) into a pay month, so a deadline just after Cairo
+// midnight on the 1st never lands in the previous month's payslip.
+export function cairoMonthWindow(month: number, year: number): { start: Date; end: Date } {
+  const next = month === 12 ? { m: 1, y: year + 1 } : { m: month + 1, y: year };
+  return {
+    start: fromZonedTime(`${year}-${pad(month)}-01T00:00:00`, CAIRO_TZ),
+    end: fromZonedTime(`${next.y}-${pad(next.m)}-01T00:00:00`, CAIRO_TZ),
+  };
+}
+
+// A single Cairo calendar day (yyyy-mm-dd) as a UTC instant window [start, end).
+export function cairoDayWindow(ymd: string): { start: Date; end: Date } {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + 1));
+  return {
+    start: fromZonedTime(`${ymd}T00:00:00`, CAIRO_TZ),
+    end: fromZonedTime(`${next.toISOString().slice(0, 10)}T00:00:00`, CAIRO_TZ),
+  };
+}

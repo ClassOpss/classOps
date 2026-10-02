@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { resolveConfigFor } from "@/lib/operation";
 import { loadVacations, vacationDaysInMonth, vacationFractionOff } from "@/lib/vacations";
 import { effectiveDeductionTotal } from "@/lib/incident-deductions";
+import { cairoMonthWindow } from "@/lib/datetime";
 
 export type PayComponents = {
   classesCovered: number;
@@ -32,6 +33,7 @@ export async function computePayComponents(
   const { start, end } = monthWindow(month, year);
 
   const inMonth = { gte: start, lt: end };
+  const incidentWindow = cairoMonthWindow(month, year);
   const assistant = await prisma.assistant.findUnique({
     where: { id: assistantId },
     select: { operationId: true, perClassSalary: true },
@@ -50,10 +52,11 @@ export async function computePayComponents(
       },
       select: { classId: true, class: { select: { schoolId: true } } },
     }),
-    // Non-waived incidents whose deadline falls this month. Daily tasks are capped per
-    // session-day (see effectiveDeductionTotal); weekly tasks charge per incident.
+    // Non-waived incidents whose deadline falls this month (Cairo calendar). Each incident
+    // belongs to exactly ONE month, so last month's fines never carry into this payslip.
+    // Daily tasks are capped per session-day (see effectiveDeductionTotal); weekly per incident.
     prisma.lateIncident.findMany({
-      where: { assistantId, waived: false, deadline: inMonth },
+      where: { assistantId, waived: false, deadline: { gte: incidentWindow.start, lt: incidentWindow.end } },
       select: { sessionId: true, quizPrepId: true, type: true, deductionAmount: true },
     }),
     // Only admin-approved office hours count toward the bonus.

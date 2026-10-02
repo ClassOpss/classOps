@@ -44,11 +44,13 @@ async function generateCalculations(periodId: string, month: number, year: numbe
     select: { id: true },
   });
   for (const a of assistants) {
-    const c = await computePayComponents(a.id, month, year);
     const existing = await prisma.payCalculation.findUnique({
       where: { payPeriodId_assistantId: { payPeriodId: periodId, assistantId: a.id } },
-      select: { manualAdjustment: true },
+      select: { manualAdjustment: true, status: true },
     });
+    // A sent payslip is frozen: later waives / new incidents must not silently rewrite it.
+    if (existing?.status === "sent") continue;
+    const c = await computePayComponents(a.id, month, year);
     const manual = Number(existing?.manualAdjustment ?? 0);
     await prisma.payCalculation.upsert({
       where: { payPeriodId_assistantId: { payPeriodId: periodId, assistantId: a.id } },
