@@ -49,6 +49,8 @@ export async function computePayComponents(
       where: {
         assistantId,
         isSubstitute: false,
+        // Deactivated classes leave assignments open; they're hidden from the assistant, so don't pay them.
+        class: { active: true },
         startDate: { lt: end },
         OR: [{ endDate: null }, { endDate: { gt: start } }],
       },
