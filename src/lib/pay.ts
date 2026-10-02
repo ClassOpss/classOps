@@ -23,6 +23,35 @@ export function monthWindow(month: number, year: number): { start: Date; end: Da
   };
 }
 
+export type PaidClass = { classId: string; name: string; schoolId: string; endDate: Date | null };
+
+// The distinct classes an assistant gets a base salary for in a month: permanent roster rows
+// overlapping the month (endDate exclusive). Covers (isSubstitute) are paid via
+// coverageAdjustment, deactivated classes are hidden from the assistant, and zero-length rows
+// (assigned by mistake, ended the same day) don't count. A class counts once even with several
+// rows (day-owner switches close one row and open another).
+export async function paidClasses(assistantId: string, month: number, year: number): Promise<PaidClass[]> {
+  const { start, end } = monthWindow(month, year);
+  const rows = await prisma.classAssignment.findMany({
+    where: {
+      assistantId,
+      isSubstitute: false,
+      class: { active: true },
+      startDate: { lt: end },
+      OR: [{ endDate: null }, { endDate: { gt: start } }],
+    },
+    orderBy: { startDate: "asc" },
+    select: { classId: true, startDate: true, endDate: true, class: { select: { name: true, schoolId: true } } },
+  });
+  const byClass = new Map<string, PaidClass>();
+  for (const r of rows) {
+    if (r.endDate && r.endDate.getTime() <= r.startDate.getTime()) continue;
+    // Later rows win, so the current open row beats an earlier closed one.
+    byClass.set(r.classId, { classId: r.classId, name: r.class.name, schoolId: r.class.schoolId, endDate: r.endDate });
+  }
+  return [...byClass.values()];
+}
+
 // Live-computed pay parts for an assistant in a month (manual adjustment lives on the
 // stored calculation, not here). total = base − deductions + bonus + manualAdjustment.
 export async function computePayComponents(
@@ -43,19 +72,7 @@ export async function computePayComponents(
   const perClassRate =
     assistant?.perClassSalary != null ? Number(assistant.perClassSalary) : cfg.perClassSalary;
   const [assignments, incidents, officeHours, covered, ownedCovered, vacations] = await Promise.all([
-    // Distinct classes the assistant was on the permanent roster of this month. Covers
-    // (isSubstitute) are paid via coverageAdjustment, not as a class. endDate is exclusive.
-    prisma.classAssignment.findMany({
-      where: {
-        assistantId,
-        isSubstitute: false,
-        // Deactivated classes leave assignments open; they're hidden from the assistant, so don't pay them.
-        class: { active: true },
-        startDate: { lt: end },
-        OR: [{ endDate: null }, { endDate: { gt: start } }],
-      },
-      select: { classId: true, startDate: true, endDate: true, class: { select: { schoolId: true } } },
-    }),
+    paidClasses(assistantId, month, year),
     // Non-waived incidents whose deadline falls this month (Cairo calendar). Each incident
     // belongs to exactly ONE month, so last month's fines never carry into this payslip.
     // Daily tasks are capped per session-day (see effectiveDeductionTotal); weekly per incident.
@@ -78,13 +95,7 @@ export async function computePayComponents(
     loadVacations(assistant?.operationId ?? ""),
   ]);
 
-  // Distinct classes, each with its school (a class contributes once even with 2 assignments).
-  const classSchool = new Map<string, string>();
-  // Skip zero-length rows (assigned by mistake and ended the same day).
-  for (const a of assignments) {
-    if (a.endDate && a.endDate.getTime() <= a.startDate.getTime()) continue;
-    classSchool.set(a.classId, a.class.schoolId);
-  }
+  const classSchool = new Map<string, string>(assignments.map((a) => [a.classId, a.schoolId]));
   const classesCovered = classSchool.size;
   const perClassBase = perClassRate * cfg.payMultiplier;
   const lateDeductions = effectiveDeductionTotal(
