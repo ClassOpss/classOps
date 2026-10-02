@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { IncidentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { cairoDayWindow, cairoMonthWindow, formatCairo } from "@/lib/datetime";
-import { waiveIncident, unwaiveIncident } from "@/actions/incidents";
+import { waiveIncident, unwaiveIncident, confirmIncidents, unconfirmIncident } from "@/actions/incidents";
 import { effectiveDeductionTotal, perIncidentCharge } from "@/lib/incident-deductions";
 
 export const INCIDENT_LABEL: Record<IncidentType, string> = {
@@ -28,10 +28,19 @@ export type IncidentFilters = {
   task?: string;
   who?: string; // assistantId
   day?: string; // yyyy-mm-dd (Cairo)
-  status?: string; // open | waived | all
+  status?: string; // review (default) | confirmed | waived | all
 };
 
-type Status = "open" | "waived" | "all";
+type Status = "review" | "confirmed" | "waived" | "all";
+const STATUS_LABEL: Record<Status, string> = {
+  review: "To review",
+  confirmed: "Confirmed",
+  waived: "Waived",
+  all: "All",
+};
+type Row = { waived: boolean; confirmedAt: Date | null };
+const rowStatus = (i: Row): Exclude<Status, "all"> =>
+  i.waived ? "waived" : i.confirmedAt ? "confirmed" : "review";
 
 function Chip({
   href,
@@ -79,7 +88,8 @@ export async function IncidentsPanel({
   const curYear = Number(formatCairo(now, "yyyy"));
   const month = Number(sp.im) >= 1 && Number(sp.im) <= 12 ? Number(sp.im) : curMonth;
   const year = Number(sp.iy) >= 2024 && Number(sp.iy) <= 2100 ? Number(sp.iy) : curYear;
-  const status: Status = sp.status === "waived" || sp.status === "all" ? sp.status : "open";
+  const status: Status =
+    sp.status === "confirmed" || sp.status === "waived" || sp.status === "all" ? sp.status : "review";
   const task = sp.task && sp.task in INCIDENT_LABEL ? (sp.task as IncidentType) : null;
   const day = sp.day && /^\d{4}-\d{2}-\d{2}$/.test(sp.day) ? sp.day : null;
   const who = sp.who || null;
@@ -91,7 +101,7 @@ export async function IncidentsPanel({
       task,
       who,
       day,
-      status: status === "open" ? null : status,
+      status: status === "review" ? null : status,
     };
     const merged = { ...base, ...o };
     const qs = new URLSearchParams();
@@ -141,10 +151,10 @@ export async function IncidentsPanel({
   );
 
   // Per-assistant summary (always over the month, ignoring other filters).
-  const byAssistant = new Map<string, { name: string; open: number; egp: number }>();
+  const byAssistant = new Map<string, { name: string; review: number; egp: number }>();
   for (const i of monthIncidents) {
-    const a = byAssistant.get(i.assistantId) ?? { name: i.assistant.name, open: 0, egp: 0 };
-    if (!i.waived) a.open++;
+    const a = byAssistant.get(i.assistantId) ?? { name: i.assistant.name, review: 0, egp: 0 };
+    if (rowStatus(i) === "review") a.review++;
     byAssistant.set(i.assistantId, a);
   }
   for (const [id, a] of byAssistant) {
@@ -152,33 +162,33 @@ export async function IncidentsPanel({
   }
   const assistants = [...byAssistant.entries()].sort((x, y) => y[1].egp - x[1].egp || x[1].name.localeCompare(y[1].name));
 
-  const matchStatus = (w: boolean) => status === "all" || (status === "waived" ? w : !w);
+  const matchStatus = (i: Row) => status === "all" || rowStatus(i) === status;
   const dayKey = (d: Date) => formatCairo(d, "yyyy-MM-dd");
   // Each filter's counts respect the OTHER filters, so chips show what clicking would give.
   const base = monthIncidents.filter((i) => !who || i.assistantId === who);
   const taskCounts = new Map<IncidentType, number>();
   for (const i of base) {
-    if (!matchStatus(i.waived) || (day && dayKey(i.deadline) !== day)) continue;
+    if (!matchStatus(i) || (day && dayKey(i.deadline) !== day)) continue;
     taskCounts.set(i.type, (taskCounts.get(i.type) ?? 0) + 1);
   }
   const dayCounts = new Map<string, number>();
   for (const i of base) {
-    if (!matchStatus(i.waived) || (task && i.type !== task)) continue;
+    if (!matchStatus(i) || (task && i.type !== task)) continue;
     const k = dayKey(i.deadline);
     dayCounts.set(k, (dayCounts.get(k) ?? 0) + 1);
   }
-  const statusCounts = { open: 0, waived: 0, all: 0 };
+  const statusCounts = { review: 0, confirmed: 0, waived: 0, all: 0 };
   for (const i of base) {
     if ((task && i.type !== task) || (day && dayKey(i.deadline) !== day)) continue;
     statusCounts.all++;
-    if (i.waived) statusCounts.waived++;
-    else statusCounts.open++;
+    statusCounts[rowStatus(i)]++;
   }
 
   const shown = base.filter(
-    (i) => matchStatus(i.waived) && (!task || i.type === task) && (!day || dayKey(i.deadline) === day),
+    (i) => matchStatus(i) && (!task || i.type === task) && (!day || dayKey(i.deadline) === day),
   );
-  const shownEgp = shown.reduce((s, i) => s + (rowCharge.get(i.id) ?? 0), 0);
+  const reviewIds = shown.filter((i) => rowStatus(i) === "review").map((i) => i.id);
+  const shownEgp =shown.reduce((s, i) => s + (rowCharge.get(i.id) ?? 0), 0);
 
   const groups = new Map<string, typeof shown>();
   for (const i of shown) {
@@ -187,7 +197,7 @@ export async function IncidentsPanel({
   }
 
   const monthName = MONTHS[month - 1];
-  const anyFilter = !!(task || who || day || status !== "open");
+  const anyFilter = !!(task || who || day || status !== "review");
   const whoName = who ? byAssistant.get(who)?.name : null;
   const allSent =
     !!period &&
@@ -274,7 +284,9 @@ export async function IncidentsPanel({
                   <span className={`text-lg font-semibold ${a.egp > 0 ? "text-danger" : "text-success"}`}>
                     {a.egp > 0 ? `−${a.egp}` : "0"} <span className="text-xs font-normal">EGP</span>
                   </span>
-                  <span className="text-xs text-faint">{a.open} open</span>
+                  <span className={`text-xs ${a.review > 0 ? "font-medium text-warn" : "text-faint"}`}>
+                    {a.review > 0 ? `${a.review} to review` : "✓ reviewed"}
+                  </span>
                 </div>
               </Link>
             );
@@ -287,9 +299,9 @@ export async function IncidentsPanel({
         <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="eyebrow mr-1 w-12">Show</span>
-            {(["open", "waived", "all"] as const).map((s) => (
-              <Chip key={s} href={href({ status: s === "open" ? null : s })} active={status === s}>
-                {s === "open" ? "Open" : s === "waived" ? "Waived" : "All"}
+            {(["review", "confirmed", "waived", "all"] as const).map((s) => (
+              <Chip key={s} href={href({ status: s === "review" ? null : s })} active={status === s}>
+                {STATUS_LABEL[s]}
                 <Count n={statusCounts[s]} active={status === s} />
               </Chip>
             ))}
@@ -317,14 +329,25 @@ export async function IncidentsPanel({
                 </Chip>
               ))}
           </div>
-          {anyFilter && (
-            <p className="text-xs text-muted">
-              Showing {shown.length} incident{shown.length === 1 ? "" : "s"}
-              {whoName ? ` for ${whoName}` : ""} · {shownEgp} EGP ·{" "}
-              <Link href={href({ task: null, who: null, day: null, status: null })} scroll={false} className="link">
-                Clear filters
-              </Link>
-            </p>
+          {(anyFilter || reviewIds.length > 1) && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted">
+              {anyFilter && (
+                <span>
+                  Showing {shown.length} incident{shown.length === 1 ? "" : "s"}
+                  {whoName ? ` for ${whoName}` : ""} · {shownEgp} EGP ·{" "}
+                  <Link href={href({ task: null, who: null, day: null, status: null })} scroll={false} className="link">
+                    Clear filters
+                  </Link>
+                </span>
+              )}
+              {reviewIds.length > 1 && (
+                <form action={confirmIncidents.bind(null, reviewIds)} className="ml-auto">
+                  <button type="submit" className="btn-primary btn-sm">
+                    Confirm all {reviewIds.length} shown
+                  </button>
+                </form>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -333,7 +356,18 @@ export async function IncidentsPanel({
       {monthIncidents.length === 0 ? (
         <p className="px-5 py-8 text-center text-sm text-muted">No late incidents in {monthName} — everyone&apos;s on time. 🎉</p>
       ) : shown.length === 0 ? (
-        <p className="px-5 py-8 text-center text-sm text-muted">Nothing matches these filters.</p>
+        status === "review" && !task && !day ? (
+          <div className="px-5 py-8 text-center text-sm">
+            <p className="font-medium text-success">✓ All caught up — every {monthName} fine{whoName ? ` for ${whoName}` : ""} is reviewed.</p>
+            <p className="mt-1 text-muted">
+              New fines will show up here. See{" "}
+              <Link href={href({ status: "confirmed" })} scroll={false} className="link">confirmed</Link> or{" "}
+              <Link href={href({ status: "waived" })} scroll={false} className="link">waived</Link>.
+            </p>
+          </div>
+        ) : (
+          <p className="px-5 py-8 text-center text-sm text-muted">Nothing matches these filters.</p>
+        )
       ) : (
         <div>
           {[...groups.entries()].map(([d, rows]) => {
@@ -374,18 +408,39 @@ export async function IncidentsPanel({
                         )}
                         <span className="ml-auto">
                           {locked ? (
-                            <span className="text-xs text-faint" title="This assistant's payslip for the month is sent">
-                              🔒 payslip sent
+                            <span className="flex items-center gap-2">
+                              <span className="text-xs text-faint" title="This assistant's payslip for the month is sent">
+                                🔒 payslip sent
+                              </span>
+                              {rowStatus(i) === "review" && (
+                                <form action={confirmIncidents.bind(null, [i.id])}>
+                                  <button type="submit" className="btn-primary btn-sm">Confirm</button>
+                                </form>
+                              )}
                             </span>
                           ) : i.waived ? (
                             <form action={unwaiveIncident.bind(null, i.id)}>
                               <button type="submit" className="link text-xs">Un-waive</button>
                             </form>
-                          ) : (
-                            <form action={waiveIncident.bind(null, i.id)} className="flex items-center gap-2">
-                              <input name="reason" placeholder="reason" className="input !w-32 !py-1 text-xs" />
-                              <button type="submit" className="btn-secondary btn-sm">Waive</button>
+                          ) : i.confirmedAt ? (
+                            <form action={unconfirmIncident.bind(null, i.id)} className="flex items-center gap-2">
+                              <span className="badge-success" title={`Confirmed ${formatCairo(i.confirmedAt, "d MMM, h:mm a")}`}>
+                                ✓ Confirmed
+                              </span>
+                              <button type="submit" className="link text-xs">Undo</button>
                             </form>
+                          ) : (
+                            <span className="flex items-center gap-2">
+                              <form action={confirmIncidents.bind(null, [i.id])}>
+                                <button type="submit" className="btn-primary btn-sm" title="The fine stands — it stays on the payslip and leaves this list">
+                                  Confirm
+                                </button>
+                              </form>
+                              <form action={waiveIncident.bind(null, i.id)} className="flex items-center gap-2">
+                                <input name="reason" placeholder="reason" className="input !w-28 !py-1 text-xs" />
+                                <button type="submit" className="btn-secondary btn-sm">Waive</button>
+                              </form>
+                            </span>
                           )}
                         </span>
                       </li>

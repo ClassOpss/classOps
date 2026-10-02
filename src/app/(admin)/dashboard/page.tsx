@@ -49,7 +49,7 @@ export default async function DashboardPage({
             // This Cairo month only — earlier months are billed on their own payslips.
             const w = cairoMonthWindow(Number(formatCairo(now, "M")), Number(formatCairo(now, "yyyy")));
             return prisma.lateIncident.count({
-              where: { waived: false, assistant: { operationId }, deadline: { gte: w.start, lt: w.end } },
+              where: { waived: false, confirmedAt: null, assistant: { operationId }, deadline: { gte: w.start, lt: w.end } },
             });
           })()
         : Promise.resolve(0),
@@ -109,7 +109,7 @@ export default async function DashboardPage({
         <StatCard label="Active classes" value={activeClasses} />
         <StatCard label="Active assistants" value={activeAssistants} />
         <StatCard label="Sessions this month (delivered / planned)" value={`${delivered} / ${planned}`} />
-        {isAdmin && <StatCard label="Open late incidents (this month)" value={openIncidentCount} />}
+        {isAdmin && <StatCard label="Late fines to review (this month)" value={openIncidentCount} />}
       </div>
 
       {atRisk.length > 0 && (

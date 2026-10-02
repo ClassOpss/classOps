@@ -735,6 +735,9 @@ model LateIncident {
   deductionAmount Decimal      @default(100) @map("deduction_amount") @db.Decimal(10, 2)
   waived          Boolean      @default(false)
   waiveReason     String?      @map("waive_reason")
+  // Admin reviewed the fine and let it stand: still deducted, but leaves the dashboard's
+  // "To review" list. Mutually exclusive with waived in practice (waiving clears it).
+  confirmedAt     DateTime?    @map("confirmed_at") @db.Timestamptz(6)
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
 
   assistant Assistant           @relation(fields: [assistantId], references: [id])
