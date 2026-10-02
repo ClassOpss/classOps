@@ -3,8 +3,6 @@ import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { recalcPayPeriod, setAdjustment, approveCalc, sendCalc } from "@/actions/pay";
 import { currentOperationId } from "@/lib/operation";
-import { paidClasses } from "@/lib/pay";
-
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -39,15 +37,7 @@ export default async function PayPeriodPage({
     );
   }
 
-  // Which classes the live rule counts per assistant, so the "Classes" number is checkable.
-  const counted = new Map(
-    await Promise.all(
-      period.calculations.map(async (c) => [c.assistantId, await paidClasses(c.assistantId, period.month, period.year)] as const),
-    ),
-  );
-  const fmtDay = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-
-  const grandTotal =period.calculations.reduce((s, c) => s + Number(c.total), 0);
+  const grandTotal = period.calculations.reduce((s, c) => s + Number(c.total), 0);
   const statusBadge: Record<string, string> = {
     pending: "badge-neutral",
     approved: "badge-brand",
@@ -97,22 +87,7 @@ export default async function PayPeriodPage({
               {period.calculations.map((c) => (
                 <tr key={c.id}>
                   <td className="font-medium">{c.assistant.name}</td>
-                  <td>
-                    {c.classesCovered}
-                    <div className="text-xs text-muted">
-                      {(counted.get(c.assistantId) ?? []).map((k) => (
-                        <div key={k.classId}>
-                          {k.name}
-                          {k.days < k.monthDays && ` (${k.days}/${k.monthDays} days)`}
-                          {k.endDate && ` (ended ${fmtDay(k.endDate)})`}
-                        </div>
-                      ))}
-                    </div>
-                    {c.status === "sent" && (
-
-                      <div className="text-xs text-faint">Sent — frozen, not recalculated</div>
-                    )}
-                  </td>
+                  <td>{c.classesCovered}</td>
                   <td>{egp(c.baseSalary)}</td>
                   <td className="text-danger">-{egp(c.lateDeductions)}</td>
                   <td className={Number(c.vacationDeduction) > 0 ? "text-danger" : "text-faint"}>
