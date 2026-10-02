@@ -516,6 +516,14 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
       optional "waive existing fines" for newly-off tasks (grade_entry incidents have no class link, so
       those must be waived by hand). Browser-verified locally: 2 fines waived, re-run cron created 0.
 
+    ── Day owners + history-safe roster switches (commit d2080f1) ──
+    • ClassAssignment.ownedWeekdays (admin "Who logs which day" picker on /classes/[id]/assistants,
+      actions/assignments.saveDayOwners). Changing days CLOSES the row today + opens a new row, so
+      past sessions keep the old split. reassignResponsibilities owns each session per the roster on
+      ITS date (endDate is exclusive: the switch day belongs to the new roster). Coverage detection
+      skips lessons logged by an on-roster assistant when the stamped owner wasn't on the roster yet.
+      Verified with scripts/dev-switch.ts + dev-switch-check.ts (0 false covers).
+
     ── Assistant student-progress dashboard ──
     • /my/classes/[id]/progress (lib/student-progress.classProgress): the assistant's SUB-GROUP
       (getVisibleStudentIds) vs the whole class — attendance / HW-on-time / grade-average stat cards
