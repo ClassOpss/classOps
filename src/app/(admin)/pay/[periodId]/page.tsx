@@ -103,11 +103,13 @@ export default async function PayPeriodPage({
                       {(counted.get(c.assistantId) ?? []).map((k) => (
                         <div key={k.classId}>
                           {k.name}
+                          {k.days < k.monthDays && ` (${k.days}/${k.monthDays} days)`}
                           {k.endDate && ` (ended ${fmtDay(k.endDate)})`}
                         </div>
                       ))}
                     </div>
-                    {c.status === "sent" && (counted.get(c.assistantId)?.length ?? 0) !== c.classesCovered && (
+                    {c.status === "sent" && (
+
                       <div className="text-xs text-faint">Sent — frozen, not recalculated</div>
                     )}
                   </td>

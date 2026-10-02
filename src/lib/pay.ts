@@ -23,10 +23,18 @@ export function monthWindow(month: number, year: number): { start: Date; end: Da
   };
 }
 
-export type PaidClass = { classId: string; name: string; schoolId: string; endDate: Date | null };
+export type PaidClass = {
+  classId: string;
+  name: string;
+  schoolId: string;
+  endDate: Date | null;
+  days: number; // days on this class's roster within the month
+  monthDays: number;
+  share: number; // days / monthDays — the fraction of this class's base salary earned
+};
 
 // The distinct classes an assistant gets a base salary for in a month: permanent roster rows
-// overlapping the month (endDate exclusive). Covers (isSubstitute) are paid via
+// overlapping the month (endDate exclusive), prorated by days on the roster. Covers (isSubstitute) are paid via
 // coverageAdjustment, deactivated classes are hidden from the assistant, and zero-length rows
 // (assigned by mistake, ended the same day) don't count. A class counts once even with several
 // rows (day-owner switches close one row and open another).
@@ -43,13 +51,29 @@ export async function paidClasses(assistantId: string, month: number, year: numb
     orderBy: { startDate: "asc" },
     select: { classId: true, startDate: true, endDate: true, class: { select: { name: true, schoolId: true } } },
   });
+  const DAY = 86_400_000;
+  const monthDays = Math.round((end.getTime() - start.getTime()) / DAY);
   const byClass = new Map<string, PaidClass>();
   for (const r of rows) {
     if (r.endDate && r.endDate.getTime() <= r.startDate.getTime()) continue;
-    // Later rows win, so the current open row beats an earlier closed one.
-    byClass.set(r.classId, { classId: r.classId, name: r.class.name, schoolId: r.class.schoolId, endDate: r.endDate });
+    // Days on the roster inside this month; a class's rows don't overlap, so they add up.
+    const from = Math.max(start.getTime(), r.startDate.getTime());
+    const to = Math.min(end.getTime(), (r.endDate ?? end).getTime());
+    const days = Math.max(0, Math.round((to - from) / DAY));
+    const prev = byClass.get(r.classId);
+    const total = Math.min(monthDays, (prev?.days ?? 0) + days);
+    // Later rows win the endDate, so the current open row beats an earlier closed one.
+    byClass.set(r.classId, {
+      classId: r.classId,
+      name: r.class.name,
+      schoolId: r.class.schoolId,
+      endDate: r.endDate,
+      days: total,
+      monthDays,
+      share: total / monthDays,
+    });
   }
-  return [...byClass.values()];
+  return [...byClass.values()].filter((c) => c.days > 0);
 }
 
 // Live-computed pay parts for an assistant in a month (manual adjustment lives on the
@@ -95,8 +119,10 @@ export async function computePayComponents(
     loadVacations(assistant?.operationId ?? ""),
   ]);
 
-  const classSchool = new Map<string, string>(assignments.map((a) => [a.classId, a.schoolId]));
-  const classesCovered = classSchool.size;
+  // Base is prorated per class; the stored count is whole-class equivalents (e.g. 2 full
+  // classes + 1 day of a third = 2). The pay page lists the partial classes.
+  const classShares = assignments.reduce((s, a) => s + a.share, 0);
+  const classesCovered = Math.round(classShares);
   const perClassBase = perClassRate * cfg.payMultiplier;
   const lateDeductions = effectiveDeductionTotal(
     incidents.map((i) => ({
@@ -111,14 +137,14 @@ export async function computePayComponents(
 
   // Per class: withhold a fraction of its base for its school's vacation days this month.
   let vacationDeduction = 0;
-  for (const schoolId of classSchool.values()) {
-    const days = vacationDaysInMonth(schoolId, month, year, vacations);
-    vacationDeduction += perClassBase * vacationFractionOff(days);
+  for (const a of assignments) {
+    const days = vacationDaysInMonth(a.schoolId, month, year, vacations);
+    vacationDeduction += perClassBase * a.share * vacationFractionOff(days);
   }
 
   return {
     classesCovered,
-    baseSalary: classesCovered * perClassBase,
+    baseSalary: Math.round(classShares * perClassBase),
     lateDeductions,
     vacationDeduction,
     officeHoursBonus: officeHours * cfg.officeHourBonus,
