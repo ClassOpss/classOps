@@ -43,9 +43,17 @@ export default async function MyClassesPage() {
     },
   });
 
+  // One card per class: on a roster-change day an assistant can have both the closing and
+  // the new assignment row for the same class (permanent row wins over a cover).
+  const byClass = new Map<string, (typeof assignments)[number]>();
+  for (const a of assignments) {
+    const prev = byClass.get(a.classId);
+    if (!prev || (prev.isSubstitute && !a.isSubstitute)) byClass.set(a.classId, a);
+  }
+
   const classes = (
     await Promise.all(
-      assignments.map(async (a) => {
+      [...byClass.values()].map(async (a) => {
         const { students } = await classProgress(a.class.id, await getVisibleStudentIds(a.class.id, user));
         const flagged = students.filter((s) => s.reasons.length > 0).length;
         return { ...a.class, isCover: a.isSubstitute, coverUntil: a.endDate, flagged };

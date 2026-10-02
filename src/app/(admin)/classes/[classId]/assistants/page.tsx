@@ -7,6 +7,8 @@ import { formatCairo, cairoToday } from "@/lib/datetime";
 import { AssignAssistant } from "./assign-assistant";
 import { ArrangeCover } from "./arrange-cover";
 import { TaskToggles } from "./task-toggles";
+import { DayOwners } from "./day-owners";
+import { scheduleDays } from "@/lib/schedule";
 
 export default async function AssistantsPage({
   params,
@@ -20,7 +22,14 @@ export default async function AssistantsPage({
 
   const klass = await prisma.class.findFirst({
     where: { id: classId, operationId },
-    select: { id: true, name: true, lmsType: true, disabledTasks: true, school: { select: { name: true } } },
+    select: {
+      id: true,
+      name: true,
+      lmsType: true,
+      disabledTasks: true,
+      schedule: true,
+      school: { select: { name: true } },
+    },
   });
   if (!klass) {
     return (
@@ -32,7 +41,7 @@ export default async function AssistantsPage({
   }
 
   const now = new Date();
-  const [assignments, allAssistants, subs, studentCount, covers] = await Promise.all([
+  const [assignments, allAssistants, subs, studentCount, covers, upcoming] = await Promise.all([
     prisma.classAssignment.findMany({
       // Permanent roster only — temporary covers (isSubstitute) are listed separately.
       where: { classId, endDate: null, isSubstitute: false },
@@ -51,7 +60,23 @@ export default async function AssistantsPage({
       orderBy: { startDate: "asc" },
       include: { assistant: { select: { id: true, name: true } } },
     }),
+    // Upcoming lessons -> who currently owns each weekday (pre-fills the day-owner picker).
+    prisma.classSession.findMany({
+      where: { classId, dayOff: false, scheduledDate: { gte: cairoToday() } },
+      orderBy: { scheduledDate: "asc" },
+      select: { scheduledDate: true, responsibleAssistantId: true },
+    }),
   ]);
+  const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const dayOwners = scheduleDays(klass.schedule as object)
+    .map((label) => WEEKDAYS.indexOf(label))
+    .filter((wd, i, all) => wd >= 0 && all.indexOf(wd) === i)
+    .sort((a, b) => a - b)
+    .map((weekday) => ({
+      weekday,
+      label: WEEKDAYS[weekday],
+      ownerId: upcoming.find((s) => s.scheduledDate.getUTCDay() === weekday)?.responsibleAssistantId ?? null,
+    }));
 
   const today = formatCairo(now, "yyyy-MM-dd");
   const activeIds = new Set(assignments.map((a) => a.assistantId));
@@ -102,6 +127,22 @@ export default async function AssistantsPage({
         <section className="card p-5">
           <h2 className="section-title mb-3">Assign an assistant</h2>
           <AssignAssistant classId={classId} available={available} />
+        </section>
+      )}
+
+      {isAdmin && (
+        <section className="card p-5">
+          <h2 className="section-title mb-1">Who logs which day</h2>
+          <p className="mb-3 text-sm text-muted">
+            The assistant who owns a day logs its attendance, parent update and classroom
+            upload, and is the one fined if they’re missed. Changes apply from today on — past
+            lessons keep the owner they had, so their logs never show up as covers.
+          </p>
+          <DayOwners
+            classId={classId}
+            days={dayOwners}
+            assistants={assignments.map((a) => ({ id: a.assistant.id, name: a.assistant.name }))}
+          />
         </section>
       )}
 

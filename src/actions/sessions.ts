@@ -14,30 +14,75 @@ import { currentOperationId } from "@/lib/operation";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
-// Active assistants assigned to a class, in a stable order (so day-ownership is deterministic).
-async function classAssistantIds(classId: string, now: Date): Promise<string[]> {
-  const assigns = await prisma.classAssignment.findMany({
-    // Only the permanent roster owns day responsibilities — never temporary covers.
-    where: { classId, isSubstitute: false, ...activeAt(now) },
+type RosterAssignment = { assistantId: string; startDate: Date; endDate: Date | null; ownedWeekdays: number[] };
+
+// A roster's assistant ids (stable order, so day-ownership is deterministic) + its pinned weekdays.
+function rosterOwnership(roster: RosterAssignment[]): { ids: string[]; dayOwners: Map<number, string> } {
+  const ids = [...new Set(roster.map((a) => a.assistantId))];
+  const dayOwners = new Map<number, string>();
+  for (const a of roster) for (const wd of a.ownedWeekdays) dayOwners.set(wd, a.assistantId);
+  return { ids, dayOwners };
+}
+
+// The class's permanent roster (never temporary covers) — ended assignments included,
+// so past sessions can be attributed to whoever was on the class at the time.
+function classRoster(classId: string, where: object = {}): Promise<RosterAssignment[]> {
+  return prisma.classAssignment.findMany({
+    where: { classId, isSubstitute: false, ...where },
     orderBy: [{ startDate: "asc" }, { assistant: { name: "asc" } }],
-    select: { assistantId: true },
+    select: { assistantId: true, startDate: true, endDate: true, ownedWeekdays: true },
   });
-  return [...new Set(assigns.map((a) => a.assistantId))];
 }
 
 // Recompute responsibleAssistantId for a class's sessions (e.g. after assistants change).
+// Each session is owned per the roster ON ITS DATE: an assistant counts from their start
+// date, and an ended assignment stops counting on its end date (endAssignment stamps the
+// day of the switch). So a roster change only re-owns sessions from the switch onward —
+// past sessions stay with whoever had them, and their logs never turn into false "covers".
 export async function reassignResponsibilities(classId: string): Promise<void> {
-  const sessions = await prisma.classSession.findMany({
-    where: { classId },
-    orderBy: { scheduledDate: "asc" },
-    select: { id: true, scheduledDate: true, dayOff: true },
+  const [sessions, roster] = await Promise.all([
+    prisma.classSession.findMany({
+      where: { classId },
+      orderBy: { scheduledDate: "asc" },
+      select: { id: true, scheduledDate: true, dayOff: true, responsibleAssistantId: true },
+    }),
+    classRoster(classId),
+  ]);
+  const today = cairoToday().getTime();
+  const current = roster.filter((a) => a.endDate === null || a.endDate.getTime() > today);
+  const rosterAt = (d: Date) =>
+    roster.filter((a) => a.startDate.getTime() <= d.getTime() && (a.endDate === null || a.endDate.getTime() > d.getTime()));
+
+  // Group sessions by the roster that owned them, then split each group with the
+  // ownership rule (run over ALL sessions so weekday/alternation order stays stable).
+  const groups = new Map<string, { roster: RosterAssignment[]; idx: Set<number> }>();
+  const owners: (string | null)[] = sessions.map((s) => s.responsibleAssistantId);
+  sessions.forEach((s, i) => {
+    let r = s.scheduledDate.getTime() >= today ? current : rosterAt(s.scheduledDate);
+    if (r.length === 0) {
+      // Nobody assigned on that date (session predates the first assignment): keep
+      // whatever owner it already has; only fill in a missing one from today's roster.
+      if (s.responsibleAssistantId) return;
+      r = current;
+    }
+    const key = r.map((a) => `${a.assistantId}:${a.ownedWeekdays.join(",")}`).join("|");
+    const g = groups.get(key) ?? { roster: r, idx: new Set<number>() };
+    g.idx.add(i);
+    groups.set(key, g);
   });
-  const assistantIds = await classAssistantIds(classId, new Date());
-  const owners = assignResponsibilities(sessions, assistantIds);
+  for (const g of groups.values()) {
+    const { ids, dayOwners } = rosterOwnership(g.roster);
+    const split = assignResponsibilities(sessions, ids, dayOwners);
+    for (const i of g.idx) owners[i] = split[i];
+  }
+
+  const changed = sessions.filter((s, i) => s.responsibleAssistantId !== owners[i]);
+  if (changed.length === 0) return;
   await prisma.$transaction(
-    sessions.map((s, i) =>
-      prisma.classSession.update({ where: { id: s.id }, data: { responsibleAssistantId: owners[i] } }),
-    ),
+    sessions
+      .map((s, i) => [s, owners[i]] as const)
+      .filter(([s, o]) => s.responsibleAssistantId !== o)
+      .map(([s, o]) => prisma.classSession.update({ where: { id: s.id }, data: { responsibleAssistantId: o } })),
   );
 }
 
@@ -76,10 +121,11 @@ export async function generateSessions(
 
   const dates = weeklySlotDates(klass.planStartDate, days, items.length);
   // Stamp who owns each session's daily tasks (by weekday for multi-day, else alternating).
-  const assistantIds = await classAssistantIds(classId, new Date());
+  const { ids: assistantIds, dayOwners } = rosterOwnership(await classRoster(classId, activeAt(new Date())));
   const owners = assignResponsibilities(
     dates.map((d) => ({ scheduledDate: d, dayOff: false })),
     assistantIds,
+    dayOwners,
   );
 
   await prisma.classSession.deleteMany({ where: { classId } });

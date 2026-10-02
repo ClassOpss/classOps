@@ -5,9 +5,12 @@
 //     assistant (Tue -> A, Thu -> B), so A owns every Tuesday, B every Thursday.
 //   • 2 assistants, a SINGLE weekday -> alternate week by week (A, B, A, B …).
 // Day-off sessions have no owner (null). Returns owners aligned to the input order.
+// `dayOwners` (weekday -> assistantId) lets the admin pin who owns a weekday in a
+// multi-weekday class (e.g. Omar owns Tuesdays); unpinned weekdays use the automatic split.
 export function assignResponsibilities<T extends { scheduledDate: Date; dayOff: boolean }>(
   sessions: T[],
   assistantIds: string[],
+  dayOwners: Map<number, string> = new Map(),
 ): (string | null)[] {
   const n = sessions.length;
   if (assistantIds.length === 0) return new Array(n).fill(null);
@@ -20,7 +23,12 @@ export function assignResponsibilities<T extends { scheduledDate: Date; dayOff: 
 
   if (weekdays.size >= 2) {
     const sorted = [...weekdays].sort((a, b) => a - b);
-    const owner = new Map(sorted.map((wd, i) => [wd, assistantIds[i % assistantIds.length]]));
+    const owner = new Map(
+      sorted.map((wd, i) => {
+        const pinned = dayOwners.get(wd);
+        return [wd, pinned && assistantIds.includes(pinned) ? pinned : assistantIds[i % assistantIds.length]];
+      }),
+    );
     for (let i = 0; i < n; i++) {
       result[i] = sessions[i].dayOff ? null : (owner.get(sessions[i].scheduledDate.getUTCDay()) ?? null);
     }

@@ -90,6 +90,67 @@ export async function endAssignment(assignmentId: string): Promise<void> {
   revalidatePath("/my", "layout"); // the un-assigned assistant's class list must refresh
 }
 
+// Pin which assistant owns each class weekday's daily tasks (form fields day:<0-6> =
+// assistantId), then re-stamp session owners. Only today onward changes — past sessions
+// keep the owner they had (see reassignResponsibilities). Also usable with no changes as a
+// "recalculate" to repair owners after an earlier roster switch.
+export async function saveDayOwners(classId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const admin = await requireRole("admin");
+  await assertClassInOperation(classId);
+
+  const active = await prisma.classAssignment.findMany({
+    where: { classId, endDate: null, isSubstitute: false },
+    select: { id: true, assistantId: true, startDate: true, ownedWeekdays: true, exemptTasks: true, notes: true },
+  });
+  const pins = new Map<string, number[]>(active.map((a) => [a.assistantId, []]));
+  for (let wd = 0; wd < 7; wd++) {
+    const owner = String(formData.get(`day:${wd}`) ?? "");
+    if (owner && pins.has(owner)) pins.get(owner)!.push(wd);
+  }
+
+  // Days are stored on the assignment row, and past sessions are owned per the roster
+  // rows active on their date. So changing an assistant's days must NOT rewrite their
+  // existing row (that would re-own their past lessons too): close it today and open a
+  // fresh row from today carrying the new days. A row that starts today is just updated.
+  const today = cairoToday();
+  await prisma.$transaction(async (tx) => {
+    for (const a of active) {
+      const next = pins.get(a.assistantId) ?? [];
+      if (next.join(",") === a.ownedWeekdays.join(",")) continue;
+      if (a.startDate.getTime() >= today.getTime()) {
+        await tx.classAssignment.update({ where: { id: a.id }, data: { ownedWeekdays: next } });
+        continue;
+      }
+      await tx.classAssignment.update({ where: { id: a.id }, data: { endDate: today } });
+      await tx.classAssignment.create({
+        data: {
+          classId,
+          assistantId: a.assistantId,
+          startDate: today,
+          ownedWeekdays: next,
+          exemptTasks: a.exemptTasks,
+          notes: a.notes,
+        },
+      });
+    }
+  });
+  await reassignResponsibilities(classId);
+  await logActivity({
+    actorId: admin.id,
+    actorRole: admin.role,
+    action: "set_day_owners",
+    entityType: "class",
+    entityId: classId,
+    classId,
+    metadata: Object.fromEntries(pins),
+  });
+  revalidatePath(`/classes/${classId}/assistants`);
+  revalidatePath(`/classes/${classId}/sessions`);
+  revalidatePath("/dashboard");
+  revalidatePath("/my", "layout");
+  return { ok: true };
+}
+
 // Arrange a temporary cover: give `assistantId` scoped, auto-expiring access to this
 // class for the Cairo day(s) [fromDate, toDate]. Marked isSubstitute, so it never
 // affects the permanent 2-assistant roster, day ownership, or student division — the

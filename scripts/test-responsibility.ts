@@ -34,4 +34,17 @@ assert(
   "single assistant owns all",
 );
 
+
+// Admin-pinned weekday owners override the automatic split (B owns Tuesdays).
+assert(
+  JSON.stringify(assignResponsibilities(tueThu, ["A", "B"], new Map([[2, "B"], [4, "A"]]))) ===
+    JSON.stringify(["B", "A", "B", "A"]),
+  "pinned weekdays: B=Tue, A=Thu",
+);
+// A pin to someone not on the roster is ignored (falls back to the automatic split).
+assert(
+  JSON.stringify(assignResponsibilities(tueThu, ["A", "B"], new Map([[2, "Z"]]))) ===
+    JSON.stringify(["A", "B", "A", "B"]),
+  "pin to an off-roster assistant is ignored",
+);
 console.log("\nALL RESPONSIBILITY TESTS PASSED");

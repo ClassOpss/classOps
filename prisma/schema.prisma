@@ -378,6 +378,9 @@ model ClassAssignment {
   substitutingFor String?        @map("substituting_for")
   // Tasks THIS assistant is excused from in this class (never listed, reminded, or fined).
   exemptTasks     IncidentType[] @default([]) @map("exempt_tasks")
+  // Weekdays (0=Sun … 6=Sat) whose daily tasks this assistant owns, picked by the admin.
+  // Empty = use the automatic split (lib/responsibility).
+  ownedWeekdays   Int[]          @default([]) @map("owned_weekdays")
   notes           String?
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
 

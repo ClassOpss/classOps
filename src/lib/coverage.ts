@@ -37,6 +37,19 @@ export async function detectCoverageCandidates(operationId: string): Promise<Cov
     }),
     loadVacations(operationId),
   ]);
+  const roster = await prisma.classAssignment.findMany({
+    where: { isSubstitute: false, class: { operationId } },
+    select: { classId: true, assistantId: true, startDate: true, endDate: true },
+  });
+  // Was this assistant on the class's permanent roster on that date?
+  const onRoster = (classId: string, assistantId: string, d: Date) =>
+    roster.some(
+      (a) =>
+        a.classId === classId &&
+        a.assistantId === assistantId &&
+        a.startDate.getTime() <= d.getTime() &&
+        (a.endDate === null || a.endDate.getTime() >= d.getTime()),
+    );
 
   const out: Omit<CoverageCandidate, "covererName">[] = [];
   const covererIds = new Set<string>();
@@ -47,6 +60,12 @@ export async function detectCoverageCandidates(operationId: string): Promise<Cov
     const logger =
       s.attendance[0]?.loggedById ?? s.parentUpdate?.assistantId ?? s.classroomUpload?.assistantId ?? null;
     if (!logger || logger === s.responsibleAssistantId) continue;
+    // After a roster switch the "owner" may be someone who joined later: the logger had
+    // the class then and the owner didn't, so it was their own lesson — not a cover.
+    if (
+      onRoster(s.class.id, logger, s.scheduledDate) &&
+      !onRoster(s.class.id, s.responsibleAssistantId!, s.scheduledDate)
+    ) continue;
     covererIds.add(logger);
     out.push({
       sessionId: s.id,
