@@ -58,9 +58,9 @@ export function sessionDeadline(
 // (default Saturday) + hour, in the week containing `date`.
 // When the task's own date lands ON that weekday (e.g. HW due Saturday), the same-day 9pm
 // deadline gives no time to correct — push to the FOLLOWING deadline weekday instead.
-// The correction must stay inside the task's own month (pay periods are monthly): if the
-// pushed weekday crosses into the next month, clamp to that month's end (30th, or 28th for
-// February), but never earlier than the task date itself.
+// No month-end cap: a deadline may cross into the next month (its fine then lands on that
+// month's payslip, since incidents are bucketed by deadline), so every correction always
+// gets the same full window regardless of where the month ends.
 export function saturdayDeadline(
   date: Date,
   cfg: WeeklyDeadlineCfg = OPERATION_DEFAULTS,
@@ -70,16 +70,6 @@ export function saturdayDeadline(
   let offset = (weeklyDeadlineWeekday - base.getUTCDay() + 7) % 7;
   if (offset === 0) offset = 7; // due on the deadline weekday -> next week's weekday
   base.setUTCDate(base.getUTCDate() + offset);
-
-  const crossedMonth =
-    base.getUTCFullYear() !== date.getUTCFullYear() || base.getUTCMonth() !== date.getUTCMonth();
-  if (crossedMonth) {
-    const clampDay = Math.max(
-      date.getUTCMonth() === 1 ? 28 : 30, // Feb -> 28th, else 30th
-      date.getUTCDate(), // never before the task's own date
-    );
-    base.setUTCFullYear(date.getUTCFullYear(), date.getUTCMonth(), clampDay);
-  }
   return zonedInstant(base, `${pad(weeklyDeadlineHour)}:00:00`);
 }
 

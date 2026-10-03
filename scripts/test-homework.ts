@@ -23,23 +23,21 @@ assert(
   formatCairo(saturdayDeadline(d("2026-06-21")), "yyyy-MM-dd HH:mm") === "2026-06-27 21:00",
   "Sun 21 Jun -> Sat 27 Jun 21:00",
 );
-// Following Saturday would cross into next month -> clamp to month end (30th).
-// Sat 25 Apr 2026: following Sat = 2 May (next month) -> clamp to 30 Apr.
+// No month-end cap: deadlines may cross into the next month (full window always).
+// Sat 25 Apr 2026: following Sat = 2 May.
 assert(
-  formatCairo(saturdayDeadline(d("2026-04-25")), "yyyy-MM-dd HH:mm") === "2026-04-30 21:00",
-  "Sat 25 Apr -> clamped to 30 Apr (not 2 May)",
+  formatCairo(saturdayDeadline(d("2026-04-25")), "yyyy-MM-dd HH:mm") === "2026-05-02 21:00",
+  "Sat 25 Apr -> Sat 2 May (crosses month)",
 );
-// February clamps to the 28th. Sat 21 Feb 2026: following Sat = 28 Feb (same month, no clamp).
-// Sat 28 Feb 2026: following Sat = 7 Mar -> clamp to 28 Feb.
+// Sat 28 Feb 2026 (last day of Feb): following Sat = 7 Mar, not same-day.
 assert(
-  formatCairo(saturdayDeadline(d("2026-02-28")), "yyyy-MM-dd HH:mm") === "2026-02-28 21:00",
-  "Sat 28 Feb -> clamped to 28 Feb (not 7 Mar)",
+  formatCairo(saturdayDeadline(d("2026-02-28")), "yyyy-MM-dd HH:mm") === "2026-03-07 21:00",
+  "Sat 28 Feb -> Sat 7 Mar (no same-day deadline)",
 );
-// A weekday whose same-week Saturday already crosses the month also clamps.
-// Thu 30 Apr 2026: that week's Sat = 2 May -> clamp to 30 Apr.
+// Thu 30 Apr 2026: that week's Sat = 2 May.
 assert(
-  formatCairo(saturdayDeadline(d("2026-04-30")), "yyyy-MM-dd HH:mm") === "2026-04-30 21:00",
-  "Thu 30 Apr -> clamped to 30 Apr",
+  formatCairo(saturdayDeadline(d("2026-04-30")), "yyyy-MM-dd HH:mm") === "2026-05-02 21:00",
+  "Thu 30 Apr -> Sat 2 May",
 );
 
 // HW status

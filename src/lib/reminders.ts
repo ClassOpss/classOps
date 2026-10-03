@@ -205,13 +205,17 @@ async function gatherWeekly(
 ): Promise<void> {
   if (ops.size === 0) return;
   const weekEnd = cairoDate(now); // the weekly deadline weekday (Saturday)
-  const weekStart = new Date(weekEnd);
-  weekStart.setUTCDate(weekStart.getUTCDate() - 6);
+  // Items dated up to a week before this week can carry a pushed deadline (due ON Saturday ->
+  // next Saturday), so look back two weeks and keep only those whose deadline is still ahead
+  // today. HW due today is therefore NOT nudged — its correction is due next Saturday.
+  const lookback = new Date(weekEnd);
+  lookback.setUTCDate(lookback.getUTCDate() - 13);
+  const dueToday = (d: Date) => d > now && cairoDate(d).getTime() === weekEnd.getTime();
 
   const homeworks = await prisma.homeworkAssignment.findMany({
     where: {
       noHomework: false,
-      deadline: { gte: weekStart, lte: weekEnd },
+      deadline: { gte: lookback, lte: weekEnd },
       class: { operationId: { in: [...ops] } },
     },
     select: {
@@ -233,6 +237,7 @@ async function gatherWeekly(
     const operationId = hw.class.operationId;
     if (onVacation(vacs, operationId, hw.class.schoolId, hw.deadline)) continue;
     const deadline = saturdayDeadline(hw.deadline, cfgFor(cfgs, operationId));
+    if (!dueToday(deadline)) continue;
     const submitted = new Set(hw.submissions.map((x) => x.studentId));
     for (const { assistantId } of hw.class.assignments) {
       if (!taskRequired("hw_correction", { disabledTasks: hw.class.disabledTasks, exemptTasks: exemptionsFor(assistantId, hw.class.assignments) })) continue;
@@ -248,7 +253,7 @@ async function gatherWeekly(
   }
 
   const assessments = await prisma.assessment.findMany({
-    where: { date: { gte: weekStart, lte: weekEnd }, class: { operationId: { in: [...ops] } } },
+    where: { date: { gte: lookback, lte: weekEnd }, class: { operationId: { in: [...ops] } } },
     select: {
       classId: true,
       date: true,
@@ -268,6 +273,7 @@ async function gatherWeekly(
     const operationId = a.class.operationId;
     if (onVacation(vacs, operationId, a.class.schoolId, a.date)) continue;
     const deadline = saturdayDeadline(a.date, cfgFor(cfgs, operationId));
+    if (!dueToday(deadline)) continue;
     const graded = new Set(a.grades.map((g) => g.studentId));
     for (const { assistantId } of a.class.assignments) {
       if (!taskRequired("grade_entry", { disabledTasks: a.class.disabledTasks, exemptTasks: exemptionsFor(assistantId, a.class.assignments) })) continue;

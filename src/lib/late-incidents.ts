@@ -222,16 +222,25 @@ async function detectMonthly(now: Date, cfgs: CfgMap): Promise<Queued[]> {
 }
 
 // Weekly run (Saturday 9pm): incident per assistant whose sub-group HW/grades aren't complete
-// for items due this week (Sunday–Saturday).
+// for items whose CORRECTION deadline (saturdayDeadline) fell this week (Sunday–Saturday).
+// Selecting by the computed deadline (not the due date) matters: HW due ON Saturday is
+// corrected by the NEXT Saturday, so it must not be fined in the run on its own due day.
 async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queued[]> {
   const weekEnd = cairoDate(now); // Saturday
   const weekStart = new Date(weekEnd);
   weekStart.setUTCDate(weekStart.getUTCDate() - 6); // Sunday
+  // A pushed deadline is at most 7 days after the item's date, so look back one extra week.
+  const lookback = new Date(weekStart);
+  lookback.setUTCDate(lookback.getUTCDate() - 7);
+  const deadlineThisWeek = (d: Date) => {
+    const day = cairoDate(d);
+    return day >= weekStart && day <= weekEnd;
+  };
 
   const queued: Queued[] = [];
 
   const homeworks = await prisma.homeworkAssignment.findMany({
-    where: { noHomework: false, deadline: { gte: weekStart, lte: weekEnd } },
+    where: { noHomework: false, deadline: { gte: lookback, lte: weekEnd } },
     select: {
       id: true,
       classId: true,
@@ -252,6 +261,7 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
     const operationId = hw.class.operationId;
     if (onVacation(vacs, operationId, hw.class.schoolId, hw.deadline)) continue; // school break
     const deadline = saturdayDeadline(hw.deadline, cfgFor(cfgs, operationId));
+    if (!deadlineThisWeek(deadline)) continue; // e.g. due today (Saturday) -> next week's run
     const submitted = new Set(hw.submissions.map((s) => s.studentId));
     for (const { assistantId } of hw.class.assignments) {
       const scope = { disabledTasks: hw.class.disabledTasks, exemptTasks: exemptionsFor(assistantId, hw.class.assignments) };
@@ -275,7 +285,7 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
   }
 
   const assessments = await prisma.assessment.findMany({
-    where: { date: { gte: weekStart, lte: weekEnd } },
+    where: { date: { gte: lookback, lte: weekEnd } },
     select: {
       classId: true,
       date: true,
@@ -294,6 +304,7 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
     const operationId = a.class.operationId;
     if (onVacation(vacs, operationId, a.class.schoolId, a.date)) continue; // school break
     const deadline = saturdayDeadline(a.date, cfgFor(cfgs, operationId));
+    if (!deadlineThisWeek(deadline)) continue;
     const graded = new Set(a.grades.map((g) => g.studentId));
     for (const { assistantId } of a.class.assignments) {
       const scope = { disabledTasks: a.class.disabledTasks, exemptTasks: exemptionsFor(assistantId, a.class.assignments) };
