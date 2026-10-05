@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireClassAccess } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
+import { attachQuizTasks } from "@/lib/quiz-assessment";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
@@ -50,6 +51,7 @@ export async function createAssessment(
       isDiagnostic: d.isDiagnostic,
     },
   });
+  await attachQuizTasks(assessment);
   await logActivity({
     actorId: user.id,
     actorRole: user.role,
@@ -59,6 +61,9 @@ export async function createAssessment(
     classId,
   });
   revalidatePath(`/classes/${classId}/assessments`);
+  revalidatePath(`/classes/${classId}/quizzes`);
+  revalidatePath(`/my/classes/${classId}`, "layout");
+  revalidatePath("/my/tasks");
   return { ok: true };
 }
 
@@ -117,6 +122,8 @@ export async function deleteAssessment(assessmentId: string): Promise<void> {
   });
   if (!found) return;
   const user = await requireClassAccess(found.classId);
+  // Its own ad-hoc quiz tasks go with it; a cadence cycle just loses the link.
+  await prisma.quizPrep.deleteMany({ where: { assessmentId, adHoc: true } });
   const a = await prisma.assessment.delete({
     where: { id: assessmentId },
     select: { classId: true },
@@ -130,4 +137,7 @@ export async function deleteAssessment(assessmentId: string): Promise<void> {
     classId: a.classId,
   });
   revalidatePath(`/classes/${a.classId}/assessments`);
+  revalidatePath(`/classes/${a.classId}/quizzes`);
+  revalidatePath(`/my/classes/${a.classId}`, "layout");
+  revalidatePath("/my/tasks");
 }

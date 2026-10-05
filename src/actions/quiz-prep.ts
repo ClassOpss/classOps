@@ -8,22 +8,31 @@ import { ymdUtc } from "@/lib/datetime";
 import { isQuizDate } from "@/lib/quiz";
 import { ensureQuizAssessment as linkQuizAssessment } from "@/lib/quiz-assessment";
 
-// Resolve a class + validate that `scheduledDateStr` is a genuine cadence date for it.
-// Returns { user, classId, scheduledDate } or null when access/validation fails.
+// Resolve a class + validate that `scheduledDateStr` is a genuine cycle for it: a cadence
+// date, or the key of an ad-hoc cycle (a hand-added assessment's tasks).
+// Returns { user, scheduledDate, quizStartDate } or null when access/validation fails.
 async function resolveCycle(classId: string, scheduledDateStr: string) {
   const user = await requireClassAccess(classId);
   const klass = await prisma.class.findUnique({
     where: { id: classId },
     select: { quizStartDate: true },
   });
-  if (!klass?.quizStartDate) return null;
+  if (!klass) return null;
   const scheduledDate = ymdUtc(scheduledDateStr);
-  if (Number.isNaN(scheduledDate.getTime()) || !isQuizDate(klass.quizStartDate, scheduledDate)) return null;
+  if (Number.isNaN(scheduledDate.getTime())) return null;
+  const onCadence = !!klass.quizStartDate && isQuizDate(klass.quizStartDate, scheduledDate);
+  if (!onCadence) {
+    const adHoc = await prisma.quizPrep.findFirst({
+      where: { classId, scheduledDate, adHoc: true },
+      select: { id: true },
+    });
+    if (!adHoc) return null;
+  }
   return { user, scheduledDate, quizStartDate: klass.quizStartDate };
 }
 
 // Create/link the quiz's assessment, then refresh the assessment lists.
-async function ensureQuizAssessment(classId: string, scheduledDate: Date, quizStartDate: Date) {
+async function ensureQuizAssessment(classId: string, scheduledDate: Date, quizStartDate: Date | null) {
   if (await linkQuizAssessment(classId, scheduledDate, quizStartDate)) {
     revalidatePath(`/classes/${classId}/assessments`);
     revalidatePath(`/my/classes/${classId}/assessments`);

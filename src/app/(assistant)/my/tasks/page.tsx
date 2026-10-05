@@ -5,7 +5,7 @@ import { taskRequired, type TaskScope } from "@/lib/task-toggles";
 import { resolveConfig } from "@/lib/operation";
 import { cairoToday, quizPrepDeadline, quizAnnounceDeadline, monthlyReportDeadline, formatCairo } from "@/lib/datetime";
 import { monthlyReportProgress, monthlyReportDone, yearMonthOf, previousMonth, monthName } from "@/lib/monthly-reports";
-import { scheduledQuizDatesBetween, effectiveQuizDate, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
+import { quizCyclesBetween, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   weekday: "short",
@@ -98,13 +98,21 @@ export default async function MyTasksPage() {
     classIds.length === 0
       ? []
       : await prisma.class.findMany({
-          where: { id: { in: classIds }, quizStartDate: { not: null } },
+          where: { id: { in: classIds }, OR: [{ quizStartDate: { not: null } }, { quizPreps: { some: { adHoc: true } } }] },
           select: {
             id: true,
             name: true,
             quizStartDate: true,
             quizPreps: {
-              select: { scheduledDate: true, quizDate: true, quizCreated: true, sentToPrint: true, announcedAt: true },
+              select: {
+                scheduledDate: true,
+                adHoc: true,
+                quizDate: true,
+                quizCreated: true,
+                sentToPrint: true,
+                announcedAt: true,
+                assessment: { select: { label: true, type: true } },
+              },
             },
           },
         });
@@ -113,28 +121,26 @@ export default async function MyTasksPage() {
   const soon = now.getTime() + 7 * 86_400_000;
   const recent = now.getTime() - 21 * 86_400_000;
 
-  const quizTodos: { classId: string; className: string; kind: string; quizDate: Date; deadline: Date; overdue: boolean }[] = [];
+  const quizTodos: { classId: string; className: string; title: string; kind: string; quizDate: Date; deadline: Date; overdue: boolean }[] = [];
   for (const c of quizClasses) {
-    if (!c.quizStartDate) continue;
-    const scheduled = scheduledQuizDatesBetween(
+    const cycles = quizCyclesBetween(
       c.quizStartDate,
+      c.quizPreps,
       addDays(today, -24),
       addDays(today, cfg.quizAnnounceLeadDays + 10),
     );
-    const bySched = new Map(c.quizPreps.map((r) => [r.scheduledDate.getTime(), r]));
     const near = (deadline: Date) => {
       const t = deadline.getTime();
       return t <= soon && t >= recent;
     };
-    for (const sched of scheduled) {
-      const row = bySched.get(sched.getTime());
-      const actual = effectiveQuizDate(sched, row);
+    for (const { quizDate: actual, row } of cycles) {
+      const title = row?.assessment && row.assessment.type !== "quiz" ? row.assessment.label : "Quiz";
       const annDl = quizAnnounceDeadline(actual, cfg);
       if (required(c.id, "quiz_announcement") && !quizAnnounced(row) && near(annDl))
-        quizTodos.push({ classId: c.id, className: c.name, kind: "Announcement", quizDate: actual, deadline: annDl, overdue: now.getTime() > annDl.getTime() });
+        quizTodos.push({ classId: c.id, className: c.name, title, kind: "Announcement", quizDate: actual, deadline: annDl, overdue: now.getTime() > annDl.getTime() });
       const prepDl = quizPrepDeadline(actual, cfg);
       if (required(c.id, "quiz_prep") && !quizPrepComplete(row) && near(prepDl))
-        quizTodos.push({ classId: c.id, className: c.name, kind: "Prep", quizDate: actual, deadline: prepDl, overdue: now.getTime() > prepDl.getTime() });
+        quizTodos.push({ classId: c.id, className: c.name, title, kind: "Prep", quizDate: actual, deadline: prepDl, overdue: now.getTime() > prepDl.getTime() });
     }
   }
   quizTodos.sort((a, b) => a.deadline.getTime() - b.deadline.getTime());
@@ -238,7 +244,7 @@ export default async function MyTasksPage() {
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{q.className}</p>
                         <p className="text-xs text-faint">
-                          Quiz {dateFmt.format(q.quizDate)} · {q.kind.toLowerCase()} by {formatCairo(q.deadline, "d MMM, h:mm a")}
+                          {q.title} {dateFmt.format(q.quizDate)} · {q.kind.toLowerCase()} by {formatCairo(q.deadline, "d MMM, h:mm a")}
                         </p>
                       </div>
                       <span className={q.overdue ? "badge-danger" : "badge-warn"}>

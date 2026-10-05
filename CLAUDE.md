@@ -552,6 +552,16 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
       week before + overdue; 7pm reminder email on the due day; daily cron fines once per assistant per
       month (no class link on the incident, like grade_entry). Toggleable per class/assistant.
 
+    ── Quiz tasks for EVERY assessment (not just the biweekly cadence) ──
+    • QuizPrep.adHoc (migration 20261005120000_quiz_prep_ad_hoc, backfills upcoming assessments).
+      createAssessment -> lib/quiz-assessment.attachQuizTasks: joins an open cycle already on that
+      date, else claims its cadence slot, else makes an ad-hoc cycle (scheduledDate = original date).
+      deleteAssessment removes its ad-hoc cycle. lib/quiz.quizCyclesBetween merges cadence + ad-hoc
+      cycles and is the single enumerator for the Quiz tasks pages, /my/tasks, late-incidents and
+      reminders. Announcement message names the type + time ("Midterm Announcement … at 4:00 PM").
+      No fine for an ad-hoc cycle on a deadline day it was created on (or after). Quiz tabs now
+      always shown. Tests: scripts/test-quiz-cycles.ts; seeder: scripts/dev-adhoc-quiz.ts.
+
     ── DEFERRED to v2 (next year — user decision) ──
     Student/parent self-serve portals, in-app HW upload, dropping Google Classroom, fee/payment tracking,
     admin activity tab, automatic daily-update sending to the class WhatsApp group. Design keeps these

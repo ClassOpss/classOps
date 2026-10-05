@@ -2,7 +2,7 @@ import "server-only";
 import { formatInTimeZone } from "date-fns-tz";
 import { prisma } from "@/lib/db";
 import { CAIRO_TZ, sessionDeadline, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, monthlyReportDueDate, monthlyReportDeadline, sessionStart, formatCairo } from "@/lib/datetime";
-import { scheduledQuizDatesBetween, effectiveQuizDate, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
+import { quizCyclesBetween, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
 import { subGroupStudentIds, activeAt } from "@/lib/roster";
 import { scheduleTimeForDate, type ClassSchedule } from "@/lib/schedule";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
@@ -117,7 +117,11 @@ async function gatherQuiz(
 ): Promise<void> {
   if (ops.size === 0) return;
   const classes = await prisma.class.findMany({
-    where: { active: true, quizStartDate: { not: null }, operationId: { in: [...ops] } },
+    where: {
+      active: true,
+      operationId: { in: [...ops] },
+      OR: [{ quizStartDate: { not: null } }, { quizPreps: { some: { adHoc: true } } }],
+    },
     select: {
       id: true,
       name: true,
@@ -126,20 +130,28 @@ async function gatherQuiz(
       schoolId: true,
       disabledTasks: true,
       assignments: { where: activeAt(now), select: { assistantId: true, exemptTasks: true } },
-      quizPreps: { select: { scheduledDate: true, quizDate: true, quizCreated: true, sentToPrint: true, announcedAt: true } },
+      quizPreps: {
+        select: {
+          scheduledDate: true,
+          adHoc: true,
+          quizDate: true,
+          quizCreated: true,
+          sentToPrint: true,
+          announcedAt: true,
+          assessment: { select: { label: true, type: true } },
+        },
+      },
     },
   });
 
   for (const c of classes) {
-    if (!c.quizStartDate || c.assignments.length === 0) continue;
+    if (c.assignments.length === 0) continue;
     const cfg = cfgFor(cfgs, c.operationId);
     const maxLead = Math.max(cfg.quizPrepLeadDays, cfg.quizAnnounceLeadDays);
-    const scheduled = scheduledQuizDatesBetween(c.quizStartDate, addDays(today, -21), addDays(today, maxLead + 21));
-    const rowBySched = new Map(c.quizPreps.map((r) => [r.scheduledDate.getTime(), r]));
+    const cycles = quizCyclesBetween(c.quizStartDate, c.quizPreps, addDays(today, -21), addDays(today, maxLead + 21));
 
-    for (const sched of scheduled) {
-      const row = rowBySched.get(sched.getTime());
-      const actual = effectiveQuizDate(sched, row);
+    for (const { quizDate: actual, row } of cycles) {
+      const what = row?.assessment && row.assessment.type !== "quiz" ? row.assessment.label : "quiz";
       if (onVacation(vacs, c.operationId, c.schoolId, actual)) continue;
 
       const push = (type: "quiz_prep" | "quiz_announcement", label: string, deadline: Date) => {
@@ -152,9 +164,9 @@ async function gatherQuiz(
       };
 
       if (addDays(actual, -cfg.quizAnnounceLeadDays).getTime() === today.getTime() && !quizAnnounced(row))
-        push("quiz_announcement", "Send quiz announcement", quizAnnounceDeadline(actual, cfg));
+        push("quiz_announcement", `Send ${what} announcement`, quizAnnounceDeadline(actual, cfg));
       if (addDays(actual, -cfg.quizPrepLeadDays).getTime() === today.getTime() && !quizPrepComplete(row))
-        push("quiz_prep", "Prepare quiz (create + send to print)", quizPrepDeadline(actual, cfg));
+        push("quiz_prep", `Prepare ${what} (create + send to print)`, quizPrepDeadline(actual, cfg));
     }
   }
 }

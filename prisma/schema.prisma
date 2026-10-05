@@ -678,7 +678,10 @@ model QuizPrep {
   announcedAt   DateTime? @map("announced_at") @db.Timestamptz(6)
   // The Assessment auto-created when this quiz is first confirmed (announced / created).
   assessmentId  String?   @unique @map("assessment_id")
-  loggedById    String?   @map("logged_by")
+  // true = tasks for a hand-added assessment (off the biweekly cadence). scheduledDate is
+  // then the assessment's original date — still the row's stable key.
+  adHoc         Boolean   @default(false) @map("ad_hoc")
+  loggedById   String?   @map("logged_by")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   class      Class          @relation(fields: [classId], references: [id], onDelete: Cascade)

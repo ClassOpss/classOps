@@ -2,7 +2,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import type { IncidentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { CAIRO_TZ, sessionDeadline, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, monthlyReportDueDate, monthlyReportDeadline, latenessApplies } from "@/lib/datetime";
-import { scheduledQuizDatesBetween, effectiveQuizDate, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
+import { quizCyclesBetween, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
 import { subGroupStudentIds, activeAt } from "@/lib/roster";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
 import { loadAllVacations, isSchoolOnVacation, type VacationSpan } from "@/lib/vacations";
@@ -119,7 +119,7 @@ async function detectQuiz(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queued
   const today = cairoDate(now);
 
   const classes = await prisma.class.findMany({
-    where: { active: true, quizStartDate: { not: null } },
+    where: { active: true, OR: [{ quizStartDate: { not: null } }, { quizPreps: { some: { adHoc: true } } }] },
     select: {
       id: true,
       createdAt: true,
@@ -129,25 +129,25 @@ async function detectQuiz(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queued
       disabledTasks: true,
       assignments: { where: activeAt(now), select: { assistantId: true, exemptTasks: true } },
       quizPreps: {
-        select: { id: true, scheduledDate: true, quizDate: true, quizCreated: true, sentToPrint: true, completedAt: true, announcedAt: true },
+        select: { id: true, scheduledDate: true, adHoc: true, quizDate: true, quizCreated: true, sentToPrint: true, completedAt: true, announcedAt: true, createdAt: true },
       },
     },
   });
 
   const queued: Queued[] = [];
   for (const c of classes) {
-    if (!c.quizStartDate || c.assignments.length === 0) continue;
+    if (c.assignments.length === 0) continue;
     const cfg = cfgFor(cfgs, c.operationId);
     const maxLead = Math.max(cfg.quizPrepLeadDays, cfg.quizAnnounceLeadDays);
-    // Enumerate scheduled cycles whose deadlines could land today, wide enough to absorb
-    // one-off date moves. Overrides live on the row (quizDate); others use the scheduled date.
-    const scheduled = scheduledQuizDatesBetween(c.quizStartDate, addDays(today, -21), addDays(today, maxLead + 21));
-    const rowBySched = new Map(c.quizPreps.map((r) => [r.scheduledDate.getTime(), r]));
+    // Enumerate cycles whose deadlines could land today, wide enough to absorb one-off date
+    // moves. Overrides live on the row (quizDate); others use the scheduled date. Ad-hoc
+    // cycles (hand-added assessments) come straight from their rows.
+    const cycles = quizCyclesBetween(c.quizStartDate, c.quizPreps, addDays(today, -21), addDays(today, maxLead + 21));
 
-    for (const sched of scheduled) {
-      const row = rowBySched.get(sched.getTime());
-      const actual = effectiveQuizDate(sched, row);
+    for (const { scheduledDate: sched, quizDate: actual, row, adHoc } of cycles) {
       if (onVacation(vacs, c.operationId, c.schoolId, actual)) continue; // no quiz that week
+      // An assessment added on (or after) a deadline day was never fair to fine for it.
+      if (adHoc && row && cairoDate(row.createdAt).getTime() >= today.getTime()) continue;
 
       // Need a QuizPrep id to key incidents; create a placeholder once, lazily.
       let quizPrepId = row?.id ?? null;

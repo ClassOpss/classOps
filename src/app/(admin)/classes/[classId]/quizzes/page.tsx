@@ -4,8 +4,7 @@ import { prisma } from "@/lib/db";
 import { currentOperationId, resolveConfigFor } from "@/lib/operation";
 import { cairoToday, quizPrepDeadline, quizAnnounceDeadline, formatCairo } from "@/lib/datetime";
 import {
-  scheduledQuizDatesBetween,
-  effectiveQuizDate,
+  quizCyclesBetween,
   quizPrepComplete,
   quizAnnounced,
   addDays,
@@ -46,41 +45,42 @@ export default async function ClassQuizzesPage({ params }: { params: Promise<{ c
     </div>
   );
 
-  if (!klass.quizStartDate) {
+  const cfg = await resolveConfigFor(operationId);
+  const today = cairoToday();
+
+  const rows = await prisma.quizPrep.findMany({
+    where: { classId },
+    select: { scheduledDate: true, adHoc: true, quizDate: true, coverage: true, quizCreated: true, sentToPrint: true, completedAt: true, announcedAt: true, assessment: { select: { label: true, maxMark: true, type: true } } },
+  });
+  // Show the last cycle + roughly the next 3 months.
+  const cycles = quizCyclesBetween(klass.quizStartDate, rows, addDays(today, -QUIZ_CADENCE_DAYS), addDays(today, 90));
+
+  if (cycles.length === 0) {
     return (
       <div className="flex flex-col gap-4">
         {back}
         <p className="card px-4 py-6 text-center text-sm text-muted">
-          No biweekly quiz is set up for this class. Add a quiz day + first-quiz date in the class settings.
+          No upcoming quizzes. Set a quiz day + first-quiz date in the class settings for the biweekly
+          quiz; every assessment added to the class also appears here with its own tasks.
         </p>
       </div>
     );
   }
 
-  const cfg = await resolveConfigFor(operationId);
-  const today = cairoToday();
-  // Show the last cycle + roughly the next 3 months.
-  const scheduled = scheduledQuizDatesBetween(klass.quizStartDate, addDays(today, -QUIZ_CADENCE_DAYS), addDays(today, 90));
-
-  const rows = await prisma.quizPrep.findMany({
-    where: { classId, scheduledDate: { in: scheduled } },
-    select: { scheduledDate: true, quizDate: true, coverage: true, quizCreated: true, sentToPrint: true, completedAt: true, announcedAt: true, assessment: { select: { label: true, maxMark: true } } },
-  });
-  const bySched = new Map(rows.map((r) => [r.scheduledDate.getTime(), r]));
-
   return (
     <div className="flex flex-col gap-4">
       {back}
       <p className="page-subtitle">
-        Every {QUIZ_CADENCE_DAYS} days on {klass.quizDay}. Move a single quiz here if something changes —
+        {klass.quizStartDate
+          ? `Every ${QUIZ_CADENCE_DAYS} days on ${klass.quizDay}, plus every assessment added to the class. `
+          : "Every assessment added to this class. "}
+        Move a single quiz here if something changes —
         its announcement ({cfg.quizAnnounceLeadDays}d before) and prep ({cfg.quizPrepLeadDays}d before) deadlines
         shift with it. Later quizzes stay on the schedule. Set what each quiz covers for the announcement message.
       </p>
 
       <ul className="flex flex-col gap-3">
-        {scheduled.map((sched) => {
-          const row = bySched.get(sched.getTime());
-          const actual = effectiveQuizDate(sched, row);
+        {cycles.map(({ scheduledDate: sched, quizDate: actual, row }) => {
           const moved = actual.getTime() !== sched.getTime();
           const s = iso(sched);
 
@@ -88,7 +88,7 @@ export default async function ClassQuizzesPage({ params }: { params: Promise<{ c
             <li key={s} className="card flex flex-col gap-3 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-semibold">
-                  Quiz — {dateFmt.format(actual)}
+                  {row?.assessment && row.assessment.type !== "quiz" ? row.assessment.label : "Quiz"} — {dateFmt.format(actual)}
                   {moved && <span className="ml-2 badge-neutral">moved from {dateFmt.format(sched)}</span>}
                 </p>
                 <div className="flex flex-wrap gap-1.5 text-xs">

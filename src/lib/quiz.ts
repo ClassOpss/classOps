@@ -79,6 +79,35 @@ export function effectiveQuizDate(
   return row?.quizDate ?? scheduledDate;
 }
 
+export type QuizCycle<R> = { scheduledDate: Date; quizDate: Date; row: R | undefined; adHoc: boolean };
+
+// Every quiz cycle for a class in [from, to]: the biweekly cadence dates (if the class has
+// one) plus the ad-hoc rows made for hand-added assessments, sorted by actual date. Cadence
+// cycles are windowed by scheduled date, ad-hoc ones by actual date. An ad-hoc row that
+// sits on a cadence date is that cadence cycle, so it's never listed twice.
+export function quizCyclesBetween<R extends { scheduledDate: Date; quizDate: Date; adHoc: boolean }>(
+  quizStartDate: Date | null,
+  rows: R[],
+  from: Date,
+  to: Date,
+): QuizCycle<R>[] {
+  const bySched = new Map(rows.map((r) => [r.scheduledDate.getTime(), r]));
+  const out: QuizCycle<R>[] = [];
+  if (quizStartDate) {
+    for (const d of scheduledQuizDatesBetween(quizStartDate, from, to)) {
+      const row = bySched.get(d.getTime());
+      out.push({ scheduledDate: d, quizDate: effectiveQuizDate(d, row), row, adHoc: false });
+    }
+  }
+  for (const r of rows) {
+    if (!r.adHoc) continue;
+    if (quizStartDate && isQuizDate(quizStartDate, r.scheduledDate)) continue;
+    if (r.quizDate < from || r.quizDate > to) continue;
+    out.push({ scheduledDate: r.scheduledDate, quizDate: r.quizDate, row: r, adHoc: true });
+  }
+  return out.sort((a, b) => a.quizDate.getTime() - b.quizDate.getTime());
+}
+
 // Prep is done only when BOTH steps are ticked.
 export function quizPrepComplete(p: { quizCreated: boolean; sentToPrint: boolean } | null | undefined): boolean {
   return !!p && p.quizCreated && p.sentToPrint;

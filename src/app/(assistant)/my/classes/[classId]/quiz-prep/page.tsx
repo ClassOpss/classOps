@@ -4,8 +4,7 @@ import { prisma } from "@/lib/db";
 import { resolveConfigFor } from "@/lib/operation";
 import { cairoToday, quizPrepDeadline, quizAnnounceDeadline, formatCairo, isLate } from "@/lib/datetime";
 import {
-  scheduledQuizDatesBetween,
-  effectiveQuizDate,
+  quizCyclesBetween,
   quizPrepComplete,
   quizAnnounced,
   addDays,
@@ -47,50 +46,52 @@ export default async function QuizPrepPage({ params }: { params: Promise<{ class
     </div>
   );
 
-  if (!klass.quizStartDate) {
-    return (
-      <div className="flex flex-col gap-4">
-        {back}
-        <p className="card px-4 py-6 text-center text-sm text-muted">
-          This class has no biweekly quiz set up. An admin can add a quiz day in the class settings.
-        </p>
-      </div>
-    );
-  }
-
   const cfg = await resolveConfigFor(klass.operationId);
   const today = cairoToday();
-  const scheduled = scheduledQuizDatesBetween(klass.quizStartDate, addDays(today, -QUIZ_CADENCE_DAYS), addDays(today, 28));
 
   const rows = await prisma.quizPrep.findMany({
-    where: { classId, scheduledDate: { in: scheduled } },
+    where: { classId },
     select: {
       scheduledDate: true,
+      adHoc: true,
       quizDate: true,
       coverage: true,
       quizCreated: true,
       sentToPrint: true,
       completedAt: true,
       announcedAt: true,
-      assessment: { select: { id: true, label: true, maxMark: true } },
+      assessment: { select: { id: true, label: true, maxMark: true, type: true, time: true } },
     },
   });
-  const bySched = new Map(rows.map((r) => [r.scheduledDate.getTime(), r]));
+  const cycles = quizCyclesBetween(klass.quizStartDate, rows, addDays(today, -QUIZ_CADENCE_DAYS), addDays(today, 28));
   const now = new Date();
+
+  if (cycles.length === 0) {
+    return (
+      <div className="flex flex-col gap-4">
+        {back}
+        <p className="card px-4 py-6 text-center text-sm text-muted">
+          No quizzes in the next 4 weeks. Tasks appear here for the biweekly quiz (if the class has one)
+          and for every assessment added to this class.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
       {back}
       <p className="text-sm text-muted">
-        Every {QUIZ_CADENCE_DAYS} days on {klass.quizDay}. For each quiz: send the announcement
+        {klass.quizStartDate
+          ? `Every ${QUIZ_CADENCE_DAYS} days on ${klass.quizDay}, plus every assessment added to the class. `
+          : "Every assessment added to this class. "}
+        For each one: send the announcement
         (~{cfg.quizAnnounceLeadDays}d before), then create the quiz and send it to print (~{cfg.quizPrepLeadDays}d before).
         Either assistant on this class can complete these.
       </p>
 
       <ul className="flex flex-col gap-3">
-        {scheduled.map((sched) => {
-          const row = bySched.get(sched.getTime());
-          const actual = effectiveQuizDate(sched, row);
+        {cycles.map(({ scheduledDate: sched, quizDate: actual, row }) => {
           const moved = actual.getTime() !== sched.getTime();
 
           // Announcement status
@@ -119,14 +120,20 @@ export default async function QuizPrepPage({ params }: { params: Promise<{ class
               ? <span className="badge-danger">Overdue</span>
               : <span className="badge-neutral">Due {formatCairo(prepDl, "d MMM")}</span>;
 
-          const message = buildBiweeklyQuizAnnouncement({ date: actual, coverage: row?.coverage, signature: cfg.brandSignature });
+          const message = buildBiweeklyQuizAnnouncement({
+            date: actual,
+            coverage: row?.coverage,
+            type: row?.assessment?.type,
+            time: row?.assessment?.time,
+            signature: cfg.brandSignature,
+          });
           const s = iso(sched);
 
           return (
             <li key={s} className="card flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="font-semibold">
-                  Quiz — {dateFmt.format(actual)}
+                  {row?.assessment && row.assessment.type !== "quiz" ? row.assessment.label : "Quiz"} — {dateFmt.format(actual)}
                   {moved && <span className="ml-2 badge-neutral">moved</span>}
                 </p>
                 {row?.assessment && (

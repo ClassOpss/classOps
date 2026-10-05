@@ -95,6 +95,7 @@ export default async function AssessmentsAdminPage({
                             dateLabel: dateFmt.format(a.date),
                             timeLabel: friendlyTime(a.time),
                             topics: topicsFromNotes(a.topicNotes, a.topic?.title),
+                            type: a.type,
                           },
                           cfg.brandSignature,
                         )}

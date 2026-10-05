@@ -6,7 +6,17 @@ export type QuizAnnouncementData = {
   dateLabel: string;
   timeLabel?: string | null;
   topics: string[];
+  // Assessment type (quiz/midterm/past_paper/exam); defaults to quiz.
+  type?: string | null;
 };
+
+const KIND: Record<string, string> = { quiz: "quiz", midterm: "midterm", past_paper: "past paper", exam: "exam" };
+
+export function assessmentKind(type?: string | null): string {
+  return KIND[type ?? "quiz"] ?? "quiz";
+}
+
+const cap = (s: string) => s.replace(/\b\w/g, (c) => c.toUpperCase());
 
 // "16:00" -> "4:00 PM"
 export function friendlyTime(hhmm?: string | null): string | null {
@@ -32,11 +42,12 @@ export function buildQuizAnnouncement(
   d: QuizAnnouncementData,
   signature: string = OPERATION_DEFAULTS.brandSignature,
 ): string {
+  const kind = assessmentKind(d.type);
   const lines: string[] = [];
-  lines.push("*Quiz Announcement*");
+  lines.push(`*${cap(kind)} Announcement*`);
   lines.push("Good Afternoon Parents & Students,");
   const when = d.timeLabel ? `${d.dateLabel} at ${d.timeLabel}` : d.dateLabel;
-  lines.push(`Just a quick reminder that we'll be having a quiz on ${when}.`);
+  lines.push(`Just a quick reminder that we'll be having a${/^[aeiou]/.test(kind) ? "n" : ""} ${kind} on ${when}.`);
   lines.push("It will cover:");
   if (d.topics.length > 0) {
     for (const t of d.topics) lines.push(`- ${t}`);
@@ -44,7 +55,9 @@ export function buildQuizAnnouncement(
     lines.push("- (topics to be confirmed)");
   }
   lines.push(
-    "The quiz will be short and focused, so students are encouraged to revise their notes, homework, and correction videos.",
+    kind === "quiz"
+      ? "The quiz will be short and focused, so students are encouraged to revise their notes, homework, and correction videos."
+      : "Students are encouraged to revise their notes, homework, and correction videos.",
   );
   lines.push("Always feel free to share any questions or concerns, we're always here!");
   lines.push("We'll also share results in the monthly report so you can track progress.");
@@ -58,14 +71,22 @@ export function quizDateLabel(date: Date): string {
   return `${weekdayName(date)} – ${date.getUTCDate()}/${date.getUTCMonth() + 1}/${date.getUTCFullYear()}`;
 }
 
-// The biweekly-quiz announcement message built from a cycle's actual date + coverage text.
+// The quiz-task announcement message built from a cycle's actual date + coverage text (plus
+// the linked assessment's type + time when it has one).
 export function buildBiweeklyQuizAnnouncement(opts: {
   date: Date;
   coverage?: string | null;
+  type?: string | null;
+  time?: string | null;
   signature?: string;
 }): string {
   return buildQuizAnnouncement(
-    { dateLabel: quizDateLabel(opts.date), topics: topicsFromNotes(opts.coverage) },
+    {
+      dateLabel: quizDateLabel(opts.date),
+      timeLabel: friendlyTime(opts.time),
+      topics: topicsFromNotes(opts.coverage),
+      type: opts.type,
+    },
     opts.signature ?? OPERATION_DEFAULTS.brandSignature,
   );
 }
