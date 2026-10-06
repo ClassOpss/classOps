@@ -34,12 +34,14 @@ function Stat({
   );
 }
 
-function StudentCard({ s }: { s: StudentProgress }) {
+function StudentCard({ s, classId }: { s: StudentProgress; classId: string }) {
   const hwTotal = s.hw.onTime + s.hw.late + s.hw.missing;
   return (
     <li className="card p-3.5">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <p className="font-semibold">{s.name}</p>
+        <Link href={`/my/classes/${classId}/students/${s.id}`} className="link font-semibold">
+          {s.name} →
+        </Link>
         <span className="ml-auto flex flex-wrap gap-1.5">
           {s.reasons.length === 0 ? (
             <span className="badge-success">On track</span>
@@ -208,7 +210,7 @@ export default async function AssistantProgressPage({
         ) : (
           <ul className="flex flex-col gap-2">
             {students.map((s) => (
-              <StudentCard key={s.id} s={s} />
+              <StudentCard key={s.id} s={s} classId={classId} />
             ))}
           </ul>
         )}
