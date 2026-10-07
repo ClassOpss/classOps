@@ -86,7 +86,9 @@ export default async function PayPeriodPage({
             <tbody>
               {period.calculations.map((c) => (
                 <tr key={c.id}>
-                  <td className="font-medium">{c.assistant.name}</td>
+                  <td className="font-medium">
+                    <Link href={`/pay/${periodId}/${c.assistantId}`} className="link">{c.assistant.name}</Link>
+                  </td>
                   <td>{c.classesCovered}</td>
                   <td>{egp(c.baseSalary)}</td>
                   <td className="text-danger">-{egp(c.lateDeductions)}</td>

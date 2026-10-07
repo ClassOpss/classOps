@@ -21,6 +21,7 @@ export async function waiveIncident(incidentId: string, formData: FormData): Pro
     entityId: incidentId,
   });
   revalidatePath("/dashboard");
+  revalidatePath("/pay", "layout");
 }
 
 export async function unwaiveIncident(incidentId: string): Promise<void> {
@@ -37,6 +38,7 @@ export async function unwaiveIncident(incidentId: string): Promise<void> {
     entityId: incidentId,
   });
   revalidatePath("/dashboard");
+  revalidatePath("/pay", "layout");
 }
 
 // "Fine stands": still deducted, but off the dashboard's To-review list.
@@ -56,6 +58,7 @@ export async function confirmIncidents(incidentIds: string[]): Promise<void> {
     metadata: { count },
   });
   revalidatePath("/dashboard");
+  revalidatePath("/pay", "layout");
 }
 
 export async function unconfirmIncident(incidentId: string): Promise<void> {
@@ -69,4 +72,5 @@ export async function unconfirmIncident(incidentId: string): Promise<void> {
     entityId: incidentId,
   });
   revalidatePath("/dashboard");
+  revalidatePath("/pay", "layout");
 }
