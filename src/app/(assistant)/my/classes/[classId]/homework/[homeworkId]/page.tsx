@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { submitHomeworkSubmissions, updateHomeworkDeadline } from "@/actions/homework";
 import { saturdayDeadline, isLate, formatCairo } from "@/lib/datetime";
 import { resolveConfig } from "@/lib/operation";
+import { homeworkDueAt } from "@/lib/task-timing";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -33,7 +34,7 @@ export default async function HomeworkEntryPage({
 
   const homework = await prisma.homeworkAssignment.findUnique({
     where: { id: homeworkId },
-    select: { id: true, classId: true, description: true, deadline: true, noHomework: true },
+    select: { id: true, classId: true, description: true, deadline: true, noHomework: true, class: { select: { schedule: true } } },
   });
   if (!homework || homework.classId !== classId || homework.noHomework) {
     return (
@@ -70,6 +71,7 @@ export default async function HomeworkEntryPage({
     : null;
   const late = completionAt ? isLate(completionAt, correctionDeadline) : false;
 
+  const notDue = !complete && new Date() < homeworkDueAt(homework.deadline, homework.class.schedule);
   const deadlineValue = homework.deadline.toISOString().slice(0, 10);
   const inputCls = "input";
 
@@ -102,6 +104,11 @@ export default async function HomeworkEntryPage({
           All {total} reviewed · completed {completionAt ? formatCairo(completionAt) : ""} —{" "}
           {late ? "Late (after 9pm Saturday)" : "On time"}
         </div>
+      ) : notDue ? (
+        <div className="rounded-lg bg-card-muted px-3 py-2.5 text-sm text-muted">
+          Not due yet — correct it once it&apos;s collected on {dateFmt.format(homework.deadline)}. Early
+          submissions can still be entered.
+        </div>
       ) : (
         <div className="rounded-lg bg-warn-soft px-3 py-2.5 text-sm text-warn">
           Incomplete — {reviewed} of {total} students reviewed. Mark every student before this
@@ -130,7 +137,7 @@ export default async function HomeworkEntryPage({
                     <span className="font-semibold">{s.name}</span>
                     {sub?.status ? (
                       <span className={STATUS_STYLE[sub.status]}>{STATUS_LABEL[sub.status]}</span>
-                    ) : (
+                    ) : notDue ? null : (
                       <span className="badge-warn">needs review</span>
                     )}
                   </div>

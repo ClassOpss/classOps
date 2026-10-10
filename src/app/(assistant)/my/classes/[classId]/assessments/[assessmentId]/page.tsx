@@ -3,6 +3,7 @@ import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { saturdayDeadline, isLate, formatCairo } from "@/lib/datetime";
 import { resolveConfig } from "@/lib/operation";
+import { assessmentHeldAt } from "@/lib/task-timing";
 import { GradeEntryForm, type GradeRow } from "./grade-entry-form";
 import { MaxMarkForm } from "@/app/(admin)/classes/[classId]/assessments/max-mark-form";
 
@@ -23,7 +24,7 @@ export default async function GradeEntryPage({
 
   const assessment = await prisma.assessment.findUnique({
     where: { id: assessmentId },
-    select: { id: true, classId: true, label: true, date: true, maxMark: true, isDiagnostic: true },
+    select: { id: true, classId: true, label: true, date: true, time: true, maxMark: true, isDiagnostic: true, class: { select: { schedule: true } } },
   });
   if (!assessment || assessment.classId !== classId) {
     return (
@@ -70,6 +71,7 @@ export default async function GradeEntryPage({
     ? grades.map((g) => g.loggedAt).sort((a, b) => b.getTime() - a.getTime())[0]
     : null;
   const late = completionAt ? isLate(completionAt, correctionDeadline) : false;
+  const upcoming = !complete && new Date() < assessmentHeldAt(assessment.date, assessment.time, assessment.class.schedule);
 
   return (
     <div className="flex flex-col gap-4">
@@ -89,6 +91,10 @@ export default async function GradeEntryPage({
         <div className={`rounded-lg px-3 py-2.5 text-sm ${late ? "bg-warn-soft text-warn" : "bg-success-soft text-success"}`}>
           All {total} graded · completed {completionAt ? formatCairo(completionAt) : ""} —{" "}
           {late ? "Late (after 9pm Saturday)" : "On time"}
+        </div>
+      ) : upcoming ? (
+        <div className="rounded-lg bg-card-muted px-3 py-2.5 text-sm text-muted">
+          Upcoming — enter grades after it&apos;s held on {dateFmt.format(assessment.date)}.
         </div>
       ) : (
         <div className="rounded-lg bg-warn-soft px-3 py-2.5 text-sm text-warn">

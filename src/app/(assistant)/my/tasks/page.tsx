@@ -4,8 +4,10 @@ import { prisma } from "@/lib/db";
 import { taskRequired, type TaskScope } from "@/lib/task-toggles";
 import { resolveConfig } from "@/lib/operation";
 import { cairoToday, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, monthlyReportDeadline, formatCairo } from "@/lib/datetime";
-import { monthlyReportProgress, monthlyReportDone, yearMonthOf, previousMonth, monthName } from "@/lib/monthly-reports";
+import { monthlyReportProgress, monthlyReportDone, yearMonthOf, monthName } from "@/lib/monthly-reports";
 import { subGroupStudentIds } from "@/lib/roster";
+import { homeworkDueAt, assessmentHeldAt, sessionStartsAt } from "@/lib/task-timing";
+import { loadVacations, isSchoolOnVacation } from "@/lib/vacations";
 import { quizCyclesBetween, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -28,9 +30,8 @@ export default async function MyTasksPage() {
     );
   }
 
+  // Overdue tasks stay listed until they're done — there is no age cutoff anywhere below.
   const now = new Date();
-  const from = new Date(now);
-  from.setUTCDate(from.getUTCDate() - 21);
 
   const assignments = await prisma.classAssignment.findMany({
     where: {
@@ -40,7 +41,7 @@ export default async function MyTasksPage() {
       // Skip deactivated classes (per class, so only the deactivated one drops).
       class: { active: true },
     },
-    select: { classId: true, exemptTasks: true, class: { select: { name: true, disabledTasks: true } } },
+    select: { classId: true, exemptTasks: true, class: { select: { name: true, disabledTasks: true, operationId: true } } },
   });
   const classIds = [...new Set(assignments.map((a) => a.classId))];
   // Per class: what's turned off for the whole class + what I'm personally excused from.
@@ -55,7 +56,7 @@ export default async function MyTasksPage() {
   const required = (classId: string, type: Parameters<typeof taskRequired>[0], extra?: Partial<TaskScope>) =>
     taskRequired(type, { ...(scopeByClass.get(classId) ?? { disabledTasks: [] }), ...extra });
 
-  // Recent, started, owned (or unowned/covered) sessions that are missing a daily task.
+  // Started, owned (or unowned/covered) sessions that are missing a daily task.
   const sessions =
     classIds.length === 0
       ? []
@@ -63,7 +64,7 @@ export default async function MyTasksPage() {
           where: {
             classId: { in: classIds },
             dayOff: false,
-            scheduledDate: { gte: from, lte: now },
+            scheduledDate: { lte: now },
             OR: [
               { responsibleAssistantId: user.assistantId },
               { responsibleAssistantId: null },
@@ -75,7 +76,7 @@ export default async function MyTasksPage() {
             id: true,
             classId: true,
             scheduledDate: true,
-            class: { select: { name: true, lmsType: true } },
+            class: { select: { name: true, lmsType: true, schedule: true } },
             attendance: { select: { id: true }, take: 1 },
             parentUpdate: { select: { id: true } },
             classroomUpload: { select: { id: true } },
@@ -83,6 +84,8 @@ export default async function MyTasksPage() {
         });
 
   const todos = sessions
+    // Today's lesson only becomes a task once it has started.
+    .filter((s) => now >= sessionStartsAt(s.scheduledDate, s.class.schedule))
     .map((s) => {
       const missing: string[] = [];
       if (required(s.classId, "attendance") && s.attendance.length === 0) missing.push("Attendance");
@@ -104,6 +107,7 @@ export default async function MyTasksPage() {
             id: true,
             name: true,
             quizStartDate: true,
+            schoolId: true,
             quizPreps: {
               select: {
                 scheduledDate: true,
@@ -118,23 +122,25 @@ export default async function MyTasksPage() {
           },
         });
   const cfg = await resolveConfig();
+  const operationId = assignments[0]?.class.operationId;
+  const vacations = operationId ? await loadVacations(operationId) : [];
   const today = cairoToday(now);
   const soon = now.getTime() + 7 * 86_400_000;
-  const recent = now.getTime() - 21 * 86_400_000;
+  const beginning = new Date(Date.UTC(2000, 0, 1));
 
   const quizTodos: { classId: string; className: string; title: string; kind: string; quizDate: Date; deadline: Date; overdue: boolean }[] = [];
   for (const c of quizClasses) {
     const cycles = quizCyclesBetween(
       c.quizStartDate,
       c.quizPreps,
-      addDays(today, -24),
+      beginning,
       addDays(today, cfg.quizAnnounceLeadDays + 10),
     );
-    const near = (deadline: Date) => {
-      const t = deadline.getTime();
-      return t <= soon && t >= recent;
-    };
+    // Shown from a week before its deadline, and kept (as overdue) until done.
+    const near = (deadline: Date) => deadline.getTime() <= soon;
     for (const { quizDate: actual, row } of cycles) {
+      // No quiz during a school break (fines + reminders skip these too).
+      if (isSchoolOnVacation(c.schoolId, actual, vacations)) continue;
       const title = row?.assessment && row.assessment.type !== "quiz" ? row.assessment.label : "Quiz";
       const annDl = quizAnnounceDeadline(actual, cfg);
       if (required(c.id, "quiz_announcement") && !quizAnnounced(row) && near(annDl))
@@ -148,23 +154,29 @@ export default async function MyTasksPage() {
 
   const classNames = new Map(assignments.map((a) => [a.classId, a.class.name]));
 
-  // Weekly sub-group tasks (HW correction / grade entry): anything already due/held whose
-  // Saturday deadline is ahead or passed within the last 3 weeks, while MY sub-group isn't
-  // fully reviewed yet. Same completeness rule the weekly fine uses.
+  // Weekly sub-group tasks (HW correction / grade entry): anything already collected/sat while
+  // MY sub-group isn't fully reviewed yet. Same completeness rule the weekly fine uses.
   const weeklyTodos: {
     key: string; classId: string; className: string; kind: "Homework" | "Grades"; title: string;
     href: string; reviewed: number; total: number; deadline: Date; overdue: boolean;
   }[] = [];
   if (classIds.length > 0) {
-    const lookback = addDays(today, -28);
     const [homeworks, assessments] = await Promise.all([
       prisma.homeworkAssignment.findMany({
-        where: { classId: { in: classIds }, noHomework: false, deadline: { gte: lookback, lte: today } },
-        select: { id: true, classId: true, description: true, deadline: true, submissions: { select: { studentId: true } } },
+        where: { classId: { in: classIds }, noHomework: false, deadline: { lte: today } },
+        select: {
+          id: true, classId: true, description: true, deadline: true,
+          class: { select: { schedule: true } },
+          submissions: { select: { studentId: true } },
+        },
       }),
       prisma.assessment.findMany({
-        where: { classId: { in: classIds }, date: { gte: lookback, lte: today } },
-        select: { id: true, classId: true, label: true, date: true, grades: { select: { studentId: true } } },
+        where: { classId: { in: classIds }, date: { lte: today } },
+        select: {
+          id: true, classId: true, label: true, date: true, time: true,
+          class: { select: { schedule: true } },
+          grades: { select: { studentId: true } },
+        },
       }),
     ]);
     const assistantId = user.assistantId;
@@ -178,7 +190,6 @@ export default async function MyTasksPage() {
       classId: string, kind: "Homework" | "Grades", id: string, title: string, href: string, date: Date, done: string[],
     ) => {
       const deadline = saturdayDeadline(date, cfg);
-      if (deadline.getTime() < recent) return; // too old to chase
       const ids = await subGroup(classId);
       if (ids.length === 0) return;
       const seen = new Set(done);
@@ -191,31 +202,48 @@ export default async function MyTasksPage() {
     };
     for (const hw of homeworks) {
       if (!required(hw.classId, "hw_correction")) continue;
+      if (now < homeworkDueAt(hw.deadline, hw.class.schedule)) continue; // not collected yet
       await push(hw.classId, "Homework", hw.id, `HW due ${dateFmt.format(hw.deadline)}${hw.description ? ` · ${hw.description}` : ""}`,
         `/my/classes/${hw.classId}/homework/${hw.id}`, hw.deadline, hw.submissions.map((x) => x.studentId));
     }
     for (const a of assessments) {
       if (!required(a.classId, "grade_entry")) continue;
+      if (now < assessmentHeldAt(a.date, a.time, a.class.schedule)) continue; // not sat yet
       await push(a.classId, "Grades", a.id, `${a.label} · ${dateFmt.format(a.date)}`,
         `/my/classes/${a.classId}/assessments/${a.id}`, a.date, a.grades.map((g) => g.studentId));
     }
   }
   weeklyTodos.sort((a, b) => a.deadline.getTime() - b.deadline.getTime());
 
-  // Monthly parent reports (due the 30th / Feb 28th): this month's shows up from a week
-  // before the deadline; last month's stays listed as overdue until it's done.
+  // Monthly parent reports (due the 30th / Feb 28th): owed for every month the class had a
+  // lesson. This month's shows up from a week before the deadline; past months stay listed
+  // as overdue until they're done.
   const reportTodos: {
     classId: string; className: string; year: number; month: number; deadline: Date; sent: number; total: number; overdue: boolean;
   }[] = [];
   const thisMonth = yearMonthOf(today);
-  const months = [previousMonth(thisMonth.year, thisMonth.month), thisMonth];
+  const taught =
+    classIds.length === 0
+      ? []
+      : await prisma.classSession.findMany({
+          where: { classId: { in: classIds }, dayOff: false, scheduledDate: { lte: today } },
+          select: { classId: true, scheduledDate: true },
+        });
+  const monthsByClass = new Map<string, Map<string, { year: number; month: number }>>();
+  for (const t of taught) {
+    const ym = yearMonthOf(t.scheduledDate);
+    const m = monthsByClass.get(t.classId) ?? new Map();
+    m.set(`${ym.year}-${ym.month}`, ym);
+    monthsByClass.set(t.classId, m);
+  }
   for (const classId of classIds) {
     if (!required(classId, "monthly_report")) continue;
+    const months = [...(monthsByClass.get(classId)?.values() ?? [])];
+    if (!months.some((m) => m.year === thisMonth.year && m.month === thisMonth.month)) months.push(thisMonth);
     for (const { year, month } of months) {
       const deadline = monthlyReportDeadline(year, month, cfg);
       const overdue = now.getTime() > deadline.getTime();
       if (!overdue && deadline.getTime() > soon) continue; // not due within a week yet
-      if (overdue && deadline.getTime() < recent) continue; // too old to chase
       const progress = await monthlyReportProgress(classId, user.assistantId, year, month, now);
       if (progress.total === 0 || monthlyReportDone(progress)) continue;
       reportTodos.push({ classId, className: classNames.get(classId) ?? "", year, month, deadline, overdue, ...progress });
@@ -229,7 +257,7 @@ export default async function MyTasksPage() {
       <div>
         <h1 className="page-title">Tasks</h1>
         {!nothing && (
-          <p className="page-subtitle">Sessions from the last 3 weeks, homework corrections, grades, upcoming quiz prep and monthly reports still needing your attention.</p>
+          <p className="page-subtitle">Lessons, homework corrections, grades, upcoming quiz prep and monthly reports still needing your attention.</p>
         )}
       </div>
 

@@ -3,6 +3,7 @@ import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { saturdayDeadline, formatCairo } from "@/lib/datetime";
 import { resolveConfig } from "@/lib/operation";
+import { homeworkDueAt } from "@/lib/task-timing";
 import { addHomework, deleteHomework } from "@/actions/homework";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -21,7 +22,7 @@ export default async function HomeworkListPage({
   const user = await requireClassAccess(classId);
 
   const [klass, visibleIds, homeworks] = await Promise.all([
-    prisma.class.findUnique({ where: { id: classId }, select: { name: true } }),
+    prisma.class.findUnique({ where: { id: classId }, select: { name: true, schedule: true } }),
     getVisibleStudentIds(classId, user),
     prisma.homeworkAssignment.findMany({
       where: { classId, noHomework: false },
@@ -38,6 +39,7 @@ export default async function HomeworkListPage({
   });
   const reviewedBy = new Map(counts.map((c) => [c.homeworkId, c._count._all]));
   const cfg = await resolveConfig();
+  const now = new Date();
 
   return (
     <div className="flex flex-col gap-4">
@@ -73,6 +75,8 @@ export default async function HomeworkListPage({
           {homeworks.map((hw) => {
             const reviewed = reviewedBy.get(hw.id) ?? 0;
             const complete = total > 0 && reviewed === total;
+            // Not collected yet -> nothing to correct, so no to-do badge.
+            const notDue = now < homeworkDueAt(hw.deadline, klass?.schedule);
             return (
               <li key={hw.id} className="card p-3.5">
                 <Link
@@ -84,9 +88,13 @@ export default async function HomeworkListPage({
                       {hw.description ?? "Homework"}
                       {!hw.sessionId && <span className="badge-neutral ml-2 align-middle">Extra</span>}
                     </p>
-                    <span className={complete ? "badge-success" : "badge-warn"}>
-                      {complete ? "Complete" : `${reviewed}/${total} reviewed`}
-                    </span>
+                    {notDue && !complete ? (
+                      <span className="badge-neutral">Not due yet</span>
+                    ) : (
+                      <span className={complete ? "badge-success" : "badge-warn"}>
+                        {complete ? "Complete" : `${reviewed}/${total} reviewed`}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-0.5 text-sm text-muted">
                     Due {dateFmt.format(hw.deadline)} · enter by {formatCairo(saturdayDeadline(hw.deadline, cfg), "EEE d MMM, h:mm a")}

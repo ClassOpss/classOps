@@ -3,6 +3,7 @@ import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { saturdayDeadline, formatCairo } from "@/lib/datetime";
 import { resolveConfig } from "@/lib/operation";
+import { assessmentHeldAt } from "@/lib/task-timing";
 import { AssessmentForm } from "@/app/(admin)/classes/[classId]/assessments/assessment-form";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -21,12 +22,12 @@ export default async function AssessmentsListPage({
   const user = await requireClassAccess(classId);
 
   const [klass, visibleIds, assessments] = await Promise.all([
-    prisma.class.findUnique({ where: { id: classId }, select: { name: true } }),
+    prisma.class.findUnique({ where: { id: classId }, select: { name: true, schedule: true } }),
     getVisibleStudentIds(classId, user),
     prisma.assessment.findMany({
       where: { classId },
       orderBy: { date: "desc" },
-      select: { id: true, label: true, type: true, date: true, maxMark: true, isDiagnostic: true },
+      select: { id: true, label: true, type: true, date: true, time: true, maxMark: true, isDiagnostic: true },
     }),
   ]);
   const total = visibleIds.length;
@@ -38,6 +39,7 @@ export default async function AssessmentsListPage({
   });
   const gradedBy = new Map(counts.map((c) => [c.assessmentId, c._count._all]));
   const cfg = await resolveConfig();
+  const now = new Date();
 
   return (
     <div className="flex flex-col gap-4">
@@ -60,6 +62,8 @@ export default async function AssessmentsListPage({
           {assessments.map((a) => {
             const graded = gradedBy.get(a.id) ?? 0;
             const complete = total > 0 && graded === total;
+            // Not sat yet -> nothing to grade, so no to-do badge.
+            const upcoming = now < assessmentHeldAt(a.date, a.time, klass?.schedule);
             return (
               <li key={a.id}>
                 <Link
@@ -71,7 +75,9 @@ export default async function AssessmentsListPage({
                       {a.label}
                       {a.isDiagnostic ? <span className="ml-1.5 badge-neutral">Diagnostic</span> : null}
                     </p>
-                    {a.maxMark == null ? (
+                    {upcoming && !complete ? (
+                      <span className="badge-neutral">Upcoming</span>
+                    ) : a.maxMark == null ? (
                       <span className="badge-warn">Set max mark</span>
                     ) : (
                       <span className={complete ? "badge-success" : "badge-warn"}>
