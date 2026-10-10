@@ -3,8 +3,9 @@ import { requireRole, requireUser } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { taskRequired, type TaskScope } from "@/lib/task-toggles";
 import { resolveConfig } from "@/lib/operation";
-import { cairoToday, quizPrepDeadline, quizAnnounceDeadline, monthlyReportDeadline, formatCairo } from "@/lib/datetime";
+import { cairoToday, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, monthlyReportDeadline, formatCairo } from "@/lib/datetime";
 import { monthlyReportProgress, monthlyReportDone, yearMonthOf, previousMonth, monthName } from "@/lib/monthly-reports";
+import { subGroupStudentIds } from "@/lib/roster";
 import { quizCyclesBetween, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -145,6 +146,62 @@ export default async function MyTasksPage() {
   }
   quizTodos.sort((a, b) => a.deadline.getTime() - b.deadline.getTime());
 
+  const classNames = new Map(assignments.map((a) => [a.classId, a.class.name]));
+
+  // Weekly sub-group tasks (HW correction / grade entry): anything already due/held whose
+  // Saturday deadline is ahead or passed within the last 3 weeks, while MY sub-group isn't
+  // fully reviewed yet. Same completeness rule the weekly fine uses.
+  const weeklyTodos: {
+    key: string; classId: string; className: string; kind: "Homework" | "Grades"; title: string;
+    href: string; reviewed: number; total: number; deadline: Date; overdue: boolean;
+  }[] = [];
+  if (classIds.length > 0) {
+    const lookback = addDays(today, -28);
+    const [homeworks, assessments] = await Promise.all([
+      prisma.homeworkAssignment.findMany({
+        where: { classId: { in: classIds }, noHomework: false, deadline: { gte: lookback, lte: today } },
+        select: { id: true, classId: true, description: true, deadline: true, submissions: { select: { studentId: true } } },
+      }),
+      prisma.assessment.findMany({
+        where: { classId: { in: classIds }, date: { gte: lookback, lte: today } },
+        select: { id: true, classId: true, label: true, date: true, grades: { select: { studentId: true } } },
+      }),
+    ]);
+    const assistantId = user.assistantId;
+    const subGroups = new Map<string, string[]>();
+    const subGroup = async (classId: string) => {
+      let ids = subGroups.get(classId);
+      if (!ids) subGroups.set(classId, (ids = await subGroupStudentIds(classId, assistantId, now)));
+      return ids;
+    };
+    const push = async (
+      classId: string, kind: "Homework" | "Grades", id: string, title: string, href: string, date: Date, done: string[],
+    ) => {
+      const deadline = saturdayDeadline(date, cfg);
+      if (deadline.getTime() < recent) return; // too old to chase
+      const ids = await subGroup(classId);
+      if (ids.length === 0) return;
+      const seen = new Set(done);
+      const reviewed = ids.filter((x) => seen.has(x)).length;
+      if (reviewed >= ids.length) return;
+      weeklyTodos.push({
+        key: `${kind}-${id}`, classId, className: classNames.get(classId) ?? "", kind, title, href,
+        reviewed, total: ids.length, deadline, overdue: now.getTime() > deadline.getTime(),
+      });
+    };
+    for (const hw of homeworks) {
+      if (!required(hw.classId, "hw_correction")) continue;
+      await push(hw.classId, "Homework", hw.id, `HW due ${dateFmt.format(hw.deadline)}${hw.description ? ` · ${hw.description}` : ""}`,
+        `/my/classes/${hw.classId}/homework/${hw.id}`, hw.deadline, hw.submissions.map((x) => x.studentId));
+    }
+    for (const a of assessments) {
+      if (!required(a.classId, "grade_entry")) continue;
+      await push(a.classId, "Grades", a.id, `${a.label} · ${dateFmt.format(a.date)}`,
+        `/my/classes/${a.classId}/assessments/${a.id}`, a.date, a.grades.map((g) => g.studentId));
+    }
+  }
+  weeklyTodos.sort((a, b) => a.deadline.getTime() - b.deadline.getTime());
+
   // Monthly parent reports (due the 30th / Feb 28th): this month's shows up from a week
   // before the deadline; last month's stays listed as overdue until it's done.
   const reportTodos: {
@@ -152,7 +209,6 @@ export default async function MyTasksPage() {
   }[] = [];
   const thisMonth = yearMonthOf(today);
   const months = [previousMonth(thisMonth.year, thisMonth.month), thisMonth];
-  const classNames = new Map(assignments.map((a) => [a.classId, a.class.name]));
   for (const classId of classIds) {
     if (!required(classId, "monthly_report")) continue;
     for (const { year, month } of months) {
@@ -166,14 +222,14 @@ export default async function MyTasksPage() {
     }
   }
   reportTodos.sort((a, b) => a.deadline.getTime() - b.deadline.getTime());
-  const nothing = todos.length === 0 && quizTodos.length === 0 && reportTodos.length === 0;
+  const nothing = todos.length === 0 && weeklyTodos.length === 0 && quizTodos.length === 0 && reportTodos.length === 0;
 
   return (
     <div className="flex flex-col gap-5">
       <div>
         <h1 className="page-title">Tasks</h1>
         {!nothing && (
-          <p className="page-subtitle">Sessions from the last 3 weeks, upcoming quiz prep and monthly reports still needing your attention.</p>
+          <p className="page-subtitle">Sessions from the last 3 weeks, homework corrections, grades, upcoming quiz prep and monthly reports still needing your attention.</p>
         )}
       </div>
 
@@ -205,6 +261,30 @@ export default async function MyTasksPage() {
                 </li>
               ))}
             </ul>
+          )}
+
+          {weeklyTodos.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <h2 className="section-title mt-2">Weekly tasks</h2>
+              <ul className="flex flex-col gap-2">
+                {weeklyTodos.map((w) => (
+                  <li key={w.key}>
+                    <Link
+                      href={w.href}
+                      className="card flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:border-border-strong"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{w.className}</p>
+                        <p className="truncate text-xs text-faint">
+                          {w.title} · {w.reviewed} of {w.total} {w.kind === "Homework" ? "reviewed" : "graded"} · due {formatCairo(w.deadline, "d MMM, h:mm a")}
+                        </p>
+                      </div>
+                      <span className={w.overdue ? "badge-danger" : "badge-warn"}>{w.overdue ? "Overdue" : w.kind}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {reportTodos.length > 0 && (
