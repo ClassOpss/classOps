@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { riskReasons, watchFlags, type RiskInput } from "@/lib/at-risk";
+import { gradeTrend, hwTrend, type GradeTrend, type HwTrend } from "@/lib/trend";
 
 export type StudentProgress = {
   id: string;
@@ -13,6 +14,8 @@ export type StudentProgress = {
   // Most recent graded assessment, relative to that assessment's class average.
   lastGrade: { label: string; percentage: number; classAverage: number } | null;
   weakPoints: string | null;
+  gradeTrend: GradeTrend; // null = fewer than 4 graded assessments
+  hwTrend: HwTrend; // null = fewer than 6 reviewed homeworks
   reasons: string[]; // at risk (grades / homework)
   flags: string[]; // informational only (attendance)
 };
@@ -50,7 +53,7 @@ export async function classProgress(classId: string, studentIds: string[]): Prom
         attendance: { where: { session: { classId } }, select: { status: true } },
         hwSubmissions: {
           where: { homework: { classId } },
-          select: { status: true, weakPoints: true, loggedAt: true },
+          select: { status: true, weakPoints: true, loggedAt: true, homework: { select: { deadline: true } } },
         },
       },
     }),
@@ -95,12 +98,25 @@ export async function classProgress(classId: string, studentIds: string[]): Prom
       missing: s.hwSubmissions.filter((h) => h.status === "missing").length,
     };
     const average = mean(counted);
+    const gTrend = gradeTrend(
+      graded
+        .filter((x) => !x.a.isDiagnostic)
+        .reverse() // newest-first -> chronological
+        .map((x) => ({ pct: x.pct, classAvg: assessmentAvg.get(x.a.id) ?? x.pct })),
+    );
+    const hTrend = hwTrend(
+      [...s.hwSubmissions]
+        .sort((a, b) => a.homework.deadline.getTime() - b.homework.deadline.getTime())
+        .map((h) => h.status),
+    );
     const risk: RiskInput = {
       attended,
       attendanceTotal,
       hwSubmitted: hw.onTime + hw.late,
       hwTotal: hw.onTime + hw.late + hw.missing,
       average,
+      gradeTrend: gTrend?.label,
+      hwTrend: hTrend?.label,
     };
     return {
       id: s.id,
@@ -114,6 +130,8 @@ export async function classProgress(classId: string, studentIds: string[]): Prom
         ? { label: last.a.label, percentage: last.pct, classAverage: assessmentAvg.get(last.a.id) ?? last.pct }
         : null,
       weakPoints: weak?.weakPoints?.trim() ?? null,
+      gradeTrend: gTrend,
+      hwTrend: hTrend,
       reasons: riskReasons(risk),
       flags: watchFlags(risk),
     };

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { classProgress, type StudentProgress } from "@/lib/student-progress";
+import { GapSparkline, GradeTrendBadge, HwTrendBadge } from "@/components/trend";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
 
@@ -82,9 +83,20 @@ function StudentCard({ s, classId }: { s: StudentProgress; classId: string }) {
         </div>
         <div>
           <dt className="text-xs text-muted">Average</dt>
-          <dd className="tabular-nums">{pct(s.average)}</dd>
+          <dd className="flex items-center gap-2 tabular-nums">
+            {pct(s.average)}
+            <GapSparkline trend={s.gradeTrend} width={56} height={20} />
+          </dd>
         </div>
       </dl>
+
+      {/* Trend: "slipping" already shows up top as an attention reason, so only the rest here. */}
+      {(s.gradeTrend && s.gradeTrend.label !== "slipping") || s.hwTrend?.label === "improving" ? (
+        <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+          {s.gradeTrend && s.gradeTrend.label !== "slipping" && <GradeTrendBadge trend={s.gradeTrend} />}
+          {s.hwTrend?.label === "improving" && <HwTrendBadge trend={s.hwTrend} />}
+        </div>
+      ) : null}
 
       {(s.lastGrade || s.weakPoints) && (
         <div className="mt-2.5 flex flex-col gap-1 border-t border-border pt-2.5 text-xs text-muted">

@@ -562,6 +562,18 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
       No fine for an ad-hoc cycle on a deadline day it was created on (or after). Quiz tabs now
       always shown. Tests: scripts/test-quiz-cycles.ts; seeder: scripts/dev-adhoc-quiz.ts.
 
+    ── Student trends (staff-only for now; parent PDF later once labels look right on real data) ──
+    • lib/trend.ts (unit-tested, scripts/test-trend.ts). GRADE trend = least-squares change in the GAP to
+      the class average over the latest 6 non-diagnostic assessments (min 4): >=+8 improving, <=-8 slipping,
+      else steady above/at/below class (mean gap of last 3 beyond ±3). Gap, not raw %, so harder quizzes
+      don't count against a student. HW trend = score (on time 1/late .5/missing 0) of the recent half vs
+      earlier half of the latest 8 reviewed HW (min 6), ±0.25. HW gives a signal weeks before grades
+      (~2 quizzes vs 5-10 HW a month). "Grades slipping"/"HW slipping" are at-risk reasons (lib/at-risk) —
+      early warning on both the admin "Needs attention" panel and the assistant progress view.
+      UI: progress cards = gap sparkline + trend badges (components/trend.tsx); student profile (whole-year
+      view only) = Trend section with Recharts student-vs-class line chart (components/grade-trend-chart.tsx,
+      animation OFF — it never drew in a hidden tab). Seeder: scripts/dev-trend.ts [clean].
+
     ── DEFERRED to v2 (next year — user decision) ──
     Student/parent self-serve portals, in-app HW upload, dropping Google Classroom, fee/payment tracking,
     admin activity tab, automatic daily-update sending to the class WhatsApp group. Design keeps these

@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { studentProfile, type HwOutcome } from "@/lib/student-profile";
+import { gradeTrend, hwTrend, type HwOutcomeForTrend } from "@/lib/trend";
+import { GradeTrendBadge, HwTrendBadge } from "@/components/trend";
+import { GradeTrendChart } from "@/components/grade-trend-chart";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const dayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "2-digit", month: "short", timeZone: "UTC" });
@@ -70,6 +73,24 @@ export default async function StudentProfilePage({
   const scored = grades.filter((g) => !g.isDiagnostic && g.percentage != null && !g.absent);
   const average = mean(scored.map((g) => g.percentage!));
   const classAverage = mean(scored.flatMap((g) => (g.classAverage == null ? [] : [g.classAverage])));
+
+  // Trend (whole-year view only — a single month has too few points). Oldest first.
+  const chrono = [...scored].filter((g) => g.classAverage != null).reverse();
+  const gTrend = period ? null : gradeTrend(chrono.map((g) => ({ pct: g.percentage!, classAvg: g.classAverage! })));
+  const hTrend = period
+    ? null
+    : hwTrend(
+        homework
+          .filter((h) => h.outcome !== "pending")
+          .reverse()
+          .map((h) => h.outcome as HwOutcomeForTrend),
+      );
+  const chartData = chrono.map((g) => ({
+    label: g.label,
+    date: dayFmt.format(g.date),
+    student: g.percentage!,
+    classAvg: g.classAverage!,
+  }));
 
   const base = `/my/classes/${classId}/students/${studentId}`;
   const periodLabel = period ? `${MONTHS[period.month - 1]} ${period.year}` : "the whole year";
@@ -172,6 +193,25 @@ export default async function StudentProfilePage({
           </a>
         )}
       </section>
+
+      {!period && chartData.length >= 2 && (
+        <Section
+          title="Trend"
+          hint="Judged on the gap to the class average, so a harder quiz doesn't count against the student."
+        >
+          <div className="flex flex-col gap-3 px-4 py-3">
+            <div className="flex flex-wrap gap-1.5 text-xs">
+              {gTrend ? (
+                <GradeTrendBadge trend={gTrend} />
+              ) : (
+                <span className="badge-neutral">Grade trend after 4 assessments ({chartData.length} so far)</span>
+              )}
+              {hTrend && (hTrend.label === "steady" ? <span className="badge-neutral">→ HW steady</span> : <HwTrendBadge trend={hTrend} />)}
+            </div>
+            <GradeTrendChart data={chartData} />
+          </div>
+        </Section>
+      )}
 
       <Section title="Attendance" hint="Newest first. Excused sessions don't count toward the rate.">
         {attendance.length === 0 ? (

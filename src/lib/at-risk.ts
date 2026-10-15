@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { COUNTED_ATTENDANCE } from "@/lib/attendance";
+import { gradeTrend, hwTrend, type GradeTrendLabel, type HwTrendLabel } from "@/lib/trend";
 
 // At-risk is decided by academic signals only: grades and homework.
 const AVERAGE_FLOOR = 50; // non-diagnostic average grade < 50%
@@ -17,6 +18,10 @@ export type RiskInput = {
   hwSubmitted: number; // on_time + late
   hwTotal: number; // reviewed HW (on_time + late + missing)
   average: number | null;
+  // Trend labels (lib/trend). "slipping" flags a student BEFORE their average or
+  // submission rate crosses the floors above — the early warning.
+  gradeTrend?: GradeTrendLabel | null;
+  hwTrend?: HwTrendLabel | null;
 };
 
 // Why a student is at risk (empty = fine). Shared by the admin dashboard and
@@ -27,6 +32,8 @@ export function riskReasons(m: RiskInput): string[] {
   if (m.hwTotal >= MIN_HW && m.hwSubmitted / m.hwTotal < HW_SUBMIT_FLOOR) {
     reasons.push(`HW ${m.hwSubmitted}/${m.hwTotal} submitted`);
   }
+  if (m.gradeTrend === "slipping") reasons.push("Grades slipping");
+  if (m.hwTrend === "slipping") reasons.push("HW slipping");
   return reasons;
 }
 
@@ -56,13 +63,24 @@ export async function detectAtRiskStudents(operationId: string): Promise<AtRiskS
       name: true,
       class: { select: { id: true, name: true } },
       attendance: { where: COUNTED_ATTENDANCE, select: { status: true } },
-      hwSubmissions: { select: { status: true } },
+      hwSubmissions: { select: { status: true, homework: { select: { deadline: true } } } },
       grades: {
         where: { assessment: { isDiagnostic: false }, percentage: { not: null } },
-        select: { percentage: true },
+        select: { percentage: true, assessmentId: true, assessment: { select: { date: true } } },
       },
     },
   });
+
+  // Class average per assessment, for the gap-to-class grade trend.
+  const avgRows = await prisma.assessmentGrade.groupBy({
+    by: ["assessmentId"],
+    where: {
+      percentage: { not: null },
+      assessment: { isDiagnostic: false, class: { active: true, operationId } },
+    },
+    _avg: { percentage: true },
+  });
+  const classAvg = new Map(avgRows.map((r) => [r.assessmentId, Number(r._avg.percentage)]));
 
   const out: AtRiskStudent[] = [];
   for (const s of students) {
@@ -75,6 +93,16 @@ export async function detectAtRiskStudents(operationId: string): Promise<AtRiskS
       hwSubmitted: s.hwSubmissions.filter((h) => h.status !== "missing").length,
       hwTotal: s.hwSubmissions.length,
       average: avg,
+      gradeTrend: gradeTrend(
+        [...s.grades]
+          .sort((a, b) => a.assessment.date.getTime() - b.assessment.date.getTime())
+          .map((g) => ({ pct: Number(g.percentage), classAvg: classAvg.get(g.assessmentId) ?? Number(g.percentage) })),
+      )?.label,
+      hwTrend: hwTrend(
+        [...s.hwSubmissions]
+          .sort((a, b) => a.homework.deadline.getTime() - b.homework.deadline.getTime())
+          .map((h) => h.status),
+      )?.label,
     };
     const reasons = riskReasons(input);
     if (reasons.length) {
