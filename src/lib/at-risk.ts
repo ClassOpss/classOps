@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { COUNTED_ATTENDANCE } from "@/lib/attendance";
-import { gradeTrend, hwTrend, type GradeTrendLabel, type HwTrendLabel } from "@/lib/trend";
+import { classGradeSeries, gradeTrend, hwTrend, pooledNoise, type GradePoint, type GradeTrendLabel, type HwTrendLabel } from "@/lib/trend";
 
 // At-risk is decided by academic signals only: grades and homework.
 const AVERAGE_FLOOR = 50; // non-diagnostic average grade < 50%
@@ -66,21 +66,32 @@ export async function detectAtRiskStudents(operationId: string): Promise<AtRiskS
       hwSubmissions: { select: { status: true, homework: { select: { deadline: true } } } },
       grades: {
         where: { assessment: { isDiagnostic: false }, percentage: { not: null } },
-        select: { percentage: true, assessmentId: true, assessment: { select: { date: true } } },
+        select: { percentage: true },
       },
     },
   });
 
-  // Class average per assessment, for the gap-to-class grade trend.
-  const avgRows = await prisma.assessmentGrade.groupBy({
-    by: ["assessmentId"],
-    where: {
-      percentage: { not: null },
-      assessment: { isDiagnostic: false, class: { active: true, operationId } },
+  // Grade trends: per class, each student's leave-one-out z per assessment (lib/trend).
+  const assessments = await prisma.assessment.findMany({
+    where: { isDiagnostic: false, class: { active: true, operationId } },
+    orderBy: { date: "asc" },
+    select: {
+      classId: true,
+      grades: { where: { percentage: { not: null } }, select: { studentId: true, percentage: true } },
     },
-    _avg: { percentage: true },
   });
-  const classAvg = new Map(avgRows.map((r) => [r.assessmentId, Number(r._avg.percentage)]));
+  const byClass = new Map<string, { grades: { studentId: string; pct: number }[] }[]>();
+  for (const a of assessments) {
+    if (!byClass.has(a.classId)) byClass.set(a.classId, []);
+    byClass.get(a.classId)!.push({ grades: a.grades.map((g) => ({ studentId: g.studentId, pct: Number(g.percentage) })) });
+  }
+  const series = new Map<string, GradePoint[]>();
+  const noise = new Map<string, number>();
+  for (const [classId, list] of byClass) {
+    const s = classGradeSeries(list);
+    noise.set(classId, pooledNoise(s.values()));
+    for (const [studentId, pts] of s) series.set(studentId, pts);
+  }
 
   const out: AtRiskStudent[] = [];
   for (const s of students) {
@@ -93,15 +104,11 @@ export async function detectAtRiskStudents(operationId: string): Promise<AtRiskS
       hwSubmitted: s.hwSubmissions.filter((h) => h.status !== "missing").length,
       hwTotal: s.hwSubmissions.length,
       average: avg,
-      gradeTrend: gradeTrend(
-        [...s.grades]
-          .sort((a, b) => a.assessment.date.getTime() - b.assessment.date.getTime())
-          .map((g) => ({ pct: Number(g.percentage), classAvg: classAvg.get(g.assessmentId) ?? Number(g.percentage) })),
-      )?.label,
+      gradeTrend: gradeTrend(series.get(s.id) ?? [], noise.get(s.class.id) ?? 0)?.label,
       hwTrend: hwTrend(
         [...s.hwSubmissions]
           .sort((a, b) => a.homework.deadline.getTime() - b.homework.deadline.getTime())
-          .map((h) => h.status),
+          .map((h) => h.status !== "missing"),
       )?.label,
     };
     const reasons = riskReasons(input);

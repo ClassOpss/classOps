@@ -563,12 +563,15 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
       always shown. Tests: scripts/test-quiz-cycles.ts; seeder: scripts/dev-adhoc-quiz.ts.
 
     ── Student trends (staff-only for now; parent PDF later once labels look right on real data) ──
-    • lib/trend.ts (unit-tested, scripts/test-trend.ts). GRADE trend = least-squares change in the GAP to
-      the class average over the latest 6 non-diagnostic assessments (min 4): >=+8 improving, <=-8 slipping,
-      else steady above/at/below class (mean gap of last 3 beyond ±3). Gap, not raw %, so harder quizzes
-      don't count against a student. HW trend = score (on time 1/late .5/missing 0) of the recent half vs
-      earlier half of the latest 8 reviewed HW (min 6), ±0.25. HW gives a signal weeks before grades
-      (~2 quizzes vs 5-10 HW a month). "Grades slipping"/"HW slipping" are at-risk reasons (lib/at-risk) —
+    • lib/trend.ts (unit-tested, scripts/test-trend.ts; REDONE from research — refs at the bottom of the
+      file). GRADES: per assessment, LEAVE-ONE-OUT z vs the other students (difficulty + spread; small
+      classes), SD floor 5pts, cap ±3. Recent = MEDIAN z of latest 3; baseline = mean z of earlier (window 8,
+      min 5 total). Reliable-change test: RC = change / (σ·√((π/2)/3 + 1/k_base)), σ = class pooled
+      within-student SD of z; improving/slipping only if |RC| ≥ 1.645 AND |change| ≥ 0.5 SD, else steady
+      above/at/below (recent median z beyond ±0.5). NOT an OLS slope (needs 8-9+ points). HW: submission
+      rate (late counts as submitted) last 4 vs up to 8 earlier (min 8 total), two-proportion z ≥ 1.645 —
+      one miss after a clean run stays steady; 2 of last 4 = slipping. All cut points are constants at the
+      top of trend.ts (tune locally). "Grades slipping"/"HW slipping" are at-risk reasons (lib/at-risk) —
       early warning on both the admin "Needs attention" panel and the assistant progress view.
       UI: progress cards = gap sparkline + trend badges (components/trend.tsx); student profile (whole-year
       view only) = Trend section with Recharts student-vs-class line chart (components/grade-trend-chart.tsx,

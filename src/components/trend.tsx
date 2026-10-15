@@ -24,7 +24,7 @@ const ARROW: Record<string, string> = { improving: "↗", slipping: "↘" };
 export function GradeTrendBadge({ trend }: { trend: GradeTrend }) {
   if (!trend) return null;
   return (
-    <span className={GRADE_CLS[trend.label]} title={`Gap to class average moved ${trend.change >= 0 ? "+" : ""}${Math.round(trend.change)} pts over the last ${trend.points.length} assessments`}>
+    <span className={GRADE_CLS[trend.label]} title={`Standing in class moved ${trend.change >= 0 ? "+" : ""}${trend.change.toFixed(1)} SD (latest 3 vs earlier ${trend.points.length - 3})`}>
       {ARROW[trend.label] ?? "→"} {GRADE_TREND_TEXT[trend.label]}
     </span>
   );
@@ -39,11 +39,11 @@ export function HwTrendBadge({ trend }: { trend: HwTrend }) {
   );
 }
 
-// Tiny line of the student's gap to the class average; the dashed line is the class.
+// Tiny line of the student's standing (z vs the rest of the class); dashed line = class average.
 export function GapSparkline({ trend, width = 84, height = 24 }: { trend: GradeTrend; width?: number; height?: number }) {
   if (!trend) return null;
-  const gaps = trend.points.map((p) => p.gap);
-  const span = Math.max(10, ...gaps.map(Math.abs)); // symmetric around the class line
+  const gaps = trend.points.map((p) => p.z);
+  const span = Math.max(1, ...gaps.map(Math.abs)); // symmetric around the class line
   const pad = 3;
   const x = (i: number) => pad + (i * (width - 2 * pad)) / (gaps.length - 1);
   const y = (g: number) => height / 2 - (g / span) * (height / 2 - pad);

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { riskReasons, watchFlags, type RiskInput } from "@/lib/at-risk";
-import { gradeTrend, hwTrend, type GradeTrend, type HwTrend } from "@/lib/trend";
+import { classGradeSeries, gradeTrend, hwTrend, pooledNoise, type GradeTrend, type HwTrend } from "@/lib/trend";
 
 export type StudentProgress = {
   id: string;
@@ -14,8 +14,8 @@ export type StudentProgress = {
   // Most recent graded assessment, relative to that assessment's class average.
   lastGrade: { label: string; percentage: number; classAverage: number } | null;
   weakPoints: string | null;
-  gradeTrend: GradeTrend; // null = fewer than 4 graded assessments
-  hwTrend: HwTrend; // null = fewer than 6 reviewed homeworks
+  gradeTrend: GradeTrend; // null = fewer than 5 standardised assessments
+  hwTrend: HwTrend; // null = fewer than 8 reviewed homeworks
   reasons: string[]; // at risk (grades / homework)
   flags: string[]; // informational only (attendance)
 };
@@ -78,6 +78,15 @@ export async function classProgress(classId: string, studentIds: string[]): Prom
     assessments.map((a) => [a.id, mean(a.grades.map((g) => Number(g.percentage)))]),
   );
 
+  // Trends: each student's standing (leave-one-out z) per assessment, oldest first.
+  const series = classGradeSeries(
+    assessments
+      .filter((a) => !a.isDiagnostic)
+      .reverse()
+      .map((a) => ({ grades: a.grades.map((g) => ({ studentId: g.studentId, pct: Number(g.percentage) })) })),
+  );
+  const noise = pooledNoise(series.values());
+
   const all: StudentProgress[] = students.map((s) => {
     const graded = assessments.flatMap((a) => {
       const g = a.grades.find((x) => x.studentId === s.id);
@@ -98,16 +107,11 @@ export async function classProgress(classId: string, studentIds: string[]): Prom
       missing: s.hwSubmissions.filter((h) => h.status === "missing").length,
     };
     const average = mean(counted);
-    const gTrend = gradeTrend(
-      graded
-        .filter((x) => !x.a.isDiagnostic)
-        .reverse() // newest-first -> chronological
-        .map((x) => ({ pct: x.pct, classAvg: assessmentAvg.get(x.a.id) ?? x.pct })),
-    );
+    const gTrend = gradeTrend(series.get(s.id) ?? [], noise);
     const hTrend = hwTrend(
       [...s.hwSubmissions]
         .sort((a, b) => a.homework.deadline.getTime() - b.homework.deadline.getTime())
-        .map((h) => h.status),
+        .map((h) => h.status !== "missing"),
     );
     const risk: RiskInput = {
       attended,

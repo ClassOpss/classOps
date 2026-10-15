@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
 import { studentProfile, type HwOutcome } from "@/lib/student-profile";
-import { gradeTrend, hwTrend, type HwOutcomeForTrend } from "@/lib/trend";
+import { classProgress } from "@/lib/student-progress";
 import { GradeTrendBadge, HwTrendBadge } from "@/components/trend";
 import { GradeTrendChart } from "@/components/grade-trend-chart";
 
@@ -56,9 +56,11 @@ export default async function StudentProfilePage({
   const y = Number(sp.year);
   const period = m >= 1 && m <= 12 && y > 2000 ? { month: m, year: y } : null;
 
-  const [klass, profile] = await Promise.all([
+  const [klass, profile, progress] = await Promise.all([
     prisma.class.findUnique({ where: { id: classId }, select: { name: true } }),
     studentProfile(classId, studentId, period),
+    // Trends need the whole class (standing vs the other students) — same numbers as the progress tab.
+    period ? null : classProgress(classId, [studentId]),
   ]);
   if (!klass || !profile) notFound();
   const { student, attendance, homework, grades, officeHours, months } = profile;
@@ -74,17 +76,10 @@ export default async function StudentProfilePage({
   const average = mean(scored.map((g) => g.percentage!));
   const classAverage = mean(scored.flatMap((g) => (g.classAverage == null ? [] : [g.classAverage])));
 
-  // Trend (whole-year view only — a single month has too few points). Oldest first.
+  // Trend (whole-year view only — a single month has too few points). Chart oldest first.
   const chrono = [...scored].filter((g) => g.classAverage != null).reverse();
-  const gTrend = period ? null : gradeTrend(chrono.map((g) => ({ pct: g.percentage!, classAvg: g.classAverage! })));
-  const hTrend = period
-    ? null
-    : hwTrend(
-        homework
-          .filter((h) => h.outcome !== "pending")
-          .reverse()
-          .map((h) => h.outcome as HwOutcomeForTrend),
-      );
+  const gTrend = progress?.students[0]?.gradeTrend ?? null;
+  const hTrend = progress?.students[0]?.hwTrend ?? null;
   const chartData = chrono.map((g) => ({
     label: g.label,
     date: dayFmt.format(g.date),
@@ -197,14 +192,14 @@ export default async function StudentProfilePage({
       {!period && chartData.length >= 2 && (
         <Section
           title="Trend"
-          hint="Judged on the gap to the class average, so a harder quiz doesn't count against the student."
+          hint="Judged on standing within the class (latest 3 vs earlier), so a harder quiz or one off day doesn't count against the student."
         >
           <div className="flex flex-col gap-3 px-4 py-3">
             <div className="flex flex-wrap gap-1.5 text-xs">
               {gTrend ? (
                 <GradeTrendBadge trend={gTrend} />
               ) : (
-                <span className="badge-neutral">Grade trend after 4 assessments ({chartData.length} so far)</span>
+                <span className="badge-neutral">Grade trend after 5 assessments ({chartData.length} so far)</span>
               )}
               {hTrend && (hTrend.label === "steady" ? <span className="badge-neutral">→ HW steady</span> : <HwTrendBadge trend={hTrend} />)}
             </div>

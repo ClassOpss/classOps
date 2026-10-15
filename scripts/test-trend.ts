@@ -1,48 +1,50 @@
-import { gradeTrend, hwTrend } from "../src/lib/trend";
+import { classGradeSeries, gradeTrend, hwTrend, looZ, pooledNoise, DEFAULT_NOISE } from "../src/lib/trend";
 
 function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error("FAIL: " + msg);
   console.log("ok: " + msg);
 }
-const g = (pct: number, classAvg: number) => ({ pct, classAvg });
+const pts = (zs: number[]) => zs.map((z) => ({ z, pct: 50 }));
+const N = DEFAULT_NOISE; // 0.6
 
-// Grades
-assert(gradeTrend([g(60, 60), g(70, 60), g(80, 60)]) === null, "3 assessments -> not enough data");
-assert(gradeTrend([g(50, 60), g(55, 60), g(65, 60), g(72, 60)])?.label === "improving", "gap -10 -> +12 = improving");
-assert(gradeTrend([g(80, 60), g(75, 62), g(62, 60), g(50, 58)])?.label === "slipping", "gap +20 -> -8 = slipping");
-// Raw % falls 80 -> 60, but the quizzes got harder: gap rises -> NOT slipping.
-assert(
-  gradeTrend([g(80, 85), g(75, 75), g(70, 62), g(60, 45)])?.label === "improving",
-  "raw % down but gap up (harder quizzes) = improving",
-);
-assert(gradeTrend([g(70, 60), g(72, 61), g(69, 60), g(71, 61)])?.label === "steady_above", "flat +10 = steady above");
-assert(gradeTrend([g(50, 60), g(49, 61), g(51, 60), g(50, 61)])?.label === "steady_below", "flat -10 = stuck below");
-assert(gradeTrend([g(60, 60), g(61, 60), g(59, 60), g(60, 60)])?.label === "steady_level", "flat 0 = at class level");
-// One bad outlier in a steady run shouldn't flip it.
-assert(
-  gradeTrend([g(70, 60), g(71, 60), g(55, 60), g(70, 60), g(71, 60)])?.label === "steady_above",
-  "single dip doesn't flip steady",
-);
-// Window is the latest 6: an old slump doesn't count.
-assert(
-  gradeTrend([g(20, 60), g(20, 60), g(70, 60), g(70, 60), g(70, 60), g(70, 60), g(70, 60), g(70, 60)])?.label ===
-    "steady_above",
-  "old slump outside window ignored",
-);
+// ── Standardisation ──
+assert(looZ(80, [60, 70]) === null, "fewer than 3 others -> can't standardise");
+assert(Math.abs(looZ(70, [50, 60, 70])! - 1) < 1e-9, "70 vs others mean 60, SD 10 -> z = +1");
+// Same +10 gap, but a tightly-bunched quiz means more than a spread-out one.
+assert(looZ(70, [58, 60, 62])! > looZ(70, [40, 60, 80])!, "same gap, tighter class -> larger z");
+// Leave-one-out: in a small class the student must not pull their own baseline.
+{
+  const s = classGradeSeries([
+    { grades: [{ studentId: "a", pct: 100 }, { studentId: "b", pct: 50 }, { studentId: "c", pct: 50 }, { studentId: "d", pct: 50 }] },
+  ]);
+  assert(s.get("a")![0].z === 3, "top scorer vs others (not incl. self), capped at +3");
+}
 
-// Homework
-assert(hwTrend(["on_time", "on_time", "missing", "missing", "missing"]) === null, "5 HW -> not enough data");
-assert(
-  hwTrend(["on_time", "on_time", "on_time", "on_time", "missing", "late", "missing", "missing"])?.label === "slipping",
-  "on time -> missing = slipping",
-);
-assert(
-  hwTrend(["missing", "missing", "late", "on_time", "on_time", "on_time"])?.label === "improving",
-  "missing -> on time = improving",
-);
-assert(
-  hwTrend(["on_time", "late", "on_time", "on_time", "late", "on_time"])?.label === "steady",
-  "mixed but flat = steady",
-);
+// ── Grade trend ──
+assert(gradeTrend(pts([0, 0, 1, 1]), N) === null, "4 assessments -> not enough data (need 5)");
+assert(gradeTrend(pts([-1, -1, 0.4, 0.5, 0.6]), N)?.label === "improving", "-1 SD -> +0.5 SD = improving");
+assert(gradeTrend(pts([1, 0.8, -0.3, -0.4, -0.2]), N)?.label === "slipping", "+0.9 SD -> -0.3 SD = slipping");
+// v1 bug: one bad quiz in a steady run flipped the label.
+assert(gradeTrend(pts([0.8, 0.9, 0.8, 0.9, -0.5, 0.8]), N)?.label === "steady_above", "one dip doesn't flip steady");
+assert(gradeTrend(pts([-0.9, -0.8, -1, -0.9, -0.8]), N)?.label === "steady_below", "flat -0.9 = stuck below");
+assert(gradeTrend(pts([0.1, -0.1, 0, 0.1, -0.1]), N)?.label === "steady_level", "flat ~0 = at class level");
+// Same change is NOT reliable for a student in a very noisy class.
+assert(gradeTrend(pts([-0.5, -0.4, 0.3, 0.4, 0.4]), 0.4)?.label === "improving", "+0.8 change, low-noise class -> improving");
+assert(gradeTrend(pts([-0.5, -0.4, 0.3, 0.4, 0.4]), 1.2)?.label !== "improving", "+0.8 change, very noisy class -> not called");
+// Small but statistically clean change still needs a meaningful size (≥0.5 SD).
+assert(gradeTrend(pts([0, 0, 0, 0, 0, 0.3, 0.3, 0.3]), 0.3)?.label === "steady_level", "+0.3 SD is too small to call");
+
+// ── Noise ──
+assert(pooledNoise([pts([0, 0])]) === DEFAULT_NOISE, "too little data -> default noise");
+assert(Math.abs(pooledNoise([pts([1, -1, 1, -1, 1, -1])]) - Math.sqrt(6 / 5)) < 1e-9, "pooled SD of a bouncing student");
+
+// ── Homework ──
+const T = true, F = false;
+assert(hwTrend([T, T, T, T, T, T, F]) === null, "7 HW -> not enough data (need 8)");
+// v1 bug: a single miss after a clean run was "slipping".
+assert(hwTrend([T, T, T, T, T, T, T, T, T, F])?.label === "steady", "one miss after 9 clean = steady");
+assert(hwTrend([T, T, T, T, T, T, T, T, F, T, F])?.label === "slipping", "two of last four missed = slipping");
+assert(hwTrend([F, F, T, F, F, F, T, T, T, T])?.label === "improving", "mostly missing -> all in = improving");
+assert(hwTrend([T, F, T, T, F, T, T, F, T, T, F, T])?.label === "steady", "same ~70% rate throughout = steady");
 
 console.log("all trend tests passed");
