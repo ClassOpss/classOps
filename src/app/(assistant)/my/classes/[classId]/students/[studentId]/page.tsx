@@ -6,6 +6,9 @@ import { studentProfile, type HwOutcome } from "@/lib/student-profile";
 import { classProgress } from "@/lib/student-progress";
 import { GradeTrendBadge, HwTrendBadge } from "@/components/trend";
 import { GradeTrendChart } from "@/components/grade-trend-chart";
+import { loadClassTrends } from "@/lib/class-trends";
+import { GROUP_META } from "@/lib/class-trend-classify";
+import { TrendDot } from "@/components/class-trends-table";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const dayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "2-digit", month: "short", timeZone: "UTC" });
@@ -56,12 +59,15 @@ export default async function StudentProfilePage({
   const y = Number(sp.year);
   const period = m >= 1 && m <= 12 && y > 2000 ? { month: m, year: y } : null;
 
-  const [klass, profile, progress] = await Promise.all([
+  const [klass, profile, progress, classTrends] = await Promise.all([
     prisma.class.findUnique({ where: { id: classId }, select: { name: true } }),
     studentProfile(classId, studentId, period),
     // Trends need the whole class (standing vs the other students) — same numbers as the progress tab.
     period ? null : classProgress(classId, [studentId]),
+    // Class-trend group (same as the Trends tab, incl. mocks), for the selected month or the whole year.
+    loadClassTrends(classId, { studentIds: [studentId], period }),
   ]);
+  const groupTrend = classTrends.rows[0]?.trend ?? null;
   if (!klass || !profile) notFound();
   const { student, attendance, homework, grades, officeHours, months } = profile;
 
@@ -189,21 +195,44 @@ export default async function StudentProfilePage({
         )}
       </section>
 
-      {!period && chartData.length >= 2 && (
+      {(groupTrend || (!period && chartData.length >= 2)) && (
         <Section
-          title="Trend"
-          hint="Judged on standing within the class (latest 3 vs earlier), so a harder quiz or one off day doesn't count against the student."
+          title={`Trend · ${periodLabel}`}
+          hint="Judged on standing within the class, so a harder quiz or one off day doesn't count against the student."
         >
           <div className="flex flex-col gap-3 px-4 py-3">
-            <div className="flex flex-wrap gap-1.5 text-xs">
-              {gTrend ? (
-                <GradeTrendBadge trend={gTrend} />
-              ) : (
-                <span className="badge-neutral">Grade trend after 5 assessments ({chartData.length} so far)</span>
-              )}
-              {hTrend && (hTrend.label === "steady" ? <span className="badge-neutral">→ HW steady</span> : <HwTrendBadge trend={hTrend} />)}
-            </div>
-            <GradeTrendChart data={chartData} />
+            {groupTrend && (
+              <div className="flex items-start gap-2 text-sm">
+                <span className="mt-1.5"><TrendDot group={groupTrend.group} /></span>
+                <span className="min-w-0 flex-1">
+                  <b>{GROUP_META[groupTrend.group].label}</b>
+                  <span className="block text-xs text-muted">{groupTrend.reason}</span>
+                </span>
+                <Link
+                  href={`/my/classes/${classId}/trends${period ? `?month=${period.month}&year=${period.year}` : ""}`}
+                  className="link shrink-0 text-xs"
+                >
+                  Class trends →
+                </Link>
+              </div>
+            )}
+            {/* Whole-year only: the strict trend badges + chart (a month has too few points). */}
+            {!period && chartData.length >= 2 && (
+              <>
+                {/* Labelled: these measure standing vs the class with the strict test (no mocks),
+                    which can differ from the action group above (e.g. remedial is an absolute level). */}
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="text-muted">Standing vs class (strict check, excl. mocks):</span>
+                  {gTrend ? (
+                    <GradeTrendBadge trend={gTrend} />
+                  ) : (
+                    <span className="badge-neutral">Grade trend after 5 assessments ({chartData.length} so far)</span>
+                  )}
+                  {hTrend && (hTrend.label === "steady" ? <span className="badge-neutral">→ HW steady</span> : <HwTrendBadge trend={hTrend} />)}
+                </div>
+                <GradeTrendChart data={chartData} />
+              </>
+            )}
           </div>
         </Section>
       )}
