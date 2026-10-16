@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireClassAccess } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { hwFeedbackFor, type HwFeedback } from "@/lib/reports/hw-feedback";
+import { parentTrendFor } from "@/lib/reports/parent-trend-data";
 
 // Record that a student's monthly PDF report went to the parent (called by the
 // "Report → parent" button once the share / chat hand-off happens). sentAt is set on the
@@ -74,7 +75,8 @@ export async function saveHwFeedback(
 
   const key = { studentId_year_month: { studentId, year, month } };
   if (text == null) {
-    await prisma.parentReportNote.deleteMany({ where: { studentId, year, month } });
+    // Back to the auto draft; keep the row's other settings (e.g. the trend switch).
+    await prisma.parentReportNote.updateMany({ where: { studentId, year, month }, data: { hwFeedback: null, updatedById: user.id } });
   } else {
     const hwFeedback = text.trim().slice(0, 4000);
     await prisma.parentReportNote.upsert({
@@ -94,4 +96,47 @@ export async function saveHwFeedback(
     metadata: { year, month },
   });
   return { ok: true, feedback: await hwFeedbackFor(studentId, month, year) };
+}
+
+// The progress-trend sentence a student's monthly report would carry, and whether the
+// assistant has switched it off for that month.
+export async function getReportTrend(
+  studentId: string,
+  year: number,
+  month: number,
+): Promise<{ ok: true; sentence: string | null; hidden: boolean } | { ok: false; error: string }> {
+  if (!validPeriod(year, month)) return { ok: false, error: "Invalid month." };
+  const student = await prisma.student.findUnique({ where: { id: studentId }, select: { classId: true } });
+  if (!student) return { ok: false, error: "Student not found." };
+  await requireClassAccess(student.classId);
+  const t = await parentTrendFor(studentId, month, year);
+  return { ok: true, sentence: t.available?.sentence ?? null, hidden: t.hidden };
+}
+
+// Include (or leave off) the progress-trend section on this month's report.
+export async function setReportTrendHidden(
+  studentId: string,
+  year: number,
+  month: number,
+  hidden: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!validPeriod(year, month)) return { ok: false, error: "Invalid month." };
+  const student = await prisma.student.findUnique({ where: { id: studentId }, select: { classId: true } });
+  if (!student) return { ok: false, error: "Student not found." };
+  const user = await requireClassAccess(student.classId);
+  await prisma.parentReportNote.upsert({
+    where: { studentId_year_month: { studentId, year, month } },
+    update: { hideTrend: hidden, updatedById: user.id },
+    create: { studentId, year, month, hideTrend: hidden, updatedById: user.id },
+  });
+  await logActivity({
+    actorId: user.id,
+    actorRole: user.role,
+    action: hidden ? "hid_report_trend" : "showed_report_trend",
+    entityType: "student",
+    entityId: studentId,
+    classId: student.classId,
+    metadata: { year, month },
+  });
+  return { ok: true };
 }

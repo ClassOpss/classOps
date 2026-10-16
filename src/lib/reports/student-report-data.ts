@@ -8,6 +8,7 @@ import { resolveConfigFor } from "@/lib/operation";
 import { hwFeedbackFor } from "@/lib/reports/hw-feedback";
 import { hwIsMissing, reportWindow } from "@/lib/report-month";
 import { cairoToday } from "@/lib/datetime";
+import { parentTrendFor, type ReportProgress } from "@/lib/reports/parent-trend-data";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -39,6 +40,8 @@ export type StudentReportData = {
   // Assistant-reviewed homework feedback (drafted from weak points). "" = omit.
   hwFeedback: string;
   grades: { label: string; date: string; score: string; classAvg: string; standing: Standing | null }[];
+  // Term-so-far trend sentence + chart (null = not enough results, or switched off).
+  progress: ReportProgress | null;
 };
 
 async function loadLogo(operationId: string, logoPath: string): Promise<string | null> {
@@ -221,5 +224,6 @@ export async function buildStudentReportData(
     missedHomework,
     hwFeedback: (await hwFeedbackFor(studentId, month, year)).text.trim(),
     grades,
+    progress: (await parentTrendFor(studentId, month, year)).progress,
   };
 }

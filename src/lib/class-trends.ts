@@ -24,12 +24,20 @@ export type TrendColumn = {
   type: string;
   isDiagnostic: boolean;
   hasBoundaries: boolean;
+  classAvg: number | null; // mean of every marked student
 };
 export type TrendCell =
   | { kind: "mark"; pct: number; letter: string | null; rank: number; n: number }
   | { kind: "absent" }
   | null; // not marked (yet)
-export type TrendRow = { id: string; name: string; code: string; cells: TrendCell[]; trend: Classified };
+export type TrendRow = {
+  id: string;
+  name: string;
+  code: string;
+  cells: TrendCell[];
+  points: TrendPoint[]; // the standardised results the trend was judged on
+  trend: Classified;
+};
 export type ClassTrends = {
   columns: TrendColumn[];
   rows: TrendRow[];
@@ -39,7 +47,11 @@ export type ClassTrends = {
 
 export async function loadClassTrends(
   classId: string,
-  opts: { studentIds?: string[] | null; period?: { month: number; year: number } | null } = {},
+  opts: {
+    studentIds?: string[] | null;
+    period?: { month: number; year: number } | null;
+    until?: Date; // only assessments dated before this (parent report: up to its month)
+  } = {},
 ): Promise<ClassTrends> {
   const win = opts.period ? monthWindow(opts.period.month, opts.period.year) : null;
   const [students, assessments, allDates] = await Promise.all([
@@ -49,7 +61,12 @@ export async function loadClassTrends(
       select: { id: true, name: true, code: true },
     }),
     prisma.assessment.findMany({
-      where: { classId, ...(win ? { date: { gte: win.start, lt: win.end } } : {}) },
+      where: {
+        classId,
+        ...(win || opts.until
+          ? { date: { ...(win ? { gte: win.start, lt: win.end } : {}), ...(opts.until ? { lt: opts.until } : {}) } }
+          : {}),
+      },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
       select: {
         id: true,
@@ -82,7 +99,8 @@ export async function loadClassTrends(
       });
     });
     for (const g of a.grades) if (g.absent) byStudent.set(g.studentId, "absent");
-    return { a, bounds, byStudent };
+    const classAvg = pcts.length ? pcts.reduce((x, y) => x + y, 0) / pcts.length : null;
+    return { a, bounds, byStudent, classAvg };
   });
 
   const rows: TrendRow[] = students.map((s) => {
@@ -98,7 +116,7 @@ export async function loadClassTrends(
         if (v.z != null) points.push({ label: a.label, pct: v.pct, z: v.z, rank: v.rank, n: v.n });
       }
     }
-    return { id: s.id, name: s.name, code: s.code, cells, trend: classifyTrend(points) };
+    return { id: s.id, name: s.name, code: s.code, cells, points, trend: classifyTrend(points) };
   });
   markBiggestImprover(rows); // class-wide, before narrowing to a sub-group
 
@@ -119,13 +137,14 @@ export async function loadClassTrends(
     .sort((a, b) => b.year - a.year || b.month - a.month);
 
   return {
-    columns: scored.map(({ a, bounds }) => ({
+    columns: scored.map(({ a, bounds, classAvg }) => ({
       id: a.id,
       label: a.label,
       date: a.date,
       type: a.type,
       isDiagnostic: a.isDiagnostic,
       hasBoundaries: !!bounds,
+      classAvg,
     })),
     rows: shown,
     counts,

@@ -1,5 +1,6 @@
-import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, StyleSheet, Svg, Line, Polyline, Circle } from "@react-pdf/renderer";
 import type { StudentReportData, Standing } from "./student-report-data";
+import type { ReportProgress } from "./parent-trend-data";
 
 const BRAND = "#4f46e5";
 const INK = "#0f1729";
@@ -46,6 +47,55 @@ function Delta({ d }: { d: number | null }) {
   );
 }
 
+const TONE = { good: { bg: "#f0fdf4", fg: GREEN }, steady: { bg: SOFT, fg: INK }, support: { bg: "#fffbeb", fg: "#b45309" } };
+
+// Student % (brand line) vs class average (dashed grey) per assessment, 0-100%.
+function ProgressChart({ points }: { points: ReportProgress["points"] }) {
+  const W = 530;
+  const H = 110;
+  const L = 26; // y-axis label gutter
+  const x = (i: number) => L + 6 + (points.length === 1 ? 0 : (i * (W - L - 12)) / (points.length - 1));
+  const y = (pct: number) => 6 + ((100 - pct) / 100) * (H - 12);
+  const line = (k: "pct" | "classAvg") => points.map((p, i) => `${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).join(" ");
+  // Up to ~8 x-labels so they never collide.
+  const step = Math.max(1, Math.ceil(points.length / 8));
+  return (
+    <View>
+      <Svg width={W} height={H}>
+        {[0, 50, 100].map((g) => (
+          <Line key={g} x1={L} x2={W} y1={y(g)} y2={y(g)} stroke={LINE} strokeWidth={0.8} />
+        ))}
+        <Polyline points={line("classAvg")} stroke={FAINT} strokeWidth={1.2} strokeDasharray="3 3" fill="none" />
+        <Polyline points={line("pct")} stroke={BRAND} strokeWidth={1.8} fill="none" />
+        {points.map((p, i) => <Circle key={i} cx={x(i)} cy={y(p.pct)} r={2.2} fill={BRAND} />)}
+      </Svg>
+      {/* Axis labels as normal text (Svg text needs embedded fonts). */}
+      <View style={{ position: "absolute", left: 0, top: 0, height: H, width: L }}>
+        {[100, 50, 0].map((g) => (
+          <Text key={g} style={{ position: "absolute", top: y(g) - 4, fontSize: 6.5, color: FAINT }}>{g}%</Text>
+        ))}
+      </View>
+      <View style={{ height: 12 }}>
+        {points.map((p, i) =>
+          i % step === 0 || i === points.length - 1 ? (
+            <Text key={i} style={{ position: "absolute", left: x(i) - 20, width: 40, textAlign: "center", fontSize: 6.5, color: FAINT }}>
+              {p.date}
+            </Text>
+          ) : null,
+        )}
+      </View>
+      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
+        <View style={{ width: 14, height: 2, backgroundColor: BRAND, marginRight: 4 }} />
+        <Text style={{ fontSize: 7.5, color: MUTED, marginRight: 14 }}>Student</Text>
+        <Svg width={14} height={4} style={{ marginRight: 4 }}>
+          <Line x1={0} x2={14} y1={2} y2={2} stroke={FAINT} strokeWidth={1.2} strokeDasharray="3 2" />
+        </Svg>
+        <Text style={{ fontSize: 7.5, color: MUTED }}>Class average</Text>
+      </View>
+    </View>
+  );
+}
+
 function standingStyle(st: Standing | null) {
   if (st === "above") return { color: GREEN, label: "Above average" };
   if (st === "below") return { color: RED, label: "Below average" };
@@ -77,6 +127,16 @@ export function StudentReportDoc({ data }: { data: StudentReportData }) {
             <View style={s.kpi}><Text style={s.kpiVal}>{String(data.summary.absences)}</Text><Text style={s.kpiLabel}>Absences</Text></View>
             <View style={[s.kpi, { marginRight: 0 }]}><Text style={s.kpiVal}>{String(data.summary.missedHw)}</Text><Text style={s.kpiLabel}>Missed homework</Text></View>
           </View>
+
+          {data.progress ? (
+            <View style={s.section} wrap={false}>
+              <Text style={s.h2}>Progress this term</Text>
+              <Text style={[s.notes, { backgroundColor: TONE[data.progress.tone].bg, color: TONE[data.progress.tone].fg, borderColor: LINE, marginBottom: 8 }]}>
+                {data.progress.sentence}
+              </Text>
+              <ProgressChart points={data.progress.points} />
+            </View>
+          ) : null}
 
           <View style={s.section}>
             <Text style={s.h2}>Grades this month</Text>

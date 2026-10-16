@@ -32,5 +32,6 @@ export async function hwFeedbackFor(studentId: string, month: number, year: numb
       select: { hwFeedback: true },
     }),
   ]);
-  return { text: note ? note.hwFeedback : draft, draft, edited: !!note };
+  const edited = note?.hwFeedback != null;
+  return { text: edited ? note!.hwFeedback! : draft, draft, edited };
 }

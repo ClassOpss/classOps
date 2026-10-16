@@ -852,7 +852,10 @@ model ParentReportNote {
   studentId   String   @map("student_id")
   year        Int
   month       Int // 1-12
-  hwFeedback  String   @map("hw_feedback")
+  // null = no edit (the report uses the auto draft from HW weak points).
+  hwFeedback  String?  @map("hw_feedback")
+  // Assistant switched the progress-trend section off for this month's report.
+  hideTrend   Boolean  @default(false) @map("hide_trend")
   updatedById String?  @map("updated_by_id") // user who last edited
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 

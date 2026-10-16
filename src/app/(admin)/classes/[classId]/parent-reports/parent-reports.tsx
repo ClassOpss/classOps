@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { setParentNotes, type FormState } from "@/actions/students";
-import { logParentReportSent, getHwFeedback, saveHwFeedback } from "@/actions/parent-reports";
+import { logParentReportSent, getHwFeedback, saveHwFeedback, getReportTrend, setReportTrendHidden } from "@/actions/parent-reports";
 import type { HwFeedback } from "@/lib/reports/hw-feedback";
 import { normalizePhone, studentCodeMessage, parentCodeMessage, parentReportMessage } from "@/lib/invites";
 import { WhatsAppSend } from "@/components/whatsapp-send";
@@ -191,6 +191,7 @@ function Row({
 
       {open && (
         <div className="mt-3 flex flex-col gap-4 border-t border-border pt-3">
+        <TrendToggle studentId={s.id} month={month} year={year} />
         <HwFeedbackEditor studentId={s.id} month={month} year={year} />
         <form action={action} className="flex flex-col gap-2">
           <span className="text-xs font-medium text-muted">Notes from the teaching team (every report)</span>
@@ -212,6 +213,57 @@ function Row({
     </li>
   );
 }
+// The report's "Progress this term" sentence (+ chart), with an on/off switch per student
+// per month so a label the assistant disagrees with never reaches the parent unreviewed.
+function TrendToggle({ studentId, month, year }: { studentId: string; month: number; year: number }) {
+  const [t, setT] = useState<{ sentence: string | null; hidden: boolean } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    setT(null);
+    getReportTrend(studentId, year, month).then((res) => {
+      if (!live) return;
+      if (res.ok) setT({ sentence: res.sentence, hidden: res.hidden });
+      else setError(res.error);
+    });
+    return () => {
+      live = false;
+    };
+  }, [studentId, month, year]);
+
+  async function toggle(include: boolean) {
+    setSaving(true);
+    const res = await setReportTrendHidden(studentId, year, month, !include);
+    setSaving(false);
+    if (res.ok) setT((x) => (x ? { ...x, hidden: !include } : x));
+    else setError(res.error);
+  }
+
+  const label = `Progress trend — ${MONTH_NAMES[month - 1]} ${year}`;
+  if (!t) return <p className="text-xs text-faint">{error ?? `Loading ${label.toLowerCase()}…`}</p>;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium text-muted">{label}</span>
+      {t.sentence == null ? (
+        <p className="text-xs text-faint">Not enough results yet — the report leaves this section out.</p>
+      ) : (
+        <>
+          <p className={`rounded-lg px-3 py-2 text-sm ${t.hidden ? "bg-card-muted text-faint line-through" : "bg-card-muted"}`}>
+            {t.sentence}
+          </p>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={!t.hidden} disabled={saving} onChange={(e) => toggle(e.target.checked)} />
+            Include on this report (with a chart vs the class average)
+          </label>
+        </>
+      )}
+      {error && <span className="text-xs text-danger">{error}</span>}
+    </div>
+  );
+}
+
 // Monthly homework feedback for the PDF: drafted from the month's HW weak points,
 // editable before sending. Loads when the notes panel opens / the month changes.
 function HwFeedbackEditor({ studentId, month, year }: { studentId: string; month: number; year: number }) {

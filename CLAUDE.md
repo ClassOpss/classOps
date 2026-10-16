@@ -600,6 +600,22 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
       loadOperationTrends; components/class-trends-table.tsx. On phones the trend shows under the name.
       Browser-verified with scripts/dev-trend.ts (seeds a mock + boundaries; `clean` removes it).
 
+    ── Progress trend on the parent report PDF ──
+    • "Progress this term" section (above "Grades this month"): one parent-worded sentence + a line chart of
+      the student % vs class average (react-pdf Svg; axis/legend labels as Text — Svg text needs fonts).
+      Covers every class assessment up to the END of the report window (class = this school year), so it
+      shows the trend before the month. lib/parent-trend.parentTrendSentence (pure, tested in
+      scripts/test-class-trends.ts) translates the class-trend group. RULES (user decisions): NO class rank;
+      never "sudden drop" (reads as "lower than earlier in the term"); support groups point to OFFICE HOURS;
+      ASCII only (Helvetica core font). Not enough results => section omitted.
+    • Per-student per-month ON/OFF switch (user decision): ParentReportNote.hideTrend (migration
+      20261016111749_parent_report_trend_toggle; hwFeedback became nullable so the row can exist for the
+      switch alone — null = no HW edit, use the draft; "Reset to HW notes" now nulls the field instead of
+      deleting the row). actions/parent-reports getReportTrend/setReportTrendHidden; TrendToggle (sentence
+      preview + checkbox) in the shared "Notes & HW feedback" panel (admin + assistant).
+      lib/reports/parent-trend-data.parentTrendFor. Verified: rendered PDFs (improving + remedial), toggle off
+      -> section omitted, on -> back.
+
     ── DEFERRED to v2 (next year — user decision) ──
     Student/parent self-serve portals, in-app HW upload, dropping Google Classroom, fee/payment tracking,
     admin activity tab, automatic daily-update sending to the class WhatsApp group. Design keeps these

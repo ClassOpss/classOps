@@ -1,5 +1,6 @@
 import { classifyTrend, markBiggestImprover, type TrendPoint } from "../src/lib/class-trend-classify";
 import { letterFor, validateBoundaries } from "../src/lib/grade-boundaries";
+import { parentTrendSentence } from "../src/lib/parent-trend";
 
 function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error("FAIL: " + msg);
@@ -37,5 +38,27 @@ assert("error" in validateBoundaries([{ grade: "A*", min: "70" }, { grade: "A", 
 assert("error" in validateBoundaries([{ grade: "A*", min: "120" }], 100), "boundary above max mark refused");
 const ok = validateBoundaries([{ grade: "A*", min: "80" }, { grade: "A", min: "" }, { grade: "B", min: "60" }], 100);
 assert("boundaries" in ok && ok.boundaries.length === 2, "blank grades skipped");
+
+// Parent wording
+const cases: [string, [number, number, number][]][] = [
+  ["improving", [[62, 0, 6], [55, -0.4, 9], [82, 1.2, 3]]],
+  ["top", [[95, 1.8, 1], [93, 1.7, 1], [96, 1.9, 1]]],
+  ["remedial", [[61, 0.2, 5], [48, -0.6, 9], [37, -1.3, 11]]],
+  ["declining", [[72, 0.8, 3], [62, 0, 7], [50, -0.7, 10]]],
+  ["sudden_drop", [[70, 0.5, 4], [72, 0.6, 4], [18, -2.2, 12]]],
+  ["watch", [[96, 1.9, 1], [70, 0.1, 6], [74, 0.1, 6]]],
+  ["recovered", [[85, 1, 2], [55, -0.5, 9], [86, 1.1, 2]]],
+  ["plateau", [[63, 0, 6], [60, -0.1, 7], [64, 0.1, 6]]],
+];
+for (const [group, rows] of cases) {
+  const pts = P(rows);
+  assert(classifyTrend(pts).group === group, `(setup) ${group}`);
+  const t = parentTrendSentence(classifyTrend(pts).group, pts)!;
+  assert(!/(d+(st|nd|rd|th)|rank|in class)/i.test(t.sentence), `${group}: no class rank in parent text`);
+  assert(!/sudden/i.test(t.sentence), `${group}: never says "sudden"`);
+  assert(/^[ -~]*$/.test(t.sentence), `${group}: plain ASCII (PDF Helvetica font)`);
+  if (t.tone === "support") assert(/office hours/i.test(t.sentence), `${group}: support points to office hours`);
+}
+assert(parentTrendSentence("not_enough", P([[90, 1, 2]])) === null, "not enough results -> no parent sentence");
 
 console.log("all class-trend tests passed");
