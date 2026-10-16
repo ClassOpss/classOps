@@ -18,6 +18,7 @@ const ICONS: Record<string, ReactNode> = {
   "/classes": (
     <path d="M3 7l9-4 9 4-9 4-9-4Zm0 0v6m4-4v5c0 1 2 2 5 2s5-1 5-2v-5" />
   ),
+  "/trends": <path d="M3 17l6-6 4 4 8-8m0 0h-5m5 0v5" />,
   "/insights": <path d="M21 21H4a1 1 0 0 1-1-1V3m4 13 4-5 3 3 5-7" />,
   "/pay": (
     <path d="M3 6h18v12H3V6Zm0 4h18M7 14h2m8 0h.01" />

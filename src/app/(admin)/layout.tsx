@@ -8,6 +8,7 @@ const NAV: (NavItem & { adminOnly: boolean })[] = [
   { href: "/dashboard", label: "Dashboard", adminOnly: false },
   { href: "/lesson-plan", label: "Lesson Plan", adminOnly: false },
   { href: "/progress", label: "Progress", adminOnly: false },
+  { href: "/trends", label: "Trends", adminOnly: false },
   { href: "/classes", label: "Classes", adminOnly: false },
   { href: "/insights", label: "Insights", adminOnly: false },
   { href: "/pay", label: "Pay", adminOnly: true },

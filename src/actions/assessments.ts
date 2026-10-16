@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db";
 import { requireClassAccess } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { attachQuizTasks } from "@/lib/quiz-assessment";
+import { Prisma } from "@prisma/client";
+import { GRADES, validateBoundaries } from "@/lib/grade-boundaries";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
 
@@ -112,6 +114,46 @@ export async function setMaxMark(
   });
   revalidatePath(`/classes/${found.classId}/assessments`);
   revalidatePath(`/my/classes/${found.classId}/assessments`, "layout");
+  return { ok: true };
+}
+
+// Set (or clear) this assessment's grade boundaries, in raw marks. Fields "g_<grade>";
+// blank grades are skipped (e.g. a Core paper stops at C); all blank clears them.
+export async function setGradeBoundaries(
+  assessmentId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const found = await prisma.assessment.findUnique({
+    where: { id: assessmentId },
+    select: { classId: true, maxMark: true },
+  });
+  if (!found) return { error: "Assessment not found." };
+  const user = await requireClassAccess(found.classId);
+  if (found.maxMark == null) return { error: "Set the max mark first." };
+
+  const result = validateBoundaries(
+    GRADES.map((grade) => ({ grade, min: String(formData.get(`g_${grade}`) ?? "") })),
+    found.maxMark,
+  );
+  if ("error" in result) return { error: result.error };
+
+  await prisma.assessment.update({
+    where: { id: assessmentId },
+    data: { gradeBoundaries: result.boundaries.length ? result.boundaries : Prisma.DbNull },
+  });
+  await logActivity({
+    actorId: user.id,
+    actorRole: user.role,
+    action: "set_grade_boundaries",
+    entityType: "assessment",
+    entityId: assessmentId,
+    classId: found.classId,
+    metadata: { boundaries: result.boundaries },
+  });
+  revalidatePath(`/classes/${found.classId}`, "layout");
+  revalidatePath(`/my/classes/${found.classId}`, "layout");
+  revalidatePath("/trends");
   return { ok: true };
 }
 

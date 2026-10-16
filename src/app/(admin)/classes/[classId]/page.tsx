@@ -86,6 +86,7 @@ export default async function ClassOverviewPage({
           { href: `/classes/${classId}/sessions`, label: "Sessions & day-offs" },
           { href: `/classes/${classId}/quizzes`, label: "Quizzes & dates" },
           { href: `/classes/${classId}/assessments`, label: "Assessments" },
+          { href: `/classes/${classId}/trends`, label: "Trends" },
           { href: `/classes/${classId}/invites`, label: "Onboarding & invites" },
           { href: `/classes/${classId}/parent-reports`, label: "Parent reports" },
         ].map((l) => (

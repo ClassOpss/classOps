@@ -8,6 +8,8 @@ import { buildQuizAnnouncement, friendlyTime, topicsFromNotes } from "@/lib/what
 import { AssessmentForm } from "./assessment-form";
 import { QuizAnnouncement } from "./quiz-announcement";
 import { MaxMarkForm } from "./max-mark-form";
+import { GradeBoundariesForm } from "@/components/grade-boundaries-form";
+import { parseBoundaries } from "@/lib/grade-boundaries";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -85,7 +87,12 @@ export default async function AssessmentsAdminPage({
                   </td>
                   <td className="text-muted">{TYPE_LABEL[a.type]}</td>
                   <td className="text-muted">{dateFmt.format(a.date)}</td>
-                  <td><MaxMarkForm assessmentId={a.id} current={a.maxMark} /></td>
+                  <td className="min-w-[11rem]">
+                    <MaxMarkForm assessmentId={a.id} current={a.maxMark} />
+                    <div className="mt-1.5">
+                      <GradeBoundariesForm assessmentId={a.id} maxMark={a.maxMark} current={parseBoundaries(a.gradeBoundaries)} />
+                    </div>
+                  </td>
                   <td>{a._count.grades}</td>
                   <td>
                     <div className="flex flex-col gap-1">

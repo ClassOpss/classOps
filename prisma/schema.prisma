@@ -613,6 +613,9 @@ model Assessment {
   time         String? // "HH:mm" — needed for quiz announcement
   maxMark      Int?           @map("max_mark") // null = auto-created from a quiz, max not set yet
   isDiagnostic Boolean        @default(false) @map("is_diagnostic")
+  // Cambridge-style grade boundaries in RAW marks, best grade first: [{ grade: "A*", min: 72 }, ...].
+  // Set per assessment (papers shift). null = show % only.
+  gradeBoundaries Json?     @map("grade_boundaries")
   createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
 
   class    Class             @relation(fields: [classId], references: [id], onDelete: Cascade)

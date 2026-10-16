@@ -6,6 +6,8 @@ import { resolveConfig } from "@/lib/operation";
 import { assessmentHeldAt } from "@/lib/task-timing";
 import { GradeEntryForm, type GradeRow } from "./grade-entry-form";
 import { MaxMarkForm } from "@/app/(admin)/classes/[classId]/assessments/max-mark-form";
+import { GradeBoundariesForm } from "@/components/grade-boundaries-form";
+import { parseBoundaries } from "@/lib/grade-boundaries";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -24,7 +26,7 @@ export default async function GradeEntryPage({
 
   const assessment = await prisma.assessment.findUnique({
     where: { id: assessmentId },
-    select: { id: true, classId: true, label: true, date: true, time: true, maxMark: true, isDiagnostic: true, class: { select: { schedule: true } } },
+    select: { id: true, classId: true, label: true, date: true, time: true, maxMark: true, isDiagnostic: true, gradeBoundaries: true, class: { select: { schedule: true } } },
   });
   if (!assessment || assessment.classId !== classId) {
     return (
@@ -114,6 +116,11 @@ export default async function GradeEntryPage({
             <span>Max mark:</span>
             <MaxMarkForm assessmentId={assessmentId} current={assessment.maxMark} />
           </div>
+          <GradeBoundariesForm
+            assessmentId={assessmentId}
+            maxMark={assessment.maxMark}
+            current={parseBoundaries(assessment.gradeBoundaries)}
+          />
           <GradeEntryForm
             assessmentId={assessmentId}
             maxMark={assessment.maxMark}

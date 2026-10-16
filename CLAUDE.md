@@ -577,6 +577,29 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
       view only) = Trend section with Recharts student-vs-class line chart (components/grade-trend-chart.tsx,
       animation OFF — it never drew in a hidden tab). Seeder: scripts/dev-trend.ts [clean].
 
+    ── Class trends table (teacher's-eye "who needs remedial / improving / plateauing") ──
+    • Sits ALONGSIDE the per-student trend badges above (user decision). lib/class-trend-classify.ts
+      (pure, scripts/test-class-trends.ts) sorts each student into action groups, in order: Needs remedial
+      (ABSOLUTE: <50% on the last 2 — a weak class mustn't hide a struggling student) > Declining (standing
+      fell AND still falling; with 3 results the last step must be down) > Sudden drop (only the latest fell
+      ≥1.2 SD vs usual) > Watch (was top fifth, now outside top ~40%) > Plateau (says where: top/middle/
+      bottom) > Recovered (checked BEFORE Improving — a bounce back reads as a rise) > Improving (≥0.7 SD;
+      class's largest = "Biggest improver") > Consistently top > Not enough results. DESCRIPTIVE patterns
+      from 2-3 results (like reading the mark sheet), not predictions — the dashboard "slipping" alert keeps
+      the strict reliable-change test. Movement uses the same leave-one-out z as lib/trend.
+    • Mocks/diagnostics ARE included here (user decision), labelled "· mock". All assessments are columns,
+      with a month filter (?month=&year=).
+    • Assessment.gradeBoundaries (Json, RAW-mark minimum per grade A*..G, per assessment — Cambridge papers
+      shift; migration 20261016105940_assessment_grade_boundaries). lib/grade-boundaries (parse/letterFor/
+      validate; blank grades skipped, must strictly fall, ≤ max). actions/assessments.setGradeBoundaries +
+      components/grade-boundaries-form.tsx on the admin assessments table and the assistant grade-entry page.
+      Cells show the letter (+ %) when boundaries are set, else %. Below the lowest boundary = "U".
+    • Pages: /classes/[id]/trends (admin+teacher, whole class), /my/classes/[id]/trends (assistant SUB-GROUP,
+      but ranks/standing vs the WHOLE class; names link to the profile), /trends cross-class overview (sidebar;
+      lists remedial/declining/sudden-drop/watch students per class). lib/class-trends.loadClassTrends /
+      loadOperationTrends; components/class-trends-table.tsx. On phones the trend shows under the name.
+      Browser-verified with scripts/dev-trend.ts (seeds a mock + boundaries; `clean` removes it).
+
     ── DEFERRED to v2 (next year — user decision) ──
     Student/parent self-serve portals, in-app HW upload, dropping Google Classroom, fee/payment tracking,
     admin activity tab, automatic daily-update sending to the class WhatsApp group. Design keeps these

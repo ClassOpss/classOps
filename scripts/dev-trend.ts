@@ -26,13 +26,29 @@ async function main() {
   // gaps: students[0] improving, students[1] slipping, others ~class
   for (let q = 0; q < 6; q++) {
     const a = await prisma.assessment.create({
-      data: { classId: asg.classId, type: "quiz", label: `Trend Quiz ${q + 1}`, date: day(84 - q * 14), maxMark: 100, topicNotes: TAG },
+      data: {
+        classId: asg.classId,
+        // Q4 is a mock (diagnostic) — included in the trends table, excluded from averages.
+        type: q === 3 ? "past_paper" : "quiz",
+        isDiagnostic: q === 3,
+        label: q === 3 ? "Mock" : `Trend Quiz ${q + 1}`,
+        date: day(84 - q * 14),
+        maxMark: 100,
+        topicNotes: TAG,
+        gradeBoundaries: q % 2 === 0 ? [{ grade: "A*", min: 85 }, { grade: "A", min: 75 }, { grade: "B", min: 65 }, { grade: "C", min: 55 }, { grade: "D", min: 45 }, { grade: "E", min: 35 }] : undefined,
+      },
     });
     const base = [70, 55, 65, 50, 60, 68][q]; // varying difficulty
     await prisma.assessmentGrade.createMany({
       data: students.map((s, i) => {
         // 0: from below class to above. 1: from above to below. Rest: steady, with quiz-to-quiz wobble.
-        const pct = i === 0 ? base - 18 + q * 7 : i === 1 ? base + 15 - q * 7 : base + (((i + q) * 7) % 11) - 5;
+        // 2: steady then a sudden crash on the last quiz. 3: well below 50 (remedial).
+        const pct =
+          i === 0 ? base - 18 + q * 7
+          : i === 1 ? base + 15 - q * 7
+          : i === 2 ? (q === 5 ? 18 : base + 8)
+          : i === 3 ? base - 25
+          : base + (((i + q) * 7) % 11) - 5;
         const p = Math.max(0, Math.min(100, pct));
         return { assessmentId: a.id, studentId: s.id, rawMark: p, percentage: p, loggedById: asst.id };
       }),
