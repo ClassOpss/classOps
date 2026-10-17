@@ -8,7 +8,7 @@ import {
   quizPrepComplete,
   quizAnnounced,
   addDays,
-  QUIZ_CADENCE_DAYS,
+  cadenceLabel,
 } from "@/lib/quiz";
 import { buildBiweeklyQuizAnnouncement } from "@/lib/whatsapp/quiz-announcement";
 import { saveQuizPrep, markQuizAnnounced, setQuizCoverage } from "@/actions/quiz-prep";
@@ -28,7 +28,7 @@ export default async function QuizPrepPage({ params }: { params: Promise<{ class
 
   const klass = await prisma.class.findUnique({
     where: { id: classId },
-    select: { id: true, name: true, quizDay: true, quizStartDate: true, operationId: true },
+    select: { id: true, name: true, quizDay: true, quizStartDate: true, quizCadenceDays: true, operationId: true },
   });
   if (!klass) {
     return (
@@ -63,7 +63,13 @@ export default async function QuizPrepPage({ params }: { params: Promise<{ class
       assessment: { select: { id: true, label: true, maxMark: true, type: true, time: true } },
     },
   });
-  const cycles = quizCyclesBetween(klass.quizStartDate, rows, addDays(today, -QUIZ_CADENCE_DAYS), addDays(today, 28));
+  const cycles = quizCyclesBetween(
+    klass.quizStartDate,
+    rows,
+    addDays(today, -klass.quizCadenceDays),
+    addDays(today, 28),
+    klass.quizCadenceDays,
+  );
   const now = new Date();
 
   if (cycles.length === 0) {
@@ -71,7 +77,7 @@ export default async function QuizPrepPage({ params }: { params: Promise<{ class
       <div className="flex flex-col gap-4">
         {back}
         <p className="card px-4 py-6 text-center text-sm text-muted">
-          No quizzes in the next 4 weeks. Tasks appear here for the biweekly quiz (if the class has one)
+          No quizzes in the next 4 weeks. Tasks appear here for the class's regular quiz (if it has one)
           and for every assessment added to this class.
         </p>
       </div>
@@ -83,7 +89,7 @@ export default async function QuizPrepPage({ params }: { params: Promise<{ class
       {back}
       <p className="text-sm text-muted">
         {klass.quizStartDate
-          ? `Every ${QUIZ_CADENCE_DAYS} days on ${klass.quizDay}, plus every assessment added to the class. `
+          ? `${cadenceLabel(klass.quizCadenceDays)} on ${klass.quizDay}, plus every assessment added to the class. `
           : "Every assessment added to this class. "}
         For each one: send the announcement
         (~{cfg.quizAnnounceLeadDays}d before), then create the quiz and send it to print (~{cfg.quizPrepLeadDays}d before).

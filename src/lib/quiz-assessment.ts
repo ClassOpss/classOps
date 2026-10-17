@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { isQuizDate, quizNumber } from "@/lib/quiz";
 
-// Once a biweekly quiz is confirmed (announcement sent, or quiz created) it gets a linked
+// Once a cadence quiz is confirmed (announcement sent, or quiz created) it gets a linked
 // Assessment so grade entry is ready — only the max mark is left to fill in. Idempotent:
 // reuses the linked one, or adopts a quiz someone already created by hand for that class
 // + date. Returns true when it created or linked something.
@@ -9,6 +9,7 @@ export async function ensureQuizAssessment(
   classId: string,
   scheduledDate: Date,
   quizStartDate: Date | null,
+  cadence: number,
 ): Promise<boolean> {
   if (!quizStartDate) return false; // ad-hoc cycles are born with their assessment
   const row = await prisma.quizPrep.findUnique({
@@ -28,7 +29,7 @@ export async function ensureQuizAssessment(
         data: {
           classId,
           type: "quiz",
-          label: `Quiz ${quizNumber(quizStartDate, scheduledDate)}`,
+          label: `Quiz ${quizNumber(quizStartDate, scheduledDate, cadence)}`,
           topicNotes: row.coverage,
           date: row.quizDate,
           maxMark: null,
@@ -64,8 +65,11 @@ export async function attachQuizTasks(a: {
     return;
   }
 
-  const klass = await prisma.class.findUnique({ where: { id: a.classId }, select: { quizStartDate: true } });
-  const onCadence = !!klass?.quizStartDate && isQuizDate(klass.quizStartDate, a.date);
+  const klass = await prisma.class.findUnique({
+    where: { id: a.classId },
+    select: { quizStartDate: true, quizCadenceDays: true },
+  });
+  const onCadence = !!klass?.quizStartDate && isQuizDate(klass.quizStartDate, a.date, klass.quizCadenceDays);
   await prisma.quizPrep.createMany({
     data: [
       {

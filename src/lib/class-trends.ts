@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { monthWindow } from "@/lib/pay";
 import { looZ } from "@/lib/trend";
-import { letterFor, parseBoundaries } from "@/lib/grade-boundaries";
+import { effectiveBoundaries, letterFor } from "@/lib/grade-boundaries";
 import {
   classifyTrend,
   markBiggestImprover,
@@ -74,6 +74,7 @@ export async function loadClassTrends(
         date: true,
         type: true,
         isDiagnostic: true,
+        maxMark: true,
         gradeBoundaries: true,
         grades: { select: { studentId: true, rawMark: true, percentage: true, absent: true } },
       },
@@ -84,8 +85,9 @@ export async function loadClassTrends(
   // Per assessment: rank (1 = best, ties share) and leave-one-out z for every marked student.
   type Scored = { pct: number; letter: string | null; rank: number; n: number; z: number | null };
   const scored = assessments.map((a) => {
-    const bounds = parseBoundaries(a.gradeBoundaries);
     const marked = a.grades.filter((g) => !g.absent && g.percentage != null);
+    const raws = marked.filter((g) => g.rawMark != null).map((g) => Number(g.rawMark));
+    const bounds = effectiveBoundaries(a.gradeBoundaries, raws, a.maxMark)?.boundaries ?? null;
     const pcts = marked.map((g) => Number(g.percentage));
     const byStudent = new Map<string, Scored | "absent">();
     marked.forEach((g, i) => {

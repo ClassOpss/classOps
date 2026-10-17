@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { updateClass, type FormState } from "@/actions/classes";
 import { DAYS, YEAR_GROUPS, yearGroupLabel } from "@/lib/constants";
-import { QUIZ_CADENCE_DAYS } from "@/lib/quiz";
+import { QUIZ_CADENCE_OPTIONS } from "@/lib/quiz";
 
 const inputCls = "input";
 
@@ -17,6 +17,7 @@ export type ClassDefaults = {
   planStartDate: string; // yyyy-mm-dd or ""
   quizDay: string; // weekday name or ""
   quizStartDate: string; // yyyy-mm-dd or ""
+  quizCadenceDays: number; // 7 = weekly, 14 = biweekly
   notes: string;
 };
 
@@ -84,14 +85,14 @@ export function EditClassForm({
         <input name="notes" className={inputCls} defaultValue={defaults.notes} />
       </label>
       <fieldset className="sm:col-span-2">
-        <legend className="label">Biweekly quiz (optional)</legend>
+        <legend className="label">Regular quiz (optional)</legend>
         <p className="field-hint mb-2 mt-0">
-          Set the quiz weekday and the date of the first quiz. Quizzes recur every {QUIZ_CADENCE_DAYS} days;
+          Set the quiz weekday, the date of the first quiz, and how often (weekly or biweekly);
           the assistant sends the announcement, then creates the quiz and sends it for printing (lead times are
           set per operation in Settings). Move or edit individual quizzes on the class&apos;s Quizzes page.
           Leave both blank for no quiz task.
         </p>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-3">
           <label className="block">
             <span className="label">Quiz day</span>
             <select name="quizDay" className={inputCls} defaultValue={defaults.quizDay}>
@@ -102,6 +103,12 @@ export function EditClassForm({
           <label className="block">
             <span className="label">First quiz date</span>
             <input name="quizStartDate" type="date" className={inputCls} defaultValue={defaults.quizStartDate} />
+          </label>
+          <label className="block">
+            <span className="label">How often</span>
+            <select name="quizCadenceDays" className={inputCls} defaultValue={defaults.quizCadenceDays}>
+              {QUIZ_CADENCE_OPTIONS.map((o) => <option key={o.days} value={o.days}>{o.label}</option>)}
+            </select>
           </label>
         </div>
       </fieldset>

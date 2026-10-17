@@ -132,10 +132,14 @@ export async function setGradeBoundaries(
   const user = await requireClassAccess(found.classId);
   if (found.maxMark == null) return { error: "Set the max mark first." };
 
-  const result = validateBoundaries(
-    GRADES.map((grade) => ({ grade, min: String(formData.get(`g_${grade}`) ?? "") })),
-    found.maxMark,
-  );
+  // "Use automatic" clears the override; a blank form does the same.
+  const reset = formData.get("reset") === "1";
+  const result = reset
+    ? { boundaries: [] }
+    : validateBoundaries(
+        GRADES.map((grade) => ({ grade, min: String(formData.get(`g_${grade}`) ?? "") })),
+        found.maxMark,
+      );
   if ("error" in result) return { error: result.error };
 
   await prisma.assessment.update({

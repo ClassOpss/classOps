@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { DAYS, YEAR_GROUPS } from "@/lib/constants";
 import { ymdUtc } from "@/lib/datetime";
-import { weekdayName } from "@/lib/quiz";
+import { weekdayName, QUIZ_CADENCE_DAYS, QUIZ_CADENCE_OPTIONS } from "@/lib/quiz";
 import { currentOperationId, assertClassInOperation } from "@/lib/operation";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
@@ -27,9 +27,12 @@ const classSchema = z.object({
     )
     .min(1, "Pick at least one day."),
   planStartDate: z.string().optional(),
-  // Biweekly quiz: set both, or neither. The first-quiz date must land on the quiz day.
+  // Regular quiz: set both, or neither. The first-quiz date must land on the quiz day.
   quizDay: z.enum(DAYS).optional(),
   quizStartDate: z.string().optional(),
+  quizCadenceDays: z.coerce
+    .number()
+    .refine((n) => QUIZ_CADENCE_OPTIONS.some((o) => o.days === n), "Pick weekly or biweekly."),
   notes: z.string().optional(),
 }).superRefine((d, ctx) => {
   const hasDay = !!d.quizDay;
@@ -71,6 +74,7 @@ function parseForm(formData: FormData) {
     planStartDate: String(formData.get("planStartDate") ?? "").trim() || undefined,
     quizDay: String(formData.get("quizDay") ?? "").trim() || undefined,
     quizStartDate: String(formData.get("quizStartDate") ?? "").trim() || undefined,
+    quizCadenceDays: String(formData.get("quizCadenceDays") ?? QUIZ_CADENCE_DAYS),
     notes: String(formData.get("notes") ?? "").trim() || undefined,
   });
 }
@@ -92,6 +96,7 @@ export async function createClass(_prev: FormState, formData: FormData): Promise
       planStartDate: d.planStartDate ? new Date(d.planStartDate) : null,
       quizDay: d.quizDay ?? null,
       quizStartDate: d.quizStartDate ? new Date(d.quizStartDate) : null,
+      quizCadenceDays: d.quizCadenceDays,
       notes: d.notes,
     },
   });
@@ -128,6 +133,7 @@ export async function updateClass(
       planStartDate: d.planStartDate ? new Date(d.planStartDate) : null,
       quizDay: d.quizDay ?? null,
       quizStartDate: d.quizStartDate ? new Date(d.quizStartDate) : null,
+      quizCadenceDays: d.quizCadenceDays,
       notes: d.notes,
     },
   });

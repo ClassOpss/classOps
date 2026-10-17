@@ -5,6 +5,7 @@ import { setClassActive } from "@/actions/classes";
 import { scheduleSlots, scheduleLabel } from "@/lib/schedule";
 import { yearGroupLabel } from "@/lib/constants";
 import { currentOperationId } from "@/lib/operation";
+import { cadenceLabel } from "@/lib/quiz";
 import { EditClassForm, type ClassDefaults } from "./edit-class-form";
 
 const MONTHS = [
@@ -53,6 +54,7 @@ export default async function ClassOverviewPage({
     planStartDate: toDateInput(klass.planStartDate),
     quizDay: klass.quizDay ?? "",
     quizStartDate: toDateInput(klass.quizStartDate),
+    quizCadenceDays: klass.quizCadenceDays,
     notes: klass.notes ?? "",
   };
   const isAdmin = user.role === "admin";
@@ -73,7 +75,7 @@ export default async function ClassOverviewPage({
         </p>
         {klass.quizStartDate && (
           <p className="mt-0.5 text-sm text-muted">
-            Biweekly quiz on {klass.quizDay ?? scheduleLabel(klass.schedule as object)} · first quiz{" "}
+            {cadenceLabel(klass.quizCadenceDays)} quiz on {klass.quizDay ?? scheduleLabel(klass.schedule as object)} · first quiz{" "}
             {klass.quizStartDate.toISOString().slice(0, 10)}
           </p>
         )}

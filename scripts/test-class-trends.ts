@@ -33,11 +33,11 @@ assert(rows[0].trend.reason.startsWith("Biggest improver"), "largest improver is
 
 // Boundaries
 const b = [{ grade: "A*", min: 80 }, { grade: "A", min: 70 }, { grade: "B", min: 60 }];
-assert(letterFor(85, b) === "A*" && letterFor(70, b) === "A" && letterFor(10, b) === "U", "letters from raw-mark boundaries");
+assert(letterFor(85, b) === "A*" && letterFor(70, b) === "A" && letterFor(10, b) === "D", "letters from raw-mark boundaries (floor D, no U)");
 assert("error" in validateBoundaries([{ grade: "A*", min: "70" }, { grade: "A", min: "75" }], 100), "boundaries must fall");
 assert("error" in validateBoundaries([{ grade: "A*", min: "120" }], 100), "boundary above max mark refused");
 const ok = validateBoundaries([{ grade: "A*", min: "80" }, { grade: "A", min: "" }, { grade: "B", min: "60" }], 100);
-assert("boundaries" in ok && ok.boundaries.length === 2, "blank grades skipped");
+assert("boundaries" in ok && ok.boundaries.length === 3 && ok.boundaries[2].grade === "D", "blank grades skipped, D floor added");
 
 // Parent wording
 const cases: [string, [number, number, number][]][] = [

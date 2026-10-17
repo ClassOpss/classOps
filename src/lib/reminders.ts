@@ -126,6 +126,7 @@ async function gatherQuiz(
       id: true,
       name: true,
       quizStartDate: true,
+      quizCadenceDays: true,
       operationId: true,
       schoolId: true,
       disabledTasks: true,
@@ -148,7 +149,13 @@ async function gatherQuiz(
     if (c.assignments.length === 0) continue;
     const cfg = cfgFor(cfgs, c.operationId);
     const maxLead = Math.max(cfg.quizPrepLeadDays, cfg.quizAnnounceLeadDays);
-    const cycles = quizCyclesBetween(c.quizStartDate, c.quizPreps, addDays(today, -21), addDays(today, maxLead + 21));
+    const cycles = quizCyclesBetween(
+      c.quizStartDate,
+      c.quizPreps,
+      addDays(today, -21),
+      addDays(today, maxLead + 21),
+      c.quizCadenceDays,
+    );
 
     for (const { quizDate: actual, row } of cycles) {
       const what = row?.assessment && row.assessment.type !== "quiz" ? row.assessment.label : "quiz";

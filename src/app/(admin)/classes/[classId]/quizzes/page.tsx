@@ -8,7 +8,7 @@ import {
   quizPrepComplete,
   quizAnnounced,
   addDays,
-  QUIZ_CADENCE_DAYS,
+  cadenceLabel,
 } from "@/lib/quiz";
 import { setQuizDate, setQuizCoverage } from "@/actions/quiz-prep";
 
@@ -27,7 +27,7 @@ export default async function ClassQuizzesPage({ params }: { params: Promise<{ c
 
   const klass = await prisma.class.findFirst({
     where: { id: classId, operationId },
-    select: { id: true, name: true, quizDay: true, quizStartDate: true },
+    select: { id: true, name: true, quizDay: true, quizStartDate: true, quizCadenceDays: true },
   });
   if (!klass) {
     return (
@@ -53,15 +53,21 @@ export default async function ClassQuizzesPage({ params }: { params: Promise<{ c
     select: { scheduledDate: true, adHoc: true, quizDate: true, coverage: true, quizCreated: true, sentToPrint: true, completedAt: true, announcedAt: true, assessment: { select: { label: true, maxMark: true, type: true } } },
   });
   // Show the last cycle + roughly the next 3 months.
-  const cycles = quizCyclesBetween(klass.quizStartDate, rows, addDays(today, -QUIZ_CADENCE_DAYS), addDays(today, 90));
+  const cycles = quizCyclesBetween(
+    klass.quizStartDate,
+    rows,
+    addDays(today, -klass.quizCadenceDays),
+    addDays(today, 90),
+    klass.quizCadenceDays,
+  );
 
   if (cycles.length === 0) {
     return (
       <div className="flex flex-col gap-4">
         {back}
         <p className="card px-4 py-6 text-center text-sm text-muted">
-          No upcoming quizzes. Set a quiz day + first-quiz date in the class settings for the biweekly
-          quiz; every assessment added to the class also appears here with its own tasks.
+          No upcoming quizzes. Set a quiz day + first-quiz date in the class settings for the weekly or
+          biweekly quiz; every assessment added to the class also appears here with its own tasks.
         </p>
       </div>
     );
@@ -72,7 +78,7 @@ export default async function ClassQuizzesPage({ params }: { params: Promise<{ c
       {back}
       <p className="page-subtitle">
         {klass.quizStartDate
-          ? `Every ${QUIZ_CADENCE_DAYS} days on ${klass.quizDay}, plus every assessment added to the class. `
+          ? `${cadenceLabel(klass.quizCadenceDays)} on ${klass.quizDay}, plus every assessment added to the class. `
           : "Every assessment added to this class. "}
         Move a single quiz here if something changes —
         its announcement ({cfg.quizAnnounceLeadDays}d before) and prep ({cfg.quizPrepLeadDays}d before) deadlines

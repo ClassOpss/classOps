@@ -1,6 +1,7 @@
-// Biweekly quiz cadence + per-cycle model. A class opts in by setting `quizStartDate`
-// (the date of its FIRST quiz); cycles recur every 14 days. Each cycle is identified by its
-// SCHEDULED date (quizStartDate + 14·n) — a stable key that never changes. The ACTUAL quiz
+// Quiz cadence + per-cycle model. A class opts in by setting `quizStartDate`
+// (the date of its FIRST quiz); cycles recur every `quizCadenceDays` (14 = biweekly, the
+// default; 7 = weekly — set per class). Each cycle is identified by its
+// SCHEDULED date (quizStartDate + cadence·n) — a stable key that never changes. The ACTUAL quiz
 // date defaults to the scheduled date but admin/teacher can override it for a one-off move,
 // which shifts only that cycle's deadlines (later cycles stay on the cadence).
 //
@@ -13,7 +14,16 @@
 
 import { DAYS } from "@/lib/constants";
 
-export const QUIZ_CADENCE_DAYS = 14; // biweekly
+export const QUIZ_CADENCE_DAYS = 14; // biweekly — the default for a class
+export const QUIZ_CADENCE_OPTIONS = [
+  { days: 7, label: "Weekly" },
+  { days: 14, label: "Biweekly" },
+] as const;
+
+// "Weekly" / "Biweekly" (or "Every N days") for UI copy.
+export function cadenceLabel(days: number): string {
+  return QUIZ_CADENCE_OPTIONS.find((o) => o.days === days)?.label ?? `Every ${days} days`;
+}
 // Fallbacks for UI copy when an operation config isn't in hand; real deadlines read config.
 export const DEFAULT_QUIZ_PREP_LEAD_DAYS = 3;
 export const DEFAULT_QUIZ_ANNOUNCE_LEAD_DAYS = 5;
@@ -41,32 +51,37 @@ export function quizEnabled(c: { quizStartDate: Date | null }): boolean {
 }
 
 // Is `date` (UTC-midnight) one of this class's SCHEDULED (cadence) quiz dates?
-export function isQuizDate(quizStartDate: Date, date: Date): boolean {
+export function isQuizDate(quizStartDate: Date, date: Date, cadence = QUIZ_CADENCE_DAYS): boolean {
   const diff = dayDiff(quizStartDate, date);
-  return diff >= 0 && diff % QUIZ_CADENCE_DAYS === 0;
+  return diff >= 0 && diff % cadence === 0;
 }
 
 // 1-based position of a cadence date in the class's quiz sequence ("Quiz 3").
-export function quizNumber(quizStartDate: Date, scheduledDate: Date): number {
-  return Math.floor(dayDiff(quizStartDate, scheduledDate) / QUIZ_CADENCE_DAYS) + 1;
+export function quizNumber(quizStartDate: Date, scheduledDate: Date, cadence = QUIZ_CADENCE_DAYS): number {
+  return Math.floor(dayDiff(quizStartDate, scheduledDate) / cadence) + 1;
 }
 
 // The next SCHEDULED quiz date on/after `from` (UTC-midnight).
-export function nextQuizDate(quizStartDate: Date, from: Date): Date {
+export function nextQuizDate(quizStartDate: Date, from: Date, cadence = QUIZ_CADENCE_DAYS): Date {
   if (from <= quizStartDate) return quizStartDate;
-  const cycles = Math.ceil(dayDiff(quizStartDate, from) / QUIZ_CADENCE_DAYS);
-  return addDays(quizStartDate, cycles * QUIZ_CADENCE_DAYS);
+  const cycles = Math.ceil(dayDiff(quizStartDate, from) / cadence);
+  return addDays(quizStartDate, cycles * cadence);
 }
 
 // All SCHEDULED quiz dates in [from, to] inclusive (UTC-midnight). Callers resolve each to
 // its effective (possibly-overridden) date via the stored QuizPrep row.
-export function scheduledQuizDatesBetween(quizStartDate: Date, from: Date, to: Date): Date[] {
+export function scheduledQuizDatesBetween(
+  quizStartDate: Date,
+  from: Date,
+  to: Date,
+  cadence = QUIZ_CADENCE_DAYS,
+): Date[] {
   const out: Date[] = [];
   if (to < quizStartDate) return out;
-  let d = nextQuizDate(quizStartDate, from);
+  let d = nextQuizDate(quizStartDate, from, cadence);
   while (d.getTime() <= to.getTime()) {
     out.push(new Date(d));
-    d = addDays(d, QUIZ_CADENCE_DAYS);
+    d = addDays(d, cadence);
   }
   return out;
 }
@@ -81,7 +96,7 @@ export function effectiveQuizDate(
 
 export type QuizCycle<R> = { scheduledDate: Date; quizDate: Date; row: R | undefined; adHoc: boolean };
 
-// Every quiz cycle for a class in [from, to]: the biweekly cadence dates (if the class has
+// Every quiz cycle for a class in [from, to]: the cadence dates (if the class has
 // one) plus the ad-hoc rows made for hand-added assessments, sorted by actual date. Cadence
 // cycles are windowed by scheduled date, ad-hoc ones by actual date. An ad-hoc row that
 // sits on a cadence date is that cadence cycle, so it's never listed twice.
@@ -90,18 +105,19 @@ export function quizCyclesBetween<R extends { scheduledDate: Date; quizDate: Dat
   rows: R[],
   from: Date,
   to: Date,
+  cadence = QUIZ_CADENCE_DAYS,
 ): QuizCycle<R>[] {
   const bySched = new Map(rows.map((r) => [r.scheduledDate.getTime(), r]));
   const out: QuizCycle<R>[] = [];
   if (quizStartDate) {
-    for (const d of scheduledQuizDatesBetween(quizStartDate, from, to)) {
+    for (const d of scheduledQuizDatesBetween(quizStartDate, from, to, cadence)) {
       const row = bySched.get(d.getTime());
       out.push({ scheduledDate: d, quizDate: effectiveQuizDate(d, row), row, adHoc: false });
     }
   }
   for (const r of rows) {
     if (!r.adHoc) continue;
-    if (quizStartDate && isQuizDate(quizStartDate, r.scheduledDate)) continue;
+    if (quizStartDate && isQuizDate(quizStartDate, r.scheduledDate, cadence)) continue;
     if (r.quizDate < from || r.quizDate > to) continue;
     out.push({ scheduledDate: r.scheduledDate, quizDate: r.quizDate, row: r, adHoc: true });
   }

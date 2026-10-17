@@ -110,7 +110,7 @@ async function detectDaily(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queue
   return queued;
 }
 
-// Daily run: the biweekly quiz's SHARED sub-tasks — announcement (quizAnnounceLeadDays
+// Daily run: the cadence quiz's SHARED sub-tasks — announcement (quizAnnounceLeadDays
 // before) and prep = create + send to print (quizPrepLeadDays before) — each due at the
 // daily deadline hour before the quiz's ACTUAL date. A cycle whose sub-task isn't done on
 // time charges EVERY active assigned assistant (capped to one deduction per cycle in pay).
@@ -124,6 +124,7 @@ async function detectQuiz(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queued
       id: true,
       createdAt: true,
       quizStartDate: true,
+      quizCadenceDays: true,
       operationId: true,
       schoolId: true,
       disabledTasks: true,
@@ -142,7 +143,13 @@ async function detectQuiz(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queued
     // Enumerate cycles whose deadlines could land today, wide enough to absorb one-off date
     // moves. Overrides live on the row (quizDate); others use the scheduled date. Ad-hoc
     // cycles (hand-added assessments) come straight from their rows.
-    const cycles = quizCyclesBetween(c.quizStartDate, c.quizPreps, addDays(today, -21), addDays(today, maxLead + 21));
+    const cycles = quizCyclesBetween(
+      c.quizStartDate,
+      c.quizPreps,
+      addDays(today, -21),
+      addDays(today, maxLead + 21),
+      c.quizCadenceDays,
+    );
 
     for (const { scheduledDate: sched, quizDate: actual, row, adHoc } of cycles) {
       if (onVacation(vacs, c.operationId, c.schoolId, actual)) continue; // no quiz that week

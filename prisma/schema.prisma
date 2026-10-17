@@ -265,11 +265,13 @@ model Class {
   schedule            Json
   // planStartDate: the date this class's lesson 1 takes place; used to generate sessions
   planStartDate       DateTime?      @map("plan_start_date") @db.Date
-  // Biweekly quiz: quizStartDate = the date of the FIRST quiz; every quiz recurs +14 days.
+  // Quiz cadence: quizStartDate = the date of the FIRST quiz; every quiz recurs
+  // +quizCadenceDays (14 = biweekly, 7 = weekly).
   // quizDay is the weekday label (must match quizStartDate's weekday) — informational.
-  // Both null = this class has no biweekly quiz task. See lib/quiz.ts.
+  // Both null = this class has no cadence quiz task. See lib/quiz.ts.
   quizDay             String?        @map("quiz_day")
   quizStartDate       DateTime?      @map("quiz_start_date") @db.Date
+  quizCadenceDays     Int            @default(14) @map("quiz_cadence_days")
   active              Boolean        @default(true)
   notes               String?
   // Per-class destinations for onboarding students/parents. Invite links are pasted

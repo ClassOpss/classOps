@@ -10,17 +10,17 @@ import { ensureQuizAssessment as linkQuizAssessment } from "@/lib/quiz-assessmen
 
 // Resolve a class + validate that `scheduledDateStr` is a genuine cycle for it: a cadence
 // date, or the key of an ad-hoc cycle (a hand-added assessment's tasks).
-// Returns { user, scheduledDate, quizStartDate } or null when access/validation fails.
+// Returns { user, scheduledDate, quizStartDate, cadence } or null when access/validation fails.
 async function resolveCycle(classId: string, scheduledDateStr: string) {
   const user = await requireClassAccess(classId);
   const klass = await prisma.class.findUnique({
     where: { id: classId },
-    select: { quizStartDate: true },
+    select: { quizStartDate: true, quizCadenceDays: true },
   });
   if (!klass) return null;
   const scheduledDate = ymdUtc(scheduledDateStr);
   if (Number.isNaN(scheduledDate.getTime())) return null;
-  const onCadence = !!klass.quizStartDate && isQuizDate(klass.quizStartDate, scheduledDate);
+  const onCadence = !!klass.quizStartDate && isQuizDate(klass.quizStartDate, scheduledDate, klass.quizCadenceDays);
   if (!onCadence) {
     const adHoc = await prisma.quizPrep.findFirst({
       where: { classId, scheduledDate, adHoc: true },
@@ -28,12 +28,17 @@ async function resolveCycle(classId: string, scheduledDateStr: string) {
     });
     if (!adHoc) return null;
   }
-  return { user, scheduledDate, quizStartDate: klass.quizStartDate };
+  return { user, scheduledDate, quizStartDate: klass.quizStartDate, cadence: klass.quizCadenceDays };
 }
 
 // Create/link the quiz's assessment, then refresh the assessment lists.
-async function ensureQuizAssessment(classId: string, scheduledDate: Date, quizStartDate: Date | null) {
-  if (await linkQuizAssessment(classId, scheduledDate, quizStartDate)) {
+async function ensureQuizAssessment(
+  classId: string,
+  scheduledDate: Date,
+  quizStartDate: Date | null,
+  cadence: number,
+) {
+  if (await linkQuizAssessment(classId, scheduledDate, quizStartDate, cadence)) {
     revalidatePath(`/classes/${classId}/assessments`);
     revalidatePath(`/my/classes/${classId}/assessments`);
   }
@@ -90,7 +95,7 @@ export async function saveQuizPrep(
     },
   });
 
-  if (quizCreated) await ensureQuizAssessment(classId, scheduledDate, cyc.quizStartDate);
+  if (quizCreated) await ensureQuizAssessment(classId, scheduledDate, cyc.quizStartDate, cyc.cadence);
 
   await logActivity({
     actorId: cyc.user.id,
@@ -124,7 +129,7 @@ export async function markQuizAnnounced(classId: string, scheduledDateStr: strin
     update: { announcedAt, loggedById: cyc.user.assistantId },
     create: { classId, scheduledDate, quizDate: scheduledDate, announcedAt, loggedById: cyc.user.assistantId },
   });
-  await ensureQuizAssessment(classId, scheduledDate, cyc.quizStartDate);
+  await ensureQuizAssessment(classId, scheduledDate, cyc.quizStartDate, cyc.cadence);
 
   await logActivity({
     actorId: cyc.user.id,
@@ -141,7 +146,7 @@ export async function markQuizAnnounced(classId: string, scheduledDateStr: strin
 }
 
 // Admin/teacher: move a single quiz to a different actual date. Only that cycle's
-// deadlines shift; later quizzes stay on the biweekly cadence.
+// deadlines shift; later quizzes stay on the class's cadence.
 export async function setQuizDate(
   classId: string,
   scheduledDateStr: string,

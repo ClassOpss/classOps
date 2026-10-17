@@ -138,7 +138,7 @@ export function ClassTrendsTable({ data, studentHref }: { data: ClassTrends; stu
 
 export const TREND_FOOTNOTE =
   "Movement is judged on standing in the class, so a hard paper that pulled everyone down isn't a decline. " +
-  "Needs remedial = below 50% on the last 2. Letters show when the assessment has grade boundaries set. " +
+  "Needs remedial = below 50% on the last 2. Letters use automatic Edexcel-style boundaries from the class marks (or a manual override); the lowest grade is D. " +
   "These are patterns to act on, not predictions — with 2–3 results, check before concluding.";
 
 export function parsePeriod(sp: { month?: string; year?: string }) {

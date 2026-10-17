@@ -4,7 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { createSchool, type FormState } from "@/actions/schools";
 import { createClass } from "@/actions/classes";
 import { DAYS, YEAR_GROUPS, yearGroupLabel } from "@/lib/constants";
-import { QUIZ_CADENCE_DAYS } from "@/lib/quiz";
+import { QUIZ_CADENCE_DAYS, QUIZ_CADENCE_OPTIONS } from "@/lib/quiz";
 
 const inputCls = "input";
 const btnCls = "btn-primary";
@@ -102,12 +102,12 @@ export function NewClassForm({ schools }: { schools: { id: string; name: string 
         <input name="notes" className={inputCls} />
       </label>
       <fieldset className="sm:col-span-2">
-        <legend className="label">Biweekly quiz (optional)</legend>
+        <legend className="label">Regular quiz (optional)</legend>
         <p className="field-hint mb-2 mt-0">
-          Quiz weekday + the first quiz date. Quizzes recur every {QUIZ_CADENCE_DAYS} days; assistants send the
+          Quiz weekday, the first quiz date, and how often — weekly or biweekly. Assistants send the
           announcement, create the quiz, and send it to print before each one (lead times in Settings). Leave blank for none.
         </p>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-3">
           <label className="block">
             <span className="label">Quiz day</span>
             <select name="quizDay" className={inputCls} defaultValue="">
@@ -118,6 +118,12 @@ export function NewClassForm({ schools }: { schools: { id: string; name: string 
           <label className="block">
             <span className="label">First quiz date</span>
             <input name="quizStartDate" type="date" className={inputCls} />
+          </label>
+          <label className="block">
+            <span className="label">How often</span>
+            <select name="quizCadenceDays" className={inputCls} defaultValue={QUIZ_CADENCE_DAYS}>
+              {QUIZ_CADENCE_OPTIONS.map((o) => <option key={o.days} value={o.days}>{o.label}</option>)}
+            </select>
           </label>
         </div>
       </fieldset>

@@ -9,7 +9,7 @@ import { AssessmentForm } from "./assessment-form";
 import { QuizAnnouncement } from "./quiz-announcement";
 import { MaxMarkForm } from "./max-mark-form";
 import { GradeBoundariesForm } from "@/components/grade-boundaries-form";
-import { parseBoundaries } from "@/lib/grade-boundaries";
+import { autoBoundaries, parseBoundaries } from "@/lib/grade-boundaries";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -43,7 +43,12 @@ export default async function AssessmentsAdminPage({
   const assessments = await prisma.assessment.findMany({
     where: { classId },
     orderBy: { date: "desc" },
-    include: { _count: { select: { grades: true } }, topic: { select: { title: true } }, quizPrep: { select: { id: true } } },
+    include: {
+      _count: { select: { grades: true } },
+      grades: { where: { absent: false, rawMark: { not: null } }, select: { rawMark: true } },
+      topic: { select: { title: true } },
+      quizPrep: { select: { id: true } },
+    },
   });
 
   return (
@@ -90,7 +95,12 @@ export default async function AssessmentsAdminPage({
                   <td className="min-w-[11rem]">
                     <MaxMarkForm assessmentId={a.id} current={a.maxMark} />
                     <div className="mt-1.5">
-                      <GradeBoundariesForm assessmentId={a.id} maxMark={a.maxMark} current={parseBoundaries(a.gradeBoundaries)} />
+                      <GradeBoundariesForm
+                        assessmentId={a.id}
+                        maxMark={a.maxMark}
+                        manual={parseBoundaries(a.gradeBoundaries)}
+                        auto={a.maxMark == null ? null : autoBoundaries(a.grades.map((g) => Number(g.rawMark)), a.maxMark)}
+                      />
                     </div>
                   </td>
                   <td>{a._count.grades}</td>

@@ -7,7 +7,7 @@ import { assessmentHeldAt } from "@/lib/task-timing";
 import { GradeEntryForm, type GradeRow } from "./grade-entry-form";
 import { MaxMarkForm } from "@/app/(admin)/classes/[classId]/assessments/max-mark-form";
 import { GradeBoundariesForm } from "@/components/grade-boundaries-form";
-import { parseBoundaries } from "@/lib/grade-boundaries";
+import { autoBoundaries, parseBoundaries } from "@/lib/grade-boundaries";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -38,7 +38,7 @@ export default async function GradeEntryPage({
   }
 
   const visibleIds = await getVisibleStudentIds(classId, user);
-  const [students, grades, avg] = await Promise.all([
+  const [students, grades, avg, classMarks] = await Promise.all([
     prisma.student.findMany({
       where: { id: { in: visibleIds }, active: true },
       orderBy: { name: "asc" },
@@ -50,6 +50,11 @@ export default async function GradeEntryPage({
     }),
     // Class average across ALL students (both sub-groups), for the colour coding.
     prisma.assessmentGrade.aggregate({ where: { assessmentId }, _avg: { percentage: true } }),
+    // Whole-class raw marks, for the automatic grade boundaries.
+    prisma.assessmentGrade.findMany({
+      where: { assessmentId, absent: false, rawMark: { not: null } },
+      select: { rawMark: true },
+    }),
   ]);
   const byStudent = new Map(grades.map((g) => [g.studentId, g]));
   const classAverage = avg._avg.percentage !== null ? Number(avg._avg.percentage) : null;
@@ -119,7 +124,12 @@ export default async function GradeEntryPage({
           <GradeBoundariesForm
             assessmentId={assessmentId}
             maxMark={assessment.maxMark}
-            current={parseBoundaries(assessment.gradeBoundaries)}
+            manual={parseBoundaries(assessment.gradeBoundaries)}
+            auto={
+              assessment.maxMark == null
+                ? null
+                : autoBoundaries(classMarks.map((g) => Number(g.rawMark)), assessment.maxMark)
+            }
           />
           <GradeEntryForm
             assessmentId={assessmentId}

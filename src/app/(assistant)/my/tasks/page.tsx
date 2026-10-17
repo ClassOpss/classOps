@@ -96,7 +96,7 @@ export default async function MyTasksPage() {
     })
     .filter((t) => t.missing.length > 0);
 
-  // Quiz-prep tasks: for each quiz-enabled class, any biweekly cycle that isn't complete
+  // Quiz-prep tasks: for each quiz-enabled class, any quiz cycle that isn't complete
   // and whose prep deadline is either overdue (last 21 days) or coming up within a week.
   const quizClasses =
     classIds.length === 0
@@ -107,6 +107,7 @@ export default async function MyTasksPage() {
             id: true,
             name: true,
             quizStartDate: true,
+            quizCadenceDays: true,
             schoolId: true,
             quizPreps: {
               select: {
@@ -135,6 +136,7 @@ export default async function MyTasksPage() {
       c.quizPreps,
       beginning,
       addDays(today, cfg.quizAnnounceLeadDays + 10),
+      c.quizCadenceDays,
     );
     // Shown from a week before its deadline, and kept (as overdue) until done.
     const near = (deadline: Date) => deadline.getTime() <= soon;
