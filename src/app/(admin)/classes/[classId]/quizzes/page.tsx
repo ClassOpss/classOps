@@ -10,7 +10,7 @@ import {
   addDays,
   cadenceLabel,
 } from "@/lib/quiz";
-import { setQuizDate, setQuizCoverage } from "@/actions/quiz-prep";
+import { setQuizDate, setQuizCoverage, cancelQuiz, restoreQuiz } from "@/actions/quiz-prep";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   weekday: "short",
@@ -50,15 +50,16 @@ export default async function ClassQuizzesPage({ params }: { params: Promise<{ c
 
   const rows = await prisma.quizPrep.findMany({
     where: { classId },
-    select: { scheduledDate: true, adHoc: true, quizDate: true, coverage: true, quizCreated: true, sentToPrint: true, completedAt: true, announcedAt: true, assessment: { select: { label: true, maxMark: true, type: true } } },
+    select: { scheduledDate: true, adHoc: true, cancelled: true, quizDate: true, coverage: true, quizCreated: true, sentToPrint: true, completedAt: true, announcedAt: true, assessment: { select: { label: true, maxMark: true, type: true, _count: { select: { grades: true } } } } },
   });
-  // Show the last cycle + roughly the next 3 months.
+  // Show the last cycle + roughly the next 3 months (cancelled ones too, so they can be restored).
   const cycles = quizCyclesBetween(
     klass.quizStartDate,
     rows,
     addDays(today, -klass.quizCadenceDays),
     addDays(today, 90),
     klass.quizCadenceDays,
+    true,
   );
 
   if (cycles.length === 0) {
@@ -80,15 +81,31 @@ export default async function ClassQuizzesPage({ params }: { params: Promise<{ c
         {klass.quizStartDate
           ? `${cadenceLabel(klass.quizCadenceDays)} on ${klass.quizDay}, plus every assessment added to the class. `
           : "Every assessment added to this class. "}
-        Move a single quiz here if something changes —
+        Move a quiz here if something changes —
         its announcement ({cfg.quizAnnounceLeadDays}d before) and prep ({cfg.quizPrepLeadDays}d before) deadlines
-        shift with it. Later quizzes stay on the schedule. Set what each quiz covers for the announcement message.
+        shift with it. Tick &ldquo;push later quizzes too&rdquo; to make the new date the schedule for every
+        later quiz too, or cancel a quiz that isn&apos;t happening. Set what each quiz covers for the announcement message.
       </p>
 
       <ul className="flex flex-col gap-3">
-        {cycles.map(({ scheduledDate: sched, quizDate: actual, row }) => {
+        {cycles.map(({ scheduledDate: sched, quizDate: actual, row, adHoc }) => {
           const moved = actual.getTime() !== sched.getTime();
           const s = iso(sched);
+
+          if (row?.cancelled) {
+            return (
+              <li key={s} className="card flex flex-wrap items-center justify-between gap-2 p-4 opacity-70">
+                <p className="font-semibold text-muted line-through">Quiz — {dateFmt.format(actual)}</p>
+                <div className="flex items-center gap-2">
+                  <span className="badge-neutral">Cancelled</span>
+                  <form action={restoreQuiz.bind(null, classId, s)}>
+                    <button type="submit" className="btn-secondary btn-sm">Restore</button>
+                  </form>
+                </div>
+              </li>
+            );
+          }
+          const hasGrades = (row?.assessment?._count.grades ?? 0) > 0;
 
           return (
             <li key={s} className="card flex flex-col gap-3 p-4">
@@ -109,12 +126,20 @@ export default async function ClassQuizzesPage({ params }: { params: Promise<{ c
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <form action={setQuizDate.bind(null, classId, s)} className="flex items-end gap-2">
-                  <label className="block flex-1">
-                    <span className="label">Quiz date</span>
-                    <input name="quizDate" type="date" defaultValue={iso(actual)} className="input" />
-                  </label>
-                  <button type="submit" className="btn-secondary btn-sm">Save</button>
+                <form action={setQuizDate.bind(null, classId, s)} className="flex flex-col gap-1.5">
+                  <div className="flex items-end gap-2">
+                    <label className="block flex-1">
+                      <span className="label">Quiz date</span>
+                      <input name="quizDate" type="date" defaultValue={iso(actual)} className="input" />
+                    </label>
+                    <button type="submit" className="btn-secondary btn-sm">Save</button>
+                  </div>
+                  {!adHoc && (
+                    <label className="flex items-center gap-2 text-xs text-muted">
+                      <input type="checkbox" name="shiftLater" />
+                      Push later quizzes too (they follow this new date)
+                    </label>
+                  )}
                 </form>
 
                 <form action={setQuizCoverage.bind(null, classId, s)} className="flex items-end gap-2">
@@ -124,6 +149,20 @@ export default async function ClassQuizzesPage({ params }: { params: Promise<{ c
                   </label>
                   <button type="submit" className="btn-secondary btn-sm">Save</button>
                 </form>
+              </div>
+
+              <div className="flex justify-end text-xs">
+                {adHoc && row?.assessment ? (
+                  <Link href={`/classes/${classId}/assessments`} className="link text-muted">
+                    Not happening? Delete the assessment
+                  </Link>
+                ) : hasGrades ? (
+                  <span className="text-muted">Grades entered — can&apos;t cancel</span>
+                ) : (
+                  <form action={cancelQuiz.bind(null, classId, s)}>
+                    <button type="submit" className="btn-ghost btn-sm text-danger">Cancel this quiz</button>
+                  </form>
+                )}
               </div>
             </li>
           );

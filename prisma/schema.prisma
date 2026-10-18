@@ -686,6 +686,9 @@ model QuizPrep {
   // true = tasks for a hand-added assessment (off the biweekly cadence). scheduledDate is
   // then the assessment's original date — still the row's stable key.
   adHoc         Boolean   @default(false) @map("ad_hoc")
+  // true = this cadence quiz was called off (holiday, exam week…): no tasks, no fines.
+  // The row keeps the slot so the cadence doesn't regenerate it; admin can restore it.
+  cancelled     Boolean   @default(false)
   loggedById   String?   @map("logged_by")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 

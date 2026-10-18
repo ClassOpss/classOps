@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireClassAccess } from "@/lib/auth-guards";
 import { logActivity } from "@/lib/activity";
 import { attachQuizTasks } from "@/lib/quiz-assessment";
+import { clearStaleQuizIncidents } from "@/lib/quiz-incidents";
 import { Prisma } from "@prisma/client";
 import { GRADES, validateBoundaries } from "@/lib/grade-boundaries";
 
@@ -168,8 +169,14 @@ export async function deleteAssessment(assessmentId: string): Promise<void> {
   });
   if (!found) return;
   const user = await requireClassAccess(found.classId);
-  // Its own ad-hoc quiz tasks go with it; a cadence cycle just loses the link.
-  await prisma.quizPrep.deleteMany({ where: { assessmentId, adHoc: true } });
+  // Its own ad-hoc quiz tasks go with it — and their late fines, since the quiz is gone;
+  // a cadence cycle just loses the link.
+  const own = await prisma.quizPrep.findMany({ where: { assessmentId, adHoc: true }, select: { id: true } });
+  if (own.length > 0) {
+    await prisma.quizPrep.updateMany({ where: { id: { in: own.map((r) => r.id) } }, data: { cancelled: true } });
+    await clearStaleQuizIncidents(own.map((r) => r.id));
+    await prisma.quizPrep.deleteMany({ where: { id: { in: own.map((r) => r.id) } } });
+  }
   const a = await prisma.assessment.delete({
     where: { id: assessmentId },
     select: { classId: true },
@@ -186,4 +193,8 @@ export async function deleteAssessment(assessmentId: string): Promise<void> {
   revalidatePath(`/classes/${a.classId}/quizzes`);
   revalidatePath(`/my/classes/${a.classId}`, "layout");
   revalidatePath("/my/tasks");
+  if (own.length > 0) {
+    revalidatePath("/dashboard");
+    revalidatePath("/pay", "layout");
+  }
 }

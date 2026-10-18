@@ -113,6 +113,7 @@ export default async function MyTasksPage() {
               select: {
                 scheduledDate: true,
                 adHoc: true,
+                cancelled: true,
                 quizDate: true,
                 quizCreated: true,
                 sentToPrint: true,

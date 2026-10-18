@@ -4,7 +4,7 @@ import { quizCyclesBetween } from "../src/lib/quiz";
 import { buildBiweeklyQuizAnnouncement } from "../src/lib/whatsapp/quiz-announcement";
 
 const d = (s: string) => new Date(`${s}T00:00:00Z`);
-const row = (sched: string, quiz: string, adHoc: boolean) => ({ scheduledDate: d(sched), quizDate: d(quiz), adHoc });
+const row = (sched: string, quiz: string, adHoc: boolean, cancelled = false) => ({ scheduledDate: d(sched), quizDate: d(quiz), adHoc, cancelled });
 
 // Cadence every 14 days from Oct 1 + an ad-hoc midterm on Oct 9 + an ad-hoc row that sits on a cadence date.
 const rows = [row("2026-10-09", "2026-10-09", true), row("2026-10-15", "2026-10-15", true), row("2026-10-01", "2026-10-02", false)];
@@ -17,6 +17,14 @@ assert.deepEqual(
 // No cadence: only ad-hoc rows inside the window.
 const n = quizCyclesBetween(null, [row("2026-10-09", "2026-10-09", true), row("2026-12-01", "2026-12-01", true)], d("2026-10-01"), d("2026-10-31"));
 assert.equal(n.length, 1);
+
+// A cancelled cadence quiz drops out (tasks + fines), but the admin list can still show it.
+const withCancel = [row("2026-10-15", "2026-10-15", false, true)];
+assert.deepEqual(
+  quizCyclesBetween(d("2026-10-01"), withCancel, d("2026-10-01"), d("2026-10-31")).map((x) => x.quizDate.toISOString().slice(0, 10)),
+  ["2026-10-01", "2026-10-29"],
+);
+assert.equal(quizCyclesBetween(d("2026-10-01"), withCancel, d("2026-10-01"), d("2026-10-31"), 14, true).length, 3);
 
 const m = buildBiweeklyQuizAnnouncement({ date: d("2026-10-09"), coverage: "Algebra, Graphs", type: "midterm", time: "16:00", signature: "Team" });
 assert.match(m, /^\*Midterm Announcement\*/);

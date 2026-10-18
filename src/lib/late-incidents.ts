@@ -130,7 +130,7 @@ async function detectQuiz(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queued
       disabledTasks: true,
       assignments: { where: activeAt(now), select: { assistantId: true, exemptTasks: true } },
       quizPreps: {
-        select: { id: true, scheduledDate: true, adHoc: true, quizDate: true, quizCreated: true, sentToPrint: true, completedAt: true, announcedAt: true, createdAt: true },
+        select: { id: true, scheduledDate: true, adHoc: true, cancelled: true, quizDate: true, quizCreated: true, sentToPrint: true, completedAt: true, announcedAt: true, createdAt: true },
       },
     },
   });

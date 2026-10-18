@@ -99,13 +99,26 @@ export type QuizCycle<R> = { scheduledDate: Date; quizDate: Date; row: R | undef
 // Every quiz cycle for a class in [from, to]: the cadence dates (if the class has
 // one) plus the ad-hoc rows made for hand-added assessments, sorted by actual date. Cadence
 // cycles are windowed by scheduled date, ad-hoc ones by actual date. An ad-hoc row that
-// sits on a cadence date is that cadence cycle, so it's never listed twice.
-export function quizCyclesBetween<R extends { scheduledDate: Date; quizDate: Date; adHoc: boolean }>(
+// sits on a cadence date is that cadence cycle, so it's never listed twice. Cancelled
+// cycles are dropped (no tasks, no fines) unless `includeCancelled` (the admin list).
+export function quizCyclesBetween<R extends { scheduledDate: Date; quizDate: Date; adHoc: boolean; cancelled: boolean }>(
   quizStartDate: Date | null,
   rows: R[],
   from: Date,
   to: Date,
   cadence = QUIZ_CADENCE_DAYS,
+  includeCancelled = false,
+): QuizCycle<R>[] {
+  const all = quizCyclesWithCancelled(quizStartDate, rows, from, to, cadence);
+  return includeCancelled ? all : all.filter((c) => !c.row?.cancelled);
+}
+
+function quizCyclesWithCancelled<R extends { scheduledDate: Date; quizDate: Date; adHoc: boolean }>(
+  quizStartDate: Date | null,
+  rows: R[],
+  from: Date,
+  to: Date,
+  cadence: number,
 ): QuizCycle<R>[] {
   const bySched = new Map(rows.map((r) => [r.scheduledDate.getTime(), r]));
   const out: QuizCycle<R>[] = [];

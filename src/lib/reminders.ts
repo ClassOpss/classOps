@@ -135,6 +135,7 @@ async function gatherQuiz(
         select: {
           scheduledDate: true,
           adHoc: true,
+          cancelled: true,
           quizDate: true,
           quizCreated: true,
           sentToPrint: true,

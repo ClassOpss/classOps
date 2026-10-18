@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { isQuizDate, quizNumber } from "@/lib/quiz";
+import { isQuizDate } from "@/lib/quiz";
 
 // Once a cadence quiz is confirmed (announcement sent, or quiz created) it gets a linked
 // Assessment so grade entry is ready — only the max mark is left to fill in. Idempotent:
@@ -8,15 +8,15 @@ import { isQuizDate, quizNumber } from "@/lib/quiz";
 export async function ensureQuizAssessment(
   classId: string,
   scheduledDate: Date,
-  quizStartDate: Date | null,
-  cadence: number,
 ): Promise<boolean> {
-  if (!quizStartDate) return false; // ad-hoc cycles are born with their assessment
   const row = await prisma.quizPrep.findUnique({
     where: { classId_scheduledDate: { classId, scheduledDate } },
     select: { id: true, quizDate: true, coverage: true, assessmentId: true },
   });
   if (!row || row.assessmentId) return false;
+
+  // Numbered by the class's quizzes so far, so a pushed or cancelled quiz never leaves a gap.
+  const earlier = await prisma.assessment.count({ where: { classId, type: "quiz", date: { lt: row.quizDate } } });
 
   const manual = await prisma.assessment.findFirst({
     where: { classId, type: "quiz", date: row.quizDate, quizPrep: { is: null } },
@@ -29,7 +29,7 @@ export async function ensureQuizAssessment(
         data: {
           classId,
           type: "quiz",
-          label: `Quiz ${quizNumber(quizStartDate, scheduledDate, cadence)}`,
+          label: `Quiz ${earlier + 1}`,
           topicNotes: row.coverage,
           date: row.quizDate,
           maxMark: null,
@@ -58,9 +58,10 @@ export async function attachQuizTasks(a: {
     select: { id: true, coverage: true },
   });
   if (open) {
+    // Adding an assessment on a cancelled quiz's day brings that quiz back.
     await prisma.quizPrep.update({
       where: { id: open.id },
-      data: { assessmentId: a.id, coverage: open.coverage ?? a.topicNotes },
+      data: { assessmentId: a.id, coverage: open.coverage ?? a.topicNotes, cancelled: false },
     });
     return;
   }

@@ -616,6 +616,19 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
       lib/reports/parent-trend-data.parentTrendFor. Verified: rendered PDFs (improving + remedial), toggle off
       -> section omitted, on -> back.
 
+    ── Cancel / push quizzes (admin+teacher, /classes/[id]/quizzes) ──
+    • QuizPrep.cancelled (migration 20261018120000_quiz_prep_cancelled): cancelQuiz keeps the slot as a
+      cancelled row (restoreQuiz undoes), deletes its auto-made assessment, refused once grades exist.
+      quizCyclesBetween drops cancelled cycles (tasks/fines/reminders); the admin page passes
+      includeCancelled. Hand-added assessment cycles go away by deleting the assessment.
+    • "Push later quizzes too" on the date form -> shiftCadenceFrom: the new date becomes the cadence
+      anchor (Class.quizStartDate/quizDay); earlier cadence cycles are materialised + flipped to adHoc rows
+      (history keeps its keys), this+later rows are re-keyed (parked first to dodge the unique index)
+      carrying their own moves/cancels/assessment dates. Auto quiz labels now count earlier quizzes.
+    • lib/quiz-incidents.clearStaleQuizIncidents: on cancel / move / push / ad-hoc assessment delete,
+      DELETES quiz fines whose deadline no longer matches the cycle (all for cancelled) and recomputes the
+      affected unsent payslips (sent ones stay frozen). Browser + DB verified.
+
     ── DEFERRED to v2 (next year — user decision) ──
     Student/parent self-serve portals, in-app HW upload, dropping Google Classroom, fee/payment tracking,
     admin activity tab, automatic daily-update sending to the class WhatsApp group. Design keeps these

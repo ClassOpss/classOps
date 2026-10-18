@@ -54,6 +54,7 @@ export default async function QuizPrepPage({ params }: { params: Promise<{ class
     select: {
       scheduledDate: true,
       adHoc: true,
+      cancelled: true,
       quizDate: true,
       coverage: true,
       quizCreated: true,
