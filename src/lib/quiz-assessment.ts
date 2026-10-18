@@ -16,7 +16,16 @@ export async function ensureQuizAssessment(
   if (!row || row.assessmentId) return false;
 
   // Numbered by the class's quizzes so far, so a pushed or cancelled quiz never leaves a gap.
-  const earlier = await prisma.assessment.count({ where: { classId, type: "quiz", date: { lt: row.quizDate } } });
+  // Mocks don't count (Quiz 1, Quiz 2, Mock 1 -> Quiz 3): diagnostic, or named "Mock …".
+  const earlier = await prisma.assessment.count({
+    where: {
+      classId,
+      type: "quiz",
+      isDiagnostic: false,
+      NOT: { label: { contains: "mock", mode: "insensitive" } },
+      date: { lt: row.quizDate },
+    },
+  });
 
   const manual = await prisma.assessment.findFirst({
     where: { classId, type: "quiz", date: row.quizDate, quizPrep: { is: null } },
