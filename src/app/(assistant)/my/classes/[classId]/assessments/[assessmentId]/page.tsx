@@ -7,6 +7,7 @@ import { assessmentHeldAt } from "@/lib/task-timing";
 import { GradeEntryForm, type GradeRow } from "./grade-entry-form";
 import { MaxMarkForm } from "@/app/(admin)/classes/[classId]/assessments/max-mark-form";
 import { GradeBoundariesForm } from "@/components/grade-boundaries-form";
+import { RenameAssessment } from "@/components/rename-assessment";
 import { autoBoundaries, parseBoundaries } from "@/lib/grade-boundaries";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -85,7 +86,7 @@ export default async function GradeEntryPage({
       <div>
         <Link href={`/my/classes/${classId}/assessments`} className="link text-sm">← Assessments</Link>
         <h1 className="mt-1 text-lg font-semibold tracking-tight">
-          {assessment.label}
+          <RenameAssessment assessmentId={assessmentId} label={assessment.label} />
           {assessment.isDiagnostic ? <span className="ml-1.5 badge-neutral">Diagnostic</span> : null}
         </h1>
         <p className="text-sm text-muted">

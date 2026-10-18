@@ -70,6 +70,41 @@ export async function createAssessment(
   return { ok: true };
 }
 
+// Rename an assessment (e.g. an auto-made "Quiz 3" -> "Quiz 3 — Trigonometry").
+export async function renameAssessment(
+  assessmentId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const found = await prisma.assessment.findUnique({
+    where: { id: assessmentId },
+    select: { classId: true, label: true },
+  });
+  if (!found) return { error: "Assessment not found." };
+  const user = await requireClassAccess(found.classId);
+
+  const parsed = schema.shape.label.safeParse(String(formData.get("label") ?? "").trim());
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const label = parsed.data;
+  if (label === found.label) return { ok: true };
+
+  await prisma.assessment.update({ where: { id: assessmentId }, data: { label } });
+  await logActivity({
+    actorId: user.id,
+    actorRole: user.role,
+    action: "renamed_assessment",
+    entityType: "assessment",
+    entityId: assessmentId,
+    classId: found.classId,
+    metadata: { from: found.label, to: label },
+  });
+  revalidatePath(`/classes/${found.classId}`, "layout");
+  revalidatePath(`/my/classes/${found.classId}`, "layout");
+  revalidatePath("/my/tasks");
+  revalidatePath("/trends");
+  return { ok: true };
+}
+
 // Set (or correct) the max mark — auto-created quiz assessments start without one.
 // Existing percentages are recomputed; a max below a mark already entered is refused.
 export async function setMaxMark(

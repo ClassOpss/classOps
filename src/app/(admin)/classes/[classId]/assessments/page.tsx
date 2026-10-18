@@ -8,6 +8,7 @@ import { buildQuizAnnouncement, friendlyTime, topicsFromNotes } from "@/lib/what
 import { AssessmentForm } from "./assessment-form";
 import { QuizAnnouncement } from "./quiz-announcement";
 import { MaxMarkForm } from "./max-mark-form";
+import { RenameAssessment } from "@/components/rename-assessment";
 import { GradeBoundariesForm } from "@/components/grade-boundaries-form";
 import { autoBoundaries, parseBoundaries } from "@/lib/grade-boundaries";
 
@@ -86,7 +87,7 @@ export default async function AssessmentsAdminPage({
               {assessments.map((a) => (
                 <tr key={a.id}>
                   <td className="font-medium">
-                    {a.label}
+                    <RenameAssessment assessmentId={a.id} label={a.label} />
                     {a.isDiagnostic ? <span className="ml-1.5 badge-neutral">Diagnostic</span> : null}
                     {a.quizPrep ? <span className="ml-1.5 badge-neutral">From quiz tasks</span> : null}
                   </td>
