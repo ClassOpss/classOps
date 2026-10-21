@@ -30,8 +30,12 @@ export default async function MyTasksPage() {
     );
   }
 
-  // Overdue tasks stay listed until they're done — there is no age cutoff anywhere below.
+  // Overdue work that still produces data (attendance, Classroom, HW correction, grades) stays
+  // listed until it's done. Tasks that are pointless once their moment passes drop off: a
+  // parent update once the class's next lesson starts, quiz announce/prep once the quiz day
+  // ends, a month's reports once the next month's reports are due. Fines are unaffected.
   const now = new Date();
+  const today = cairoToday(now);
 
   const assignments = await prisma.classAssignment.findMany({
     where: {
@@ -83,13 +87,32 @@ export default async function MyTasksPage() {
           },
         });
 
+  // Every taught (non-day-off) lesson date per class, whoever owns it — used to find a
+  // session's next lesson, and below for which months owe reports.
+  const taught =
+    classIds.length === 0
+      ? []
+      : await prisma.classSession.findMany({
+          where: { classId: { in: classIds }, dayOff: false, scheduledDate: { lte: today } },
+          select: { classId: true, scheduledDate: true },
+        });
+  const lessonDates = new Map<string, Date[]>();
+  for (const t of taught) lessonDates.set(t.classId, [...(lessonDates.get(t.classId) ?? []), t.scheduledDate]);
+  // A class update is stale once the class's next lesson has started (that lesson gets its own).
+  const nextLessonStarted = (s: (typeof sessions)[number]) => {
+    const next = (lessonDates.get(s.classId) ?? [])
+      .filter((d) => d.getTime() > s.scheduledDate.getTime())
+      .sort((a, b) => a.getTime() - b.getTime())[0];
+    return !!next && now >= sessionStartsAt(next, s.class.schedule);
+  };
+
   const todos = sessions
     // Today's lesson only becomes a task once it has started.
     .filter((s) => now >= sessionStartsAt(s.scheduledDate, s.class.schedule))
     .map((s) => {
       const missing: string[] = [];
       if (required(s.classId, "attendance") && s.attendance.length === 0) missing.push("Attendance");
-      if (required(s.classId, "parent_update") && !s.parentUpdate) missing.push("Parent update");
+      if (required(s.classId, "parent_update") && !s.parentUpdate && !nextLessonStarted(s)) missing.push("Parent update");
       if (required(s.classId, "classroom_upload", { lmsType: s.class.lmsType }) && !s.classroomUpload)
         missing.push("Classroom");
       return { s, missing };
@@ -97,7 +120,7 @@ export default async function MyTasksPage() {
     .filter((t) => t.missing.length > 0);
 
   // Quiz-prep tasks: for each quiz-enabled class, any quiz cycle that isn't complete
-  // and whose prep deadline is either overdue (last 21 days) or coming up within a week.
+  // and whose deadline is either overdue (quiz day not over yet) or coming up within a week.
   const quizClasses =
     classIds.length === 0
       ? []
@@ -126,8 +149,7 @@ export default async function MyTasksPage() {
   const cfg = await resolveConfig();
   const operationId = assignments[0]?.class.operationId;
   const vacations = operationId ? await loadVacations(operationId) : [];
-  const today = cairoToday(now);
-  const soon = now.getTime() + 7 * 86_400_000;
+  const soon =now.getTime() + 7 * 86_400_000;
   const beginning = new Date(Date.UTC(2000, 0, 1));
 
   const quizTodos: { classId: string; className: string; title: string; kind: string; quizDate: Date; deadline: Date; overdue: boolean }[] = [];
@@ -139,9 +161,11 @@ export default async function MyTasksPage() {
       addDays(today, cfg.quizAnnounceLeadDays + 10),
       c.quizCadenceDays,
     );
-    // Shown from a week before its deadline, and kept (as overdue) until done.
+    // Shown from a week before its deadline, and kept (as overdue) until done or the quiz day ends.
     const near = (deadline: Date) => deadline.getTime() <= soon;
     for (const { quizDate: actual, row } of cycles) {
+      // Once the quiz day is over there's nothing left to announce or prepare.
+      if (actual.getTime() < today.getTime()) continue;
       // No quiz during a school break (fines + reminders skip these too).
       if (isSchoolOnVacation(c.schoolId, actual, vacations)) continue;
       const title = row?.assessment && row.assessment.type !== "quiz" ? row.assessment.label : "Quiz";
@@ -219,19 +243,12 @@ export default async function MyTasksPage() {
   weeklyTodos.sort((a, b) => a.deadline.getTime() - b.deadline.getTime());
 
   // Monthly parent reports (due the 30th / Feb 28th): owed for every month the class had a
-  // lesson. This month's shows up from a week before the deadline; past months stay listed
-  // as overdue until they're done.
+  // lesson. This month's shows up from a week before the deadline; a past month stays listed
+  // as overdue until it's done or the next month's reports fall due (those supersede it).
   const reportTodos: {
     classId: string; className: string; year: number; month: number; deadline: Date; sent: number; total: number; overdue: boolean;
   }[] = [];
   const thisMonth = yearMonthOf(today);
-  const taught =
-    classIds.length === 0
-      ? []
-      : await prisma.classSession.findMany({
-          where: { classId: { in: classIds }, dayOff: false, scheduledDate: { lte: today } },
-          select: { classId: true, scheduledDate: true },
-        });
   const monthsByClass = new Map<string, Map<string, { year: number; month: number }>>();
   for (const t of taught) {
     const ym = yearMonthOf(t.scheduledDate);
@@ -247,6 +264,8 @@ export default async function MyTasksPage() {
       const deadline = monthlyReportDeadline(year, month, cfg);
       const overdue = now.getTime() > deadline.getTime();
       if (!overdue && deadline.getTime() > soon) continue; // not due within a week yet
+      const following = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
+      if (now.getTime() > monthlyReportDeadline(following.year, following.month, cfg).getTime()) continue; // superseded
       const progress = await monthlyReportProgress(classId, user.assistantId, year, month, now);
       if (progress.total === 0 || monthlyReportDone(progress)) continue;
       reportTodos.push({ classId, className: classNames.get(classId) ?? "", year, month, deadline, overdue, ...progress });
