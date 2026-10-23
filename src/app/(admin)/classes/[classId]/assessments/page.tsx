@@ -104,7 +104,12 @@ export default async function AssessmentsAdminPage({
                       />
                     </div>
                   </td>
-                  <td>{a._count.grades}</td>
+                  <td>
+                    {a._count.grades}
+                    <Link href={`/classes/${classId}/assessments/${a.id}/correctors`} className="link mt-1 block text-xs">
+                      Who&apos;s correcting
+                    </Link>
+                  </td>
                   <td>
                     <div className="flex flex-col gap-1">
                       <QuizAnnouncement

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { CAIRO_TZ, sessionDeadline, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, monthlyReportDueDate, monthlyReportDeadline, sessionStart, formatCairo } from "@/lib/datetime";
 import { quizCyclesBetween, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
 import { subGroupStudentIds, activeAt } from "@/lib/roster";
+import { loadPaperOwners, papersOf } from "@/lib/paper-owners";
 import { scheduleTimeForDate, type ClassSchedule } from "@/lib/schedule";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
 import { loadAllVacations, isSchoolOnVacation, type VacationSpan } from "@/lib/vacations";
@@ -275,9 +276,8 @@ async function gatherWeekly(
   const assessments = await prisma.assessment.findMany({
     where: { date: { gte: lookback, lte: weekEnd }, class: { operationId: { in: [...ops] } } },
     select: {
-      classId: true,
+      id: true,
       date: true,
-      grades: { select: { studentId: true } },
       class: {
         select: {
           name: true,
@@ -289,18 +289,17 @@ async function gatherWeekly(
       },
     },
   });
+  const papers = await loadPaperOwners(assessments.map((a) => a.id), now);
   for (const a of assessments) {
     const operationId = a.class.operationId;
     if (onVacation(vacs, operationId, a.class.schoolId, a.date)) continue;
     const deadline = saturdayDeadline(a.date, cfgFor(cfgs, operationId));
     if (!dueToday(deadline)) continue;
-    const graded = new Set(a.grades.map((g) => g.studentId));
+    const p = papers.get(a.id);
+    if (!p) continue;
     for (const { assistantId } of a.class.assignments) {
       if (!taskRequired("grade_entry", { disabledTasks: a.class.disabledTasks, exemptTasks: exemptionsFor(assistantId, a.class.assignments) })) continue;
-      const subIds = await subGroupStudentIds(a.classId, assistantId, now);
-      if (subIds.length === 0) continue;
-      const done = subIds.filter((id) => graded.has(id)).length;
-      if (done < subIds.length) {
+      if (papersOf(p.owners, assistantId).some((id) => !p.graded.has(id))) {
         const bucket = buckets.get(assistantId) ?? { operationId, tasks: [] };
         bucket.tasks.push({ label: `Enter assessment grades — ${a.class.name}`, deadline });
         buckets.set(assistantId, bucket);

@@ -44,7 +44,7 @@ export function GradeEntryForm({
         {classAverage !== null ? ` · class average ${classAverage.toFixed(1)}%` : ""}
       </p>
       {students.length === 0 ? (
-        <p className="px-4 py-5 text-sm text-muted">No students assigned to you in this class.</p>
+        <p className="px-4 py-5 text-sm text-muted">No papers are yours on this assessment.</p>
       ) : (
         <ul className="divide-y divide-border">
           {students.map((s) => {

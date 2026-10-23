@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
+import { requireClassAccess } from "@/lib/auth-guards";
+import { paperRows } from "@/lib/paper-owners";
+import { PaperOwnersSummary, ClaimPapersForm } from "@/components/paper-owners";
 import { prisma } from "@/lib/db";
 import { saturdayDeadline, isLate, formatCairo } from "@/lib/datetime";
 import { resolveConfig } from "@/lib/operation";
@@ -38,7 +40,16 @@ export default async function GradeEntryPage({
     );
   }
 
-  const visibleIds = await getVisibleStudentIds(classId, user);
+  // This assistant's papers on THIS assessment: their sub-group, plus any they took over,
+  // minus any a colleague took over or already corrected (lib/paper-owners).
+  // Admin/teacher see the whole class.
+  const papers = await paperRows(assessmentId);
+  const allRows = papers?.rows ?? [];
+  const me = user.assistantId ?? null;
+  const mine = (r: (typeof allRows)[number]) => !me || r.ownerId === me || r.shared;
+  const visibleIds = allRows.filter(mine).map((r) => r.studentId);
+  const claimable = me ? allRows.filter((r) => !r.graded && !mine(r)) : [];
+  const showOwners = (papers?.assistants.length ?? 0) > 1 || allRows.some((r) => r.claimed || (me && !mine(r)));
   const [students, grades, avg, classMarks] = await Promise.all([
     prisma.student.findMany({
       where: { id: { in: visibleIds }, active: true },
@@ -104,10 +115,28 @@ export default async function GradeEntryPage({
         <div className="rounded-lg bg-card-muted px-3 py-2.5 text-sm text-muted">
           Upcoming — enter grades after it&apos;s held on {dateFmt.format(assessment.date)}.
         </div>
+      ) : total === 0 && me ? (
+        <div className="rounded-lg bg-card-muted px-3 py-2.5 text-sm text-muted">
+          No papers are yours on this assessment — a colleague is correcting them.
+        </div>
       ) : (
         <div className="rounded-lg bg-warn-soft px-3 py-2.5 text-sm text-warn">
           Incomplete — {reviewed} of {total} students graded.
         </div>
+      )}
+
+      {showOwners && (
+        <section className="card flex flex-col gap-2 p-4">
+          <h2 className="section-title">Who&apos;s correcting</h2>
+          <PaperOwnersSummary rows={allRows} meId={me} />
+        </section>
+      )}
+
+      {claimable.length > 0 && (
+        <ClaimPapersForm
+          assessmentId={assessmentId}
+          papers={claimable.map((r) => ({ studentId: r.studentId, name: r.name, ownerName: r.ownerName }))}
+        />
       )}
 
       {assessment.maxMark == null ? (

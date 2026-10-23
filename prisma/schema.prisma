@@ -322,6 +322,7 @@ model Student {
   hwSubmissions  HomeworkSubmission[]
   attendance     Attendance[]
   grades         AssessmentGrade[]
+  paperClaims    AssessmentCorrector[]
   officeHours    OfficeHourSession[]
   reportLogs     ParentReportLog[]
   reportNotes    ParentReportNote[]
@@ -356,6 +357,8 @@ model Assistant {
   hwSubmissions       HomeworkSubmission[]
   attendanceLogs      Attendance[]
   gradesLogged        AssessmentGrade[]
+  papersClaimed       AssessmentCorrector[]        @relation("CorrectorAssistant")
+  papersAssigned      AssessmentCorrector[]        @relation("CorrectorSetBy")
   parentUpdates       ParentUpdateLog[]
   classroomUploads    ClassroomUploadLog[]
   officeHours         OfficeHourSession[]
@@ -622,8 +625,9 @@ model Assessment {
 
   class    Class             @relation(fields: [classId], references: [id], onDelete: Cascade)
   topic    Topic?            @relation(fields: [topicId], references: [id])
-  grades   AssessmentGrade[]
-  quizPrep QuizPrep?
+  grades     AssessmentGrade[]
+  correctors AssessmentCorrector[]
+  quizPrep   QuizPrep?
 
   @@index([classId])
   @@map("assessments")
@@ -648,6 +652,30 @@ model AssessmentGrade {
   @@index([assessmentId])
   @@index([studentId])
   @@map("assessment_grades")
+}
+
+// Who corrects one student's paper for ONE assessment when it isn't the student's usual
+// sub-group assistant (one assistant took the whole class, or papers were split by who was
+// there). No row = the default sub-group owner. Only matters while the paper is ungraded:
+// once graded, AssessmentGrade.loggedById (the corrector, never moved by edits) is the record.
+// Assistants may only claim papers for THEMSELVES; moving papers to someone else is admin-only,
+// so nobody can hand work (and its late fine) to a colleague.
+model AssessmentCorrector {
+  id           String   @id @default(uuid())
+  assessmentId String   @map("assessment_id")
+  studentId    String   @map("student_id")
+  assistantId  String   @map("assistant_id")
+  setById      String?  @map("set_by") // assistant who claimed it; null = set by admin
+  setAt        DateTime @default(now()) @map("set_at") @db.Timestamptz(6)
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assistant  Assistant  @relation("CorrectorAssistant", fields: [assistantId], references: [id])
+  setBy      Assistant? @relation("CorrectorSetBy", fields: [setById], references: [id])
+
+  @@unique([assessmentId, studentId])
+  @@index([assessmentId])
+  @@map("assessment_correctors")
 }
 
 // ----------------------------------------------------------------------------

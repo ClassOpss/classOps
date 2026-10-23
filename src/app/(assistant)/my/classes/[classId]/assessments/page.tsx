@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
+import { requireClassAccess } from "@/lib/auth-guards";
+import { loadPaperOwners, papersOf } from "@/lib/paper-owners";
 import { prisma } from "@/lib/db";
 import { saturdayDeadline, formatCairo } from "@/lib/datetime";
 import { resolveConfig } from "@/lib/operation";
@@ -21,23 +22,23 @@ export default async function AssessmentsListPage({
   const { classId } = await params;
   const user = await requireClassAccess(classId);
 
-  const [klass, visibleIds, assessments] = await Promise.all([
+  const [klass, assessments] = await Promise.all([
     prisma.class.findUnique({ where: { id: classId }, select: { name: true, schedule: true } }),
-    getVisibleStudentIds(classId, user),
     prisma.assessment.findMany({
       where: { classId },
       orderBy: { date: "desc" },
       select: { id: true, label: true, type: true, date: true, time: true, maxMark: true, isDiagnostic: true },
     }),
   ]);
-  const total = visibleIds.length;
-
-  const counts = await prisma.assessmentGrade.groupBy({
-    by: ["assessmentId"],
-    where: { assessmentId: { in: assessments.map((a) => a.id) }, studentId: { in: visibleIds } },
-    _count: { _all: true },
-  });
-  const gradedBy = new Map(counts.map((c) => [c.assessmentId, c._count._all]));
+  // Per assessment: the papers that are this assistant's (sub-group, or taken over) and how
+  // many of those are graded. Admin/teacher (no assistantId) see the whole class.
+  const papers = await loadPaperOwners(assessments.map((a) => a.id));
+  const progress = (id: string) => {
+    const p = papers.get(id);
+    if (!p) return { graded: 0, total: 0 };
+    const mine = user.assistantId ? papersOf(p.owners, user.assistantId) : [...p.owners.keys()];
+    return { graded: mine.filter((s) => p.graded.has(s)).length, total: mine.length };
+  };
   const cfg = await resolveConfig();
   const now = new Date();
 
@@ -60,7 +61,7 @@ export default async function AssessmentsListPage({
       ) : (
         <ul className="flex flex-col gap-2">
           {assessments.map((a) => {
-            const graded = gradedBy.get(a.id) ?? 0;
+            const { graded, total } = progress(a.id);
             const complete = total > 0 && graded === total;
             // Not sat yet -> nothing to grade, so no to-do badge.
             const upcoming = now < assessmentHeldAt(a.date, a.time, klass?.schedule);
@@ -79,6 +80,8 @@ export default async function AssessmentsListPage({
                       <span className="badge-neutral">Upcoming</span>
                     ) : a.maxMark == null ? (
                       <span className="badge-warn">Set max mark</span>
+                    ) : total === 0 ? (
+                      <span className="badge-neutral">Colleague correcting</span>
                     ) : (
                       <span className={complete ? "badge-success" : "badge-warn"}>
                         {complete ? "Complete" : `${graded}/${total} graded`}

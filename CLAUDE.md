@@ -629,6 +629,19 @@ CRON_SECRET=           # shared secret to protect /api/cron/* endpoints
       DELETES quiz fines whose deadline no longer matches the cycle (all for cancelled) and recomputes the
       affected unsent payslips (sent ones stay frozen). Browser + DB verified.
 
+    ── Per-assessment paper ownership (who corrected what; fines follow it) ──
+    • With 2 assistants a quiz may be split by sub-group, taken whole by one, or split by who was
+      there. AssessmentCorrector (migration 20261023113748_assessment_correctors) = per-assessment
+      per-student override. lib/paper-owners.resolvePaperOwners (unit-tested, scripts/test-paper-owners.ts):
+      graded -> AssessmentGrade.loggedById (the corrector; now create-only, never moved by edits) >
+      claim (if that assistant is still on the class) > sub-group default (SHARED when no sub-groups).
+      Grade-entry page, assistant assessments list, /my/tasks, late-incident grade_entry fines and
+      reminders all use papersOf() instead of the sub-group. Assistants can only CLAIM papers for
+      themselves ("Correcting papers that aren't yours?" on the grade-entry page, confirm dialog);
+      moving papers to someone else / back is admin-only at /classes/[id]/assessments/[aid]/correctors
+      (teacher read-only). Moving papers does not touch fines already issued. Browser-verified with
+      scripts/dev-papers.ts [clean]: claim whole class -> only the claimer fined; admin move works.
+
     ── DEFERRED to v2 (next year — user decision) ──
     Student/parent self-serve portals, in-app HW upload, dropping Google Classroom, fee/payment tracking,
     admin activity tab, automatic daily-update sending to the class WhatsApp group. Design keeps these

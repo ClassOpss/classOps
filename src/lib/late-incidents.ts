@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { CAIRO_TZ, sessionDeadline, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, monthlyReportDueDate, monthlyReportDeadline, latenessApplies } from "@/lib/datetime";
 import { quizCyclesBetween, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
 import { subGroupStudentIds, activeAt } from "@/lib/roster";
+import { loadPaperOwners, papersOf } from "@/lib/paper-owners";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
 import { loadAllVacations, isSchoolOnVacation, type VacationSpan } from "@/lib/vacations";
 import { taskRequired, exemptionsFor } from "@/lib/task-toggles";
@@ -294,9 +295,8 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
   const assessments = await prisma.assessment.findMany({
     where: { date: { gte: lookback, lte: weekEnd } },
     select: {
-      classId: true,
+      id: true,
       date: true,
-      grades: { select: { studentId: true } },
       class: {
         select: {
           operationId: true,
@@ -307,19 +307,19 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
       },
     },
   });
+  // Fined only for papers that are THEIRS on this assessment (sub-group, or taken over).
+  const papers = await loadPaperOwners(assessments.map((a) => a.id), now);
   for (const a of assessments) {
     const operationId = a.class.operationId;
     if (onVacation(vacs, operationId, a.class.schoolId, a.date)) continue; // school break
     const deadline = saturdayDeadline(a.date, cfgFor(cfgs, operationId));
     if (!deadlineThisWeek(deadline)) continue;
-    const graded = new Set(a.grades.map((g) => g.studentId));
+    const p = papers.get(a.id);
+    if (!p) continue;
     for (const { assistantId } of a.class.assignments) {
       const scope = { disabledTasks: a.class.disabledTasks, exemptTasks: exemptionsFor(assistantId, a.class.assignments) };
       if (!taskRequired("grade_entry", scope)) continue;
-      const subIds = await subGroupStudentIds(a.classId, assistantId, now);
-      if (subIds.length === 0) continue;
-      const done = subIds.filter((id) => graded.has(id)).length;
-      if (done < subIds.length) {
+      if (papersOf(p.owners, assistantId).some((id) => !p.graded.has(id))) {
         queued.push({ assistantId, sessionId: null, homeworkId: null, type: "grade_entry", deadline, operationId });
       }
     }

@@ -6,6 +6,7 @@ import { resolveConfig } from "@/lib/operation";
 import { cairoToday, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, monthlyReportDeadline, formatCairo } from "@/lib/datetime";
 import { monthlyReportProgress, monthlyReportDone, yearMonthOf, monthName } from "@/lib/monthly-reports";
 import { subGroupStudentIds } from "@/lib/roster";
+import { loadPaperOwners, papersOf } from "@/lib/paper-owners";
 import { homeworkDueAt, assessmentHeldAt, sessionStartsAt } from "@/lib/task-timing";
 import { loadVacations, isSchoolOnVacation } from "@/lib/vacations";
 import { quizCyclesBetween, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
@@ -214,10 +215,9 @@ export default async function MyTasksPage() {
       return ids;
     };
     const push = async (
-      classId: string, kind: "Homework" | "Grades", id: string, title: string, href: string, date: Date, done: string[],
+      classId: string, kind: "Homework" | "Grades", id: string, title: string, href: string, date: Date, done: string[], ids: string[],
     ) => {
       const deadline = saturdayDeadline(date, cfg);
-      const ids = await subGroup(classId);
       if (ids.length === 0) return;
       const seen = new Set(done);
       const reviewed = ids.filter((x) => seen.has(x)).length;
@@ -231,13 +231,17 @@ export default async function MyTasksPage() {
       if (!required(hw.classId, "hw_correction")) continue;
       if (now < homeworkDueAt(hw.deadline, hw.class.schedule)) continue; // not collected yet
       await push(hw.classId, "Homework", hw.id, `HW due ${dateFmt.format(hw.deadline)}${hw.description ? ` · ${hw.description}` : ""}`,
-        `/my/classes/${hw.classId}/homework/${hw.id}`, hw.deadline, hw.submissions.map((x) => x.studentId));
+        `/my/classes/${hw.classId}/homework/${hw.id}`, hw.deadline, hw.submissions.map((x) => x.studentId), await subGroup(hw.classId));
     }
+    // Grades follow per-assessment paper ownership (sub-group, or papers taken over).
+    const papers = await loadPaperOwners(assessments.map((a) => a.id), now);
     for (const a of assessments) {
       if (!required(a.classId, "grade_entry")) continue;
       if (now < assessmentHeldAt(a.date, a.time, a.class.schedule)) continue; // not sat yet
+      const p = papers.get(a.id);
       await push(a.classId, "Grades", a.id, `${a.label} · ${dateFmt.format(a.date)}`,
-        `/my/classes/${a.classId}/assessments/${a.id}`, a.date, a.grades.map((g) => g.studentId));
+        `/my/classes/${a.classId}/assessments/${a.id}`, a.date, a.grades.map((g) => g.studentId),
+        p ? papersOf(p.owners, assistantId) : []);
     }
   }
   weeklyTodos.sort((a, b) => a.deadline.getTime() - b.deadline.getTime());
