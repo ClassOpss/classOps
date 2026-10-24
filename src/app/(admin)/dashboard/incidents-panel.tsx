@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { cairoDayWindow, cairoMonthWindow, formatCairo } from "@/lib/datetime";
 import { waiveIncident, unwaiveIncident, confirmIncidents, unconfirmIncident } from "@/actions/incidents";
 import { effectiveDeductionTotal, perIncidentCharge } from "@/lib/incident-deductions";
+import { incidentDoneTimes, lateBy, type IncidentDone } from "@/lib/incident-done";
+import { resolveConfigFor } from "@/lib/operation";
 
 export const INCIDENT_LABEL: Record<IncidentType, string> = {
   attendance: "Attendance",
@@ -63,6 +65,30 @@ function Chip({
     >
       {children}
     </Link>
+  );
+}
+
+// The late task's follow-up, on one line: when it finally got done, or that it still isn't.
+export function TaskOutcome({ deadline, done }: { deadline: Date; done: IncidentDone | undefined }) {
+  const at = done?.doneAt;
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs"
+      title={`Due ${formatCairo(deadline, "EEE d MMM, h:mm a")}`}
+    >
+      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${at ? "bg-warn" : "bg-danger"}`} aria-hidden />
+      {at ? (
+        <span className="text-muted">
+          Done <span className="font-medium text-fg">{formatCairo(at, "EEE d, h:mm a")}</span>
+          <span className="text-faint"> · {lateBy(deadline, at)} late</span>
+        </span>
+      ) : (
+        <span className="text-muted">
+          <span className="font-medium text-danger">Not done yet</span>
+          <span className="text-faint"> · {lateBy(deadline, new Date())} overdue</span>
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -187,6 +213,7 @@ export async function IncidentsPanel({
   const shown = base.filter(
     (i) => matchStatus(i) && (!task || i.type === task) && (!day || dayKey(i.deadline) === day),
   );
+  const doneTimes = await incidentDoneTimes(shown, operationId, await resolveConfigFor(operationId), now);
   const reviewIds = shown.filter((i) => rowStatus(i) === "review").map((i) => i.id);
   const shownEgp =shown.reduce((s, i) => s + (rowCharge.get(i.id) ?? 0), 0);
 
@@ -396,7 +423,8 @@ export async function IncidentsPanel({
                           {INCIDENT_LABEL[i.type]}
                         </Link>
                         {cls ? <Link href={`/classes/${cls.id}`} className="link">{cls.name}</Link> : null}
-                        <span className="text-faint">due {formatCairo(i.deadline, "h:mm a")}</span>
+                        {doneTimes.get(i.id)?.note && <span className="text-xs text-muted">{doneTimes.get(i.id)!.note}</span>}
+                        <TaskOutcome deadline={i.deadline} done={doneTimes.get(i.id)} />
                         {i.waived ? (
                           <span className="badge-neutral">Waived{i.waiveReason ? ` · ${i.waiveReason}` : ""}</span>
                         ) : charge > 0 ? (

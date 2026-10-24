@@ -2,13 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth-guards";
 import { prisma } from "@/lib/db";
-import { currentOperationId } from "@/lib/operation";
+import { currentOperationId, resolveConfigFor } from "@/lib/operation";
+import { incidentDoneTimes } from "@/lib/incident-done";
 import { cairoMonthWindow, formatCairo } from "@/lib/datetime";
 import { computePayComponents, monthWindow, paidClasses } from "@/lib/pay";
 import { perIncidentCharge } from "@/lib/incident-deductions";
 import { recalcPayPeriod } from "@/actions/pay";
 import { waiveIncident, unwaiveIncident, confirmIncidents } from "@/actions/incidents";
-import { INCIDENT_LABEL } from "@/app/(admin)/dashboard/incidents-panel";
+import { INCIDENT_LABEL, TaskOutcome } from "@/app/(admin)/dashboard/incidents-panel";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -103,6 +104,7 @@ export default async function AssistantPayDetailPage({
       waived: i.waived,
     })),
   );
+  const doneTimes = await incidentDoneTimes(incidents, operationId, await resolveConfigFor(operationId));
   const waived = incidents.filter((i) => i.waived);
   const sent = calc.status === "sent";
   // Stored payslip is stale if a fine was waived/added since the last recalculation.
@@ -208,10 +210,8 @@ export default async function AssistantPayDetailPage({
                     </span>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted">
-                    <span>
-                      Due {formatCairo(i.deadline, "h:mm a")} ·{" "}
-                      {i.actualTime ? `done late ${formatCairo(i.actualTime, "EEE d MMM, h:mm a")}` : "not done by the deadline"}
-                    </span>
+                    <span>Due {formatCairo(i.deadline, "h:mm a")}</span>
+                    <TaskOutcome deadline={i.deadline} done={doneTimes.get(i.id)} />
                     {i.waived && (
                       <span className="font-medium text-fg">
                         Reason: {i.waiveReason ? i.waiveReason : <span className="italic text-faint">none given</span>}
