@@ -56,7 +56,7 @@ export async function clearStaleQuizIncidents(quizPrepIds: string[]): Promise<nu
   return stale.length;
 }
 
-async function refreshUnsentPay(assistantId: string, month: number, year: number) {
+export async function refreshUnsentPay(assistantId: string, month: number, year: number) {
   const calc = await prisma.payCalculation.findFirst({
     where: { assistantId, status: { not: "sent" }, payPeriod: { month, year, status: { not: "sent" } } },
     select: { id: true, manualAdjustment: true },

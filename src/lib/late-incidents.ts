@@ -46,16 +46,14 @@ function cairoDate(now: Date): Date {
   return new Date(`${formatInTimeZone(now, CAIRO_TZ, "yyyy-MM-dd")}T00:00:00.000Z`);
 }
 
-function key(q: {
-  assistantId: string;
-  sessionId: string | null;
-  homeworkId?: string | null;
-  quizPrepId?: string | null;
-  type: string;
-  deadline: Date;
-}): string {
-  return `${q.assistantId}|${q.sessionId ?? ""}|${q.homeworkId ?? ""}|${q.quizPrepId ?? ""}|${q.type}|${q.deadline.getTime()}`;
+// One incident per assistant per task per (Cairo) deadline day — a second class or item
+// missed on the same day is not charged again (scripts/dedupe-late-incidents.ts uses the same rule).
+function key(q: { assistantId: string; type: string; deadline: Date }): string {
+  return `${q.assistantId}|${q.type}|${formatInTimeZone(q.deadline, CAIRO_TZ, "yyyy-MM-dd")}`;
 }
+
+// Serializes cron runs so two overlapping calls can't both pass the "already exists" check.
+const DETECT_LOCK_ID = 7_314_201;
 
 export type DetectResult = { created: number; checked: number };
 
@@ -327,7 +325,7 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
   return queued;
 }
 
-// Idempotent: never creates a second incident for the same (assistant, session, type, deadline).
+// Idempotent: never creates a second incident for the same (assistant, type, deadline day).
 export async function detectLateIncidents(now: Date, weekly: boolean): Promise<DetectResult> {
   const cfgs = await loadConfigs();
   const vacs = await loadAllVacations();
@@ -340,33 +338,41 @@ export async function detectLateIncidents(now: Date, weekly: boolean): Promise<D
       ];
   if (queued.length === 0) return { created: 0, checked: 0 };
 
-  const deadlines = [...new Set(queued.map((q) => q.deadline.getTime()))].map((t) => new Date(t));
-  const existing = await prisma.lateIncident.findMany({
-    where: { deadline: { in: deadlines } },
-    select: { assistantId: true, sessionId: true, homeworkId: true, quizPrepId: true, type: true, deadline: true },
-  });
-  const seen = new Set(existing.map(key));
+  // Existing incidents on any of the queued deadline days (±1 day covers the Cairo offset).
+  const times = queued.map((q) => q.deadline.getTime());
+  const from = new Date(Math.min(...times) - 86_400_000);
+  const to = new Date(Math.max(...times) + 86_400_000);
 
-  const fresh: Queued[] = [];
-  for (const q of queued) {
-    const k = key(q);
-    if (seen.has(k)) continue;
-    seen.add(k);
-    fresh.push(q);
-  }
-
-  if (fresh.length > 0) {
-    await prisma.lateIncident.createMany({
-      data: fresh.map((q) => ({
-        assistantId: q.assistantId,
-        sessionId: q.sessionId,
-        homeworkId: q.homeworkId,
-        quizPrepId: q.quizPrepId ?? null,
-        type: q.type,
-        deadline: q.deadline,
-        deductionAmount: cfgFor(cfgs, q.operationId).lateDeduction,
-      })),
+  const created = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${DETECT_LOCK_ID})`;
+    const existing = await tx.lateIncident.findMany({
+      where: { deadline: { gte: from, lte: to } },
+      select: { assistantId: true, type: true, deadline: true },
     });
-  }
-  return { created: fresh.length, checked: queued.length };
+    const seen = new Set(existing.map(key));
+
+    const fresh: Queued[] = [];
+    for (const q of queued) {
+      const k = key(q);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      fresh.push(q);
+    }
+
+    if (fresh.length > 0) {
+      await tx.lateIncident.createMany({
+        data: fresh.map((q) => ({
+          assistantId: q.assistantId,
+          sessionId: q.sessionId,
+          homeworkId: q.homeworkId,
+          quizPrepId: q.quizPrepId ?? null,
+          type: q.type,
+          deadline: q.deadline,
+          deductionAmount: cfgFor(cfgs, q.operationId).lateDeduction,
+        })),
+      });
+    }
+    return fresh.length;
+  });
+  return { created, checked: queued.length };
 }
