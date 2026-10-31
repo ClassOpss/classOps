@@ -1,5 +1,5 @@
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
-import type { PayslipData } from "./payslip-data";
+import type { PayslipData, PayslipIncident } from "./payslip-data";
 
 const BRAND = "#4f46e5";
 const INK = "#0f1729";
@@ -28,11 +28,30 @@ const s = StyleSheet.create({
   totalRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 14, paddingHorizontal: 14, backgroundColor: "#f4f5f7", borderBottomLeftRadius: 8, borderBottomRightRadius: 8 },
   totalLabel: { fontSize: 12, fontFamily: "Helvetica-Bold" },
   totalVal: { fontSize: 15, fontFamily: "Helvetica-Bold", color: BRAND },
+  sectionTitle: { marginTop: 26, fontSize: 12, fontFamily: "Helvetica-Bold" },
+  sectionHint: { fontSize: 8.5, color: MUTED, marginTop: 3 },
+  incTable: { marginTop: 10, borderWidth: 1, borderColor: LINE, borderRadius: 8 },
+  incRow: { flexDirection: "row", paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: LINE },
+  incDate: { width: 70, fontFamily: "Helvetica-Bold", fontSize: 9 },
+  incMain: { flex: 1, paddingRight: 8 },
+  incTask: { fontSize: 9.5, fontFamily: "Helvetica-Bold" },
+  incSub: { fontSize: 8, color: MUTED, marginTop: 2 },
+  incRight: { width: 92, alignItems: "flex-end" },
+  pill: { fontSize: 7, textTransform: "uppercase", letterSpacing: 0.6, borderWidth: 1, borderRadius: 20, paddingHorizontal: 6, paddingVertical: 2, marginTop: 3 },
+  empty: { paddingVertical: 12, paddingHorizontal: 14, color: MUTED },
   footer: { position: "absolute", bottom: 22, left: 32, right: 32, flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: LINE, paddingTop: 8, fontSize: 7.5, color: FAINT },
 });
 
+const STATUS: Record<PayslipIncident["status"], { label: string; color: string }> = {
+  waived: { label: "Waived", color: FAINT },
+  confirmed: { label: "Confirmed", color: RED },
+  charged: { label: "Not reviewed", color: MUTED },
+};
+
 export function PayslipDoc({ data }: { data: PayslipData }) {
   const fmt = (v: number) => `${v < 0 ? "-" : ""}${Math.abs(v).toLocaleString("en-US")} ${data.currency}`;
+  const waivedCount = data.incidents.filter((i) => i.status === "waived").length;
+  const charged = data.incidents.length - waivedCount;
 
   return (
     <Document title={`Payslip — ${data.assistantName} — ${data.periodLabel}`} author={data.brandName} subject="Payslip">
@@ -70,6 +89,41 @@ export function PayslipDoc({ data }: { data: PayslipData }) {
               <Text style={s.totalLabel}>Net total</Text>
               <Text style={s.totalVal}>{fmt(data.total)}</Text>
             </View>
+          </View>
+
+          <Text style={s.sectionTitle}>Late incidents ({data.incidents.length})</Text>
+          <Text style={s.sectionHint}>
+            {charged} charged · {waivedCount} waived. A day&apos;s daily tasks (or one quiz&apos;s tasks) are charged once.
+          </Text>
+          <View style={s.incTable}>
+            {data.incidents.length === 0 ? (
+              <Text style={s.empty}>No missed deadlines this month.</Text>
+            ) : (
+              data.incidents.map((i, k) => {
+                const st = STATUS[i.status];
+                return (
+                  <View key={k} style={[s.incRow, i.status === "waived" ? { backgroundColor: "#f7f8fa" } : {}]} wrap={false}>
+                    <Text style={s.incDate}>{i.date}</Text>
+                    <View style={s.incMain}>
+                      <Text style={s.incTask}>{i.task}</Text>
+                      {i.detail ? <Text style={s.incSub}>{i.detail}</Text> : null}
+                      <Text style={s.incSub}>
+                        Due {i.due} · <Text style={{ color: i.done ? MUTED : RED }}>{i.outcome}</Text>
+                      </Text>
+                      {i.status === "waived" ? (
+                        <Text style={s.incSub}>Waive reason: {i.reason ?? "none given"}</Text>
+                      ) : null}
+                    </View>
+                    <View style={s.incRight}>
+                      <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9.5, color: i.charge > 0 ? RED : FAINT }}>
+                        {i.charge > 0 ? fmt(-i.charge) : i.status === "waived" ? fmt(0) : "in daily cap"}
+                      </Text>
+                      <Text style={[s.pill, { color: st.color, borderColor: st.color }]}>{st.label}</Text>
+                    </View>
+                  </View>
+                );
+              })
+            )}
           </View>
         </View>
 

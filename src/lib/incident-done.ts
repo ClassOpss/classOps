@@ -28,6 +28,17 @@ export type IncidentRef = {
 
 export type IncidentDone = { doneAt: Date | null; note?: string };
 
+export const INCIDENT_LABEL: Record<IncidentType, string> = {
+  attendance: "Attendance",
+  parent_update: "Parent update",
+  classroom_upload: "Classroom upload",
+  hw_correction: "HW correction",
+  grade_entry: "Grade entry",
+  quiz_prep: "Quiz prep",
+  quiz_announcement: "Quiz announcement",
+  monthly_report: "Monthly reports",
+};
+
 const DAY = 86_400_000;
 const maxDate = (ds: Date[]) => (ds.length ? new Date(Math.max(...ds.map((d) => d.getTime()))) : null);
 

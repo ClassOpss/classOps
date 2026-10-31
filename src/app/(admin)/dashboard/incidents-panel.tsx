@@ -4,19 +4,10 @@ import { prisma } from "@/lib/db";
 import { cairoDayWindow, cairoMonthWindow, formatCairo } from "@/lib/datetime";
 import { waiveIncident, unwaiveIncident, confirmIncidents, unconfirmIncident } from "@/actions/incidents";
 import { effectiveDeductionTotal, perIncidentCharge } from "@/lib/incident-deductions";
-import { incidentDoneTimes, lateBy, type IncidentDone } from "@/lib/incident-done";
+import { INCIDENT_LABEL, incidentDoneTimes, lateBy, type IncidentDone } from "@/lib/incident-done";
 import { resolveConfigFor } from "@/lib/operation";
 
-export const INCIDENT_LABEL: Record<IncidentType, string> = {
-  attendance: "Attendance",
-  parent_update: "Parent update",
-  classroom_upload: "Classroom upload",
-  hw_correction: "HW correction",
-  grade_entry: "Grade entry",
-  quiz_prep: "Quiz prep",
-  quiz_announcement: "Quiz announcement",
-  monthly_report: "Monthly reports",
-};
+export { INCIDENT_LABEL };
 const TASK_ORDER = Object.keys(INCIDENT_LABEL) as IncidentType[];
 
 const MONTHS = [
