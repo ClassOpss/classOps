@@ -5,7 +5,7 @@ import { taskRequired, type TaskScope } from "@/lib/task-toggles";
 import { resolveConfig } from "@/lib/operation";
 import { cairoToday, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, monthlyReportDeadline, formatCairo } from "@/lib/datetime";
 import { monthlyReportProgress, monthlyReportDone, yearMonthOf, monthName } from "@/lib/monthly-reports";
-import { subGroupStudentIds } from "@/lib/roster";
+import { subGroupStudentIds, hwJoinCutoff } from "@/lib/roster";
 import { loadPaperOwners, papersOf } from "@/lib/paper-owners";
 import { homeworkDueAt, assessmentHeldAt, sessionStartsAt } from "@/lib/task-timing";
 import { loadVacations, isSchoolOnVacation } from "@/lib/vacations";
@@ -193,7 +193,8 @@ export default async function MyTasksPage() {
       prisma.homeworkAssignment.findMany({
         where: { classId: { in: classIds }, noHomework: false, deadline: { lte: today } },
         select: {
-          id: true, classId: true, description: true, deadline: true,
+          id: true, classId: true, description: true, deadline: true, createdAt: true,
+          session: { select: { scheduledDate: true } },
           class: { select: { schedule: true } },
           submissions: { select: { studentId: true } },
         },
@@ -208,12 +209,6 @@ export default async function MyTasksPage() {
       }),
     ]);
     const assistantId = user.assistantId;
-    const subGroups = new Map<string, string[]>();
-    const subGroup = async (classId: string) => {
-      let ids = subGroups.get(classId);
-      if (!ids) subGroups.set(classId, (ids = await subGroupStudentIds(classId, assistantId, now)));
-      return ids;
-    };
     const push = async (
       classId: string, kind: "Homework" | "Grades", id: string, title: string, href: string, date: Date, done: string[], ids: string[],
     ) => {
@@ -231,7 +226,8 @@ export default async function MyTasksPage() {
       if (!required(hw.classId, "hw_correction")) continue;
       if (now < homeworkDueAt(hw.deadline, hw.class.schedule)) continue; // not collected yet
       await push(hw.classId, "Homework", hw.id, `HW due ${dateFmt.format(hw.deadline)}${hw.description ? ` · ${hw.description}` : ""}`,
-        `/my/classes/${hw.classId}/homework/${hw.id}`, hw.deadline, hw.submissions.map((x) => x.studentId), await subGroup(hw.classId));
+        `/my/classes/${hw.classId}/homework/${hw.id}`, hw.deadline, hw.submissions.map((x) => x.studentId),
+        await subGroupStudentIds(hw.classId, assistantId, now, hwJoinCutoff(hw))); // students who joined since owe nothing
     }
     // Grades follow per-assessment paper ownership (sub-group, or papers taken over).
     const papers = await loadPaperOwners(assessments.map((a) => a.id), now);

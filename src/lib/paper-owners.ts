@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { activeAt } from "@/lib/roster";
+import { activeAt, joinCutoff } from "@/lib/roster";
 
 // Who corrects each student's paper for one assessment. With 2 assistants a quiz is
 // sometimes split by sub-group, sometimes taken whole by one assistant, sometimes split by
@@ -51,13 +51,17 @@ export async function loadPaperOwners(
     select: {
       id: true,
       classId: true,
+      date: true,
       grades: { select: { studentId: true, loggedById: true } },
       correctors: { select: { studentId: true, assistantId: true } },
     },
   });
   const classIds = [...new Set(assessments.map((a) => a.classId))];
   const [students, subs, assignments] = await Promise.all([
-    prisma.student.findMany({ where: { classId: { in: classIds }, active: true }, select: { id: true, classId: true } }),
+    prisma.student.findMany({
+      where: { classId: { in: classIds }, active: true },
+      select: { id: true, classId: true, createdAt: true },
+    }),
     prisma.studentAssistantAssignment.findMany({
       where: { classId: { in: classIds }, ...activeAt(now) },
       select: { classId: true, studentId: true, assistantId: true },
@@ -69,8 +73,12 @@ export async function loadPaperOwners(
   ]);
 
   for (const a of assessments) {
-    const studentIds = students.filter((s) => s.classId === a.classId).map((s) => s.id);
     const graded = new Map(a.grades.map((g) => [g.studentId, g.loggedById]));
+    // Students who joined after the assessment owe no paper on it (a graded one still counts).
+    const cutoff = joinCutoff(a.date);
+    const studentIds = students
+      .filter((s) => s.classId === a.classId && (s.createdAt < cutoff || graded.has(s.id)))
+      .map((s) => s.id);
     out.set(a.id, {
       classId: a.classId,
       graded: new Set(graded.keys()),

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { saturdayDeadline, formatCairo } from "@/lib/datetime";
 import { resolveConfig } from "@/lib/operation";
 import { homeworkDueAt } from "@/lib/task-timing";
+import { hwJoinCutoff } from "@/lib/roster";
 import { addHomework, deleteHomework } from "@/actions/homework";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -27,17 +28,24 @@ export default async function HomeworkListPage({
     prisma.homeworkAssignment.findMany({
       where: { classId, noHomework: false },
       orderBy: { deadline: "desc" },
-      select: { id: true, description: true, deadline: true, sessionId: true },
+      select: {
+        id: true, description: true, deadline: true, sessionId: true, createdAt: true,
+        session: { select: { scheduledDate: true } },
+      },
     }),
   ]);
-  const total = visibleIds.length;
-
-  const counts = await prisma.homeworkSubmission.groupBy({
-    by: ["homeworkId"],
-    where: { homeworkId: { in: homeworks.map((h) => h.id) }, studentId: { in: visibleIds } },
-    _count: { _all: true },
-  });
-  const reviewedBy = new Map(counts.map((c) => [c.homeworkId, c._count._all]));
+  // Each HW counts only the students who had joined when it was set.
+  const [students, submissions] = await Promise.all([
+    prisma.student.findMany({ where: { id: { in: visibleIds } }, select: { id: true, createdAt: true } }),
+    prisma.homeworkSubmission.findMany({
+      where: { homeworkId: { in: homeworks.map((h) => h.id) }, studentId: { in: visibleIds } },
+      select: { homeworkId: true, studentId: true },
+    }),
+  ]);
+  const rosterOf = (hw: (typeof homeworks)[number]) => {
+    const cutoff = hwJoinCutoff(hw);
+    return new Set(students.filter((s) => s.createdAt < cutoff).map((s) => s.id));
+  };
   const cfg = await resolveConfig();
   const now = new Date();
 
@@ -73,7 +81,9 @@ export default async function HomeworkListPage({
       ) : (
         <ul className="flex flex-col gap-2">
           {homeworks.map((hw) => {
-            const reviewed = reviewedBy.get(hw.id) ?? 0;
+            const roster = rosterOf(hw);
+            const total = roster.size;
+            const reviewed = submissions.filter((s) => s.homeworkId === hw.id && roster.has(s.studentId)).length;
             const complete = total > 0 && reviewed === total;
             // Not collected yet -> nothing to correct, so no to-do badge.
             const notDue = now < homeworkDueAt(hw.deadline, klass?.schedule);

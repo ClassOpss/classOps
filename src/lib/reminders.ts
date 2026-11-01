@@ -3,7 +3,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { prisma } from "@/lib/db";
 import { CAIRO_TZ, sessionDeadline, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, monthlyReportDueDate, monthlyReportDeadline, sessionStart, formatCairo } from "@/lib/datetime";
 import { quizCyclesBetween, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
-import { subGroupStudentIds, activeAt } from "@/lib/roster";
+import { subGroupStudentIds, activeAt, hwJoinCutoff } from "@/lib/roster";
 import { loadPaperOwners, papersOf } from "@/lib/paper-owners";
 import { scheduleTimeForDate, type ClassSchedule } from "@/lib/schedule";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
@@ -242,6 +242,8 @@ async function gatherWeekly(
     select: {
       classId: true,
       deadline: true,
+      createdAt: true,
+      session: { select: { scheduledDate: true } },
       submissions: { select: { studentId: true } },
       class: {
         select: {
@@ -262,7 +264,7 @@ async function gatherWeekly(
     const submitted = new Set(hw.submissions.map((x) => x.studentId));
     for (const { assistantId } of hw.class.assignments) {
       if (!taskRequired("hw_correction", { disabledTasks: hw.class.disabledTasks, exemptTasks: exemptionsFor(assistantId, hw.class.assignments) })) continue;
-      const subIds = await subGroupStudentIds(hw.classId, assistantId, now);
+      const subIds = await subGroupStudentIds(hw.classId, assistantId, now, hwJoinCutoff(hw));
       if (subIds.length === 0) continue;
       const reviewed = subIds.filter((id) => submitted.has(id)).length;
       if (reviewed < subIds.length) {

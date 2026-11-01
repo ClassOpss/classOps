@@ -5,6 +5,7 @@ import { submitHomeworkSubmissions, updateHomeworkDeadline } from "@/actions/hom
 import { saturdayDeadline, isLate, formatCairo } from "@/lib/datetime";
 import { resolveConfig } from "@/lib/operation";
 import { homeworkDueAt } from "@/lib/task-timing";
+import { hwJoinCutoff } from "@/lib/roster";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -34,7 +35,11 @@ export default async function HomeworkEntryPage({
 
   const homework = await prisma.homeworkAssignment.findUnique({
     where: { id: homeworkId },
-    select: { id: true, classId: true, description: true, deadline: true, noHomework: true, class: { select: { schedule: true } } },
+    select: {
+      id: true, classId: true, description: true, deadline: true, noHomework: true, createdAt: true,
+      session: { select: { scheduledDate: true } },
+      class: { select: { schedule: true } },
+    },
   });
   if (!homework || homework.classId !== classId || homework.noHomework) {
     return (
@@ -45,7 +50,8 @@ export default async function HomeworkEntryPage({
     );
   }
 
-  const visibleIds = await getVisibleStudentIds(classId, user);
+  // Students who joined after this HW was set aren't on it.
+  const visibleIds = await getVisibleStudentIds(classId, user, hwJoinCutoff(homework));
   const [students, submissions] = await Promise.all([
     prisma.student.findMany({
       where: { id: { in: visibleIds }, active: true },

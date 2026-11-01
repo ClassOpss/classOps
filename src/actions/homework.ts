@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireClassAccess, getVisibleStudentIds } from "@/lib/auth-guards";
+import { hwJoinCutoff } from "@/lib/roster";
 import { logActivity } from "@/lib/activity";
 import { hwStatus } from "@/lib/homework";
 
@@ -116,14 +117,17 @@ export async function submitHomeworkSubmissions(
 ): Promise<void> {
   const homework = await prisma.homeworkAssignment.findUnique({
     where: { id: homeworkId },
-    select: { id: true, classId: true, deadline: true, noHomework: true },
+    select: {
+      id: true, classId: true, deadline: true, noHomework: true, createdAt: true,
+      session: { select: { scheduledDate: true } },
+    },
   });
   if (!homework || homework.noHomework) return;
 
   const user = await requireClassAccess(homework.classId);
   if (!user.assistantId) return;
 
-  const visibleIds = new Set(await getVisibleStudentIds(homework.classId, user));
+  const visibleIds = new Set(await getVisibleStudentIds(homework.classId, user, hwJoinCutoff(homework)));
   const loggedById = user.assistantId;
   const now = new Date();
 

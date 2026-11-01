@@ -1,7 +1,7 @@
 import type { IncidentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { formatCairo, saturdayDeadline } from "@/lib/datetime";
-import { subGroupStudentIds } from "@/lib/roster";
+import { subGroupStudentIds, hwJoinCutoff } from "@/lib/roster";
 import { loadPaperOwners, papersOf } from "@/lib/paper-owners";
 import { quizPrepComplete } from "@/lib/quiz";
 import type { OperationConfig } from "@/lib/config";
@@ -95,7 +95,11 @@ export async function incidentDoneTimes(
           { id: { in: ids(hwIncidents.map((i) => i.homeworkId)) } },
         ],
       },
-      select: { id: true, classId: true, sessionId: true, submissions: { select: { studentId: true, loggedAt: true } } },
+      select: {
+        id: true, classId: true, sessionId: true, createdAt: true,
+        session: { select: { scheduledDate: true } },
+        submissions: { select: { studentId: true, loggedAt: true } },
+      },
     });
     for (const i of hwIncidents) {
       const hw = hws.find((h) => (i.homeworkId ? h.id === i.homeworkId : h.sessionId === i.sessionId));
@@ -103,7 +107,7 @@ export async function incidentDoneTimes(
         out.set(i.id, { doneAt: null });
         continue;
       }
-      const sub = await subGroupStudentIds(hw.classId, i.assistantId, now);
+      const sub = await subGroupStudentIds(hw.classId, i.assistantId, now, hwJoinCutoff(hw));
       const at = new Map(hw.submissions.map((s) => [s.studentId, s.loggedAt]));
       const done = sub.length > 0 && sub.every((id) => at.has(id));
       out.set(i.id, { doneAt: done ? maxDate(sub.map((id) => at.get(id)!)) : null });

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { homeFor } from "@/lib/routes";
 import { currentOperationId } from "@/lib/operation";
 import { cairoToday } from "@/lib/datetime";
+import { joinedFilter } from "@/lib/roster";
 
 export type SessionUser = {
   id: string;
@@ -69,13 +70,15 @@ export async function requireClassAccess(classId: string): Promise<SessionUser> 
 
 // Sub-group rule (spec 4.6): if a class has student sub-assignments, an assistant
 // only sees their own students; otherwise (single assistant) they see all of them.
-// Admin/teacher always see the full roster.
+// Admin/teacher always see the full roster. `joinedBefore` narrows to students added
+// before that instant, for one HW's / assessment's roster (see lib/roster.joinCutoff).
 export async function getVisibleStudentIds(
   classId: string,
   user: SessionUser,
+  joinedBefore?: Date,
 ): Promise<string[]> {
   const allStudents = await prisma.student.findMany({
-    where: { classId, active: true },
+    where: { classId, active: true, ...joinedFilter(joinedBefore) },
     select: { id: true },
     orderBy: { name: "asc" },
   });
@@ -112,7 +115,8 @@ export async function getVisibleStudentIds(
   // No sub-assignments at all -> single-assistant class, show everyone.
   if (subAssignments.length === 0) return allIds;
 
+  const joined = new Set(allIds);
   return subAssignments
-    .filter((s) => s.assistantId === user.assistantId)
+    .filter((s) => s.assistantId === user.assistantId && (!joinedBefore || joined.has(s.studentId)))
     .map((s) => s.studentId);
 }

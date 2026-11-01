@@ -3,7 +3,7 @@ import type { IncidentType } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { CAIRO_TZ, sessionDeadline, saturdayDeadline, quizPrepDeadline, quizAnnounceDeadline, monthlyReportDueDate, monthlyReportDeadline, latenessApplies } from "@/lib/datetime";
 import { quizCyclesBetween, quizPrepComplete, quizAnnounced, addDays } from "@/lib/quiz";
-import { subGroupStudentIds, activeAt } from "@/lib/roster";
+import { subGroupStudentIds, activeAt, hwJoinCutoff } from "@/lib/roster";
 import { loadPaperOwners, papersOf } from "@/lib/paper-owners";
 import { OPERATION_DEFAULTS, operationConfig, type OperationConfig } from "@/lib/config";
 import { loadAllVacations, isSchoolOnVacation, type VacationSpan } from "@/lib/vacations";
@@ -252,6 +252,8 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
       classId: true,
       sessionId: true,
       deadline: true,
+      createdAt: true,
+      session: { select: { scheduledDate: true } },
       submissions: { select: { studentId: true } },
       class: {
         select: {
@@ -272,7 +274,7 @@ async function detectWeekly(now: Date, cfgs: CfgMap, vacs: VacMap): Promise<Queu
     for (const { assistantId } of hw.class.assignments) {
       const scope = { disabledTasks: hw.class.disabledTasks, exemptTasks: exemptionsFor(assistantId, hw.class.assignments) };
       if (!taskRequired("hw_correction", scope)) continue;
-      const subIds = await subGroupStudentIds(hw.classId, assistantId, now);
+      const subIds = await subGroupStudentIds(hw.classId, assistantId, now, hwJoinCutoff(hw)); // joiners since owe nothing
       if (subIds.length === 0) continue;
       const reviewed = subIds.filter((id) => submitted.has(id)).length;
       if (reviewed < subIds.length) {
