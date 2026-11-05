@@ -10,7 +10,8 @@ import { GradeEntryForm, type GradeRow } from "./grade-entry-form";
 import { MaxMarkForm } from "@/app/(admin)/classes/[classId]/assessments/max-mark-form";
 import { GradeBoundariesForm } from "@/components/grade-boundaries-form";
 import { RenameAssessment } from "@/components/rename-assessment";
-import { autoBoundaries, parseBoundaries } from "@/lib/grade-boundaries";
+import { autoBoundaries, effectiveBoundaries, letterFor, parseBoundaries } from "@/lib/grade-boundaries";
+import { activeAt } from "@/lib/roster";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -50,7 +51,29 @@ export default async function GradeEntryPage({
   const visibleIds = allRows.filter(mine).map((r) => r.studentId);
   const claimable = me ? allRows.filter((r) => !r.graded && !mine(r)) : [];
   const showOwners = (papers?.assistants.length ?? 0) > 1 || allRows.some((r) => r.claimed || (me && !mine(r)));
-  const [students, grades, avg, classMarks] = await Promise.all([
+  // Papers already corrected by an assistant who has since LEFT the class (a replacement took
+  // over): the new assistant sees those marks read-only. The paper stays the previous
+  // assistant's (lib/paper-owners), so submitGrades never lets anyone else edit it.
+  // Limited to the viewer's own sub-group when the class has sub-groups.
+  const onClass = new Set(papers?.assistants.map((a) => a.id) ?? []);
+  const subs = me
+    ? await prisma.studentAssistantAssignment.findMany({
+        where: { classId, ...activeAt(new Date()) },
+        select: { studentId: true, assistantId: true },
+      })
+    : [];
+  const mySubGroup = new Set(subs.filter((s) => s.assistantId === me).map((s) => s.studentId));
+  const inheritedRows = me
+    ? allRows.filter(
+        (r) =>
+          r.graded &&
+          r.ownerId !== null &&
+          !onClass.has(r.ownerId) &&
+          (subs.length === 0 || mySubGroup.has(r.studentId)),
+      )
+    : [];
+  const inheritedIds = inheritedRows.map((r) => r.studentId);
+  const [students, grades, inheritedGrades, avg, classMarks] = await Promise.all([
     prisma.student.findMany({
       where: { id: { in: visibleIds }, active: true },
       orderBy: { name: "asc" },
@@ -59,6 +82,10 @@ export default async function GradeEntryPage({
     prisma.assessmentGrade.findMany({
       where: { assessmentId, studentId: { in: visibleIds } },
       select: { studentId: true, rawMark: true, absent: true, loggedAt: true },
+    }),
+    prisma.assessmentGrade.findMany({
+      where: { assessmentId, studentId: { in: inheritedIds } },
+      select: { studentId: true, rawMark: true, absent: true },
     }),
     // Class average across ALL students (both sub-groups), for the colour coding.
     prisma.assessmentGrade.aggregate({ where: { assessmentId }, _avg: { percentage: true } }),
@@ -79,6 +106,25 @@ export default async function GradeEntryPage({
       mark: g && g.rawMark != null ? String(Number(g.rawMark)) : "",
       absent: g?.absent ?? false,
     };
+  });
+
+  const inheritedBy = new Map(inheritedGrades.map((g) => [g.studentId, g]));
+  const bounds = effectiveBoundaries(
+    assessment.gradeBoundaries,
+    classMarks.map((g) => Number(g.rawMark)),
+    assessment.maxMark,
+  )?.boundaries;
+  const readOnly = inheritedRows.flatMap((r) => {
+    const g = inheritedBy.get(r.studentId);
+    if (!g) return [];
+    return [{
+      id: r.studentId,
+      name: r.name,
+      mark: g.rawMark != null ? String(Number(g.rawMark)) : "",
+      absent: g.absent,
+      by: r.ownerName,
+      grade: !g.absent && g.rawMark != null && bounds ? letterFor(Number(g.rawMark), bounds) : null,
+    }];
   });
 
   const total = students.length;
@@ -117,7 +163,9 @@ export default async function GradeEntryPage({
         </div>
       ) : total === 0 && me ? (
         <div className="rounded-lg bg-card-muted px-3 py-2.5 text-sm text-muted">
-          No papers are yours on this assessment — a colleague is correcting them.
+          {readOnly.length > 0
+            ? "No papers left for you — these were corrected before you joined the class."
+            : "No papers are yours on this assessment — a colleague is correcting them."}
         </div>
       ) : (
         <div className="rounded-lg bg-warn-soft px-3 py-2.5 text-sm text-warn">
@@ -166,6 +214,7 @@ export default async function GradeEntryPage({
             maxMark={assessment.maxMark}
             classAverage={classAverage}
             students={rows}
+            readOnly={readOnly}
           />
         </>
       )}
