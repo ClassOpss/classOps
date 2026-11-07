@@ -150,3 +150,30 @@ export async function paperRows(
 export async function paperOwnersFor(assessmentId: string, now: Date = new Date()): Promise<AssessmentPapers | null> {
   return (await loadPaperOwners([assessmentId], now)).get(assessmentId) ?? null;
 }
+
+// Papers already corrected by an assistant who has since LEFT the class (a replacement took
+// over mid-term). The replacement may view AND edit those marks; the paper stays credited to
+// the original corrector (loggedById is create-only), so fines/pay don't move. Limited to the
+// viewer's own sub-group when the class has sub-groups.
+export async function inheritedPaperIds(
+  classId: string,
+  assistantId: string,
+  papers: { studentId: string; ownerId: string | null; graded: boolean }[],
+  now: Date = new Date(),
+): Promise<string[]> {
+  const candidates = papers.filter((p) => p.graded && p.ownerId && p.ownerId !== SHARED && p.ownerId !== assistantId);
+  if (candidates.length === 0) return [];
+  const [assignments, subs] = await Promise.all([
+    prisma.classAssignment.findMany({ where: { classId, ...activeAt(now) }, select: { assistantId: true } }),
+    prisma.studentAssistantAssignment.findMany({
+      where: { classId, ...activeAt(now) },
+      select: { studentId: true, assistantId: true },
+    }),
+  ]);
+  const onClass = new Set(assignments.map((a) => a.assistantId));
+  if (!onClass.has(assistantId)) return [];
+  const mine = new Set(subs.filter((s) => s.assistantId === assistantId).map((s) => s.studentId));
+  return candidates
+    .filter((p) => !onClass.has(p.ownerId!) && (subs.length === 0 || mine.has(p.studentId)))
+    .map((p) => p.studentId);
+}

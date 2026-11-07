@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireClassAccess } from "@/lib/auth-guards";
-import { paperOwnersFor, papersOf } from "@/lib/paper-owners";
+import { inheritedPaperIds, paperOwnersFor, papersOf } from "@/lib/paper-owners";
 import { logActivity } from "@/lib/activity";
 
 // Assistant enters raw marks for the papers they own on this assessment (their sub-group,
@@ -20,7 +20,19 @@ export async function submitGrades(assessmentId: string, formData: FormData): Pr
   if (!user.assistantId) return;
 
   const papers = await paperOwnersFor(assessmentId);
-  const visibleIds = papers ? papersOf(papers.owners, user.assistantId) : [];
+  const ownIds = papers ? papersOf(papers.owners, user.assistantId) : [];
+  // Papers corrected by an assistant who has since left the class: the replacement may fix
+  // the mark, but the paper stays credited to the original corrector (loggedById untouched).
+  const inherited = new Set(
+    papers
+      ? await inheritedPaperIds(
+          assessment.classId,
+          user.assistantId,
+          [...papers.owners].map(([studentId, ownerId]) => ({ studentId, ownerId, graded: papers.graded.has(studentId) })),
+        )
+      : [],
+  );
+  const visibleIds = [...ownIds, ...inherited];
   const loggedById = user.assistantId;
   const now = new Date();
   const max = assessment.maxMark;
@@ -45,6 +57,7 @@ export async function submitGrades(assessmentId: string, formData: FormData): Pr
     }
 
     if (raw === "" || Number.isNaN(Number(raw))) {
+      if (inherited.has(studentId)) continue; // never un-grade someone else's corrected paper
       ops.push(prisma.assessmentGrade.deleteMany({ where: { assessmentId, studentId } })); // unreviewed
       continue;
     }
